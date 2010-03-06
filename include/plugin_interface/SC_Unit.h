@@ -81,7 +81,7 @@ enum {
 #define INBUFLENGTH(index) (unit->mInput[index]->mFromUnit->mBufLength)
 
 // set the calculation function
-#define SETCALC(func) (unit->mCalcFunc = (UnitCalcFunc)&func)
+#define SETCALC(func) (unit->mCalcFunc = (UnitCalcFunc)func)
 
 // calculate a slope for control rate interpolation to audio rate.
 #define CALCSLOPE(next,prev) ((next - prev) * sc_typeof_cast(next)unit->mRate->mSlopeFactor)
