@@ -42,12 +42,13 @@ public:
 
 private:
     dsp_thread_queue * q;
+    successor_container empty_successor_container;
 
     void fill_queue(group & root_group)
     {
         if (root_group.has_synth_children())
         {
-            fill_queue_recursive(root_group, successor_container(0), 0);
+            fill_queue_recursive(root_group, empty_successor_container, 0);
         }
     }
 
@@ -77,7 +78,8 @@ private:
         }
     }
 
-    successor_container fill_queue_recursive(abstract_group & grp, successor_container const & successors, size_t activation_limit)
+    successor_container fill_queue_recursive(abstract_group & grp, successor_container const & successors,
+                                             size_t activation_limit)
     {
         if (grp.is_parallel())
             return fill_queue_recursive(static_cast<parallel_group&>(grp), successors, activation_limit);
@@ -85,7 +87,8 @@ private:
             return fill_queue_recursive(static_cast<group&>(grp), successors, activation_limit);
     }
 
-    successor_container fill_queue_recursive(group & g, successor_container const & successors_from_parent, size_t previous_activation_limit)
+    successor_container fill_queue_recursive(group & g, successor_container const & successors_from_parent,
+                                             size_t previous_activation_limit)
     {
         assert (g.has_synth_children());
 
@@ -165,35 +168,48 @@ private:
         return successors;
     }
 
-    successor_container fill_queue_recursive(parallel_group & g, successor_container const & successors_from_parent, size_t previous_activation_limit)
+    successor_container fill_queue_recursive(parallel_group & g, successor_container const & successors_from_parent,
+                                             size_t previous_activation_limit)
     {
         assert (g.has_synth_children());
-        std::vector<thread_queue_item*, rt_pool_allocator<void*> > collected_nodes;
-        collected_nodes.reserve(g.child_synths_ + g.child_groups_ * 16); // pessimize
+        size_t reserve_elements = g.child_count() + 16; // pessimize
+        return collect_parallel_nodes(g.child_nodes, successors_from_parent, previous_activation_limit, reserve_elements);
+    }
 
-        for (server_node_list::iterator it = g.child_nodes.begin();
-            it != g.child_nodes.end(); ++it)
+    successor_container
+    fill_satellite_successors(server_node_list const & satellite_successors, size_t activation_limit)
+    {
+        return collect_parallel_nodes(satellite_successors, empty_successor_container, activation_limit, 16);
+    }
+
+    successor_container
+    collect_parallel_nodes(server_node_list const & parallel_nodes, successor_container const & successors,
+                           size_t activation_limit, size_t elements_to_reserve)
+    {
+        std::vector<thread_queue_item*, rt_pool_allocator<void*> > collected_nodes;
+        collected_nodes.reserve(elements_to_reserve);
+
+        for (server_node_list::const_iterator it = parallel_nodes.begin();
+            it != parallel_nodes.end(); ++it)
         {
-            server_node & node = *it;
+            server_node & node = const_cast<server_node &>(*it);
 
             if (node.is_synth()) {
-                thread_queue_item * q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth*>(&node)),
-                                                                    successors_from_parent, previous_activation_limit);
+                thread_queue_item * q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth *>(&node)),
+                                                                    successors, activation_limit);
 
-                if (previous_activation_limit == 0)
+                if (activation_limit == 0)
                     q->add_initially_runnable(q_item);
 
                 collected_nodes.push_back(q_item);
-            }
-            else {
-                abstract_group & grp = static_cast<abstract_group&>(node);
-
+            } else {
+                abstract_group & grp = static_cast<abstract_group &>(node);
                 if (grp.has_synth_children())
                 {
-                    successor_container group_successors = fill_queue_recursive(grp, successors_from_parent,
-                                                                                previous_activation_limit);
+                    successor_container group_successors =
+                        fill_queue_recursive(grp, successors, activation_limit);
 
-                    for (unsigned int i = 0; i != group_successors.size(); ++i)
+                    for (size_t i = 0; i != group_successors.size(); ++i)
                         collected_nodes.push_back(group_successors[i]);
                 }
             }
@@ -201,10 +217,35 @@ private:
 
         successor_container ret(collected_nodes.size());
 
-        memcpy(&ret[0], &collected_nodes[0], collected_nodes.size() * sizeof(thread_queue_item *));
+        memcpy(&ret[0], collected_nodes.data(), collected_nodes.size() * sizeof(thread_queue_item *));
 /*      for (std::size_t i = 0; i != collected_nodes.size(); ++i)
             ret[i] = collected_nodes[i]; */
         return ret;
+    }
+
+    void
+    fill_satellite_predecessors(server_node_list const & satellite_predecessors,
+                                successor_container const & successors)
+    {
+        const size_t activation_limit = 0;
+
+        for (server_node_list::const_iterator it = satellite_predecessors.begin();
+            it != satellite_predecessors.end(); ++it)
+        {
+            server_node & node = const_cast<server_node &>(*it);
+
+            if (node.is_synth()) {
+                thread_queue_item * q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth *>(&node)),
+                                                                    successors, activation_limit);
+
+                q->add_initially_runnable(q_item);
+            }
+            else {
+                abstract_group & grp = static_cast<abstract_group &>(node);
+                if (grp.has_synth_children())
+                    fill_queue_recursive(grp, successors, activation_limit);
+            }
+        }
     }
 };
 
