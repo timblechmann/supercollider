@@ -48,7 +48,8 @@ class server_node:
 {
 protected:
     server_node(int32_t node_id, bool type):
-        node_id(node_id), synth_(type), running_(true), parent_(0), use_count_(0)
+        node_id(node_id), synth_(type), running_(true), parent_(0), use_count_(0), satellite_reference_node(NULL),
+        satellite_count(0)
     {}
 
     virtual ~server_node(void)
@@ -156,7 +157,6 @@ private:
     friend class group;
     friend class parallel_group;
 
-
 public:
     /* @{ */
     /** parent group handling */
@@ -171,11 +171,31 @@ public:
     }
 
     inline void set_parent(abstract_group * parent);
-    inline void clear_parent(void);
+
+    void init_parent(abstract_group * parent)
+    {
+        add_ref();
+        assert(parent_ == 0);
+        parent_ = parent;
+    }
+
+    void clear_parent(void)
+    {
+        if (is_satellite())
+            satellite_deinit();
+        else
+            node_deinit();
+
+        parent_ = NULL;
+        release();
+    }
     /* @} */
 
 private:
     abstract_group * parent_;
+
+    /* clean up parent group for regular nodes */
+    inline void node_deinit(void);
 
 public:
     /* memory management for server_nodes */
@@ -191,9 +211,62 @@ public:
     }
     /* @} */
 
+
+    /** satellite management */
+public:
+    /* @{ */
+    void add_sat_before(server_node * node)
+    {
+        satellite_predecessors.push_front(*node);
+        node->satellite_init(this, parent_);
+    }
+
+    void add_sat_after(server_node * node)
+    {
+        satellite_successors.push_front(*node);
+        node->satellite_init(this, parent_);
+    }
+
+    void remove_sat_before(server_node * node)
+    {
+        clear_parent();
+    }
+
+    void remove_sat_after(server_node * node)
+    {
+        clear_parent();
+    }
+
+    bool is_satellite(void) const
+    {
+        return satellite_reference_node != NULL;
+    }
+
+private:
+    void satellite_init(server_node * satellite_reference, abstract_group * parent)
+    {
+        init_parent(parent);
+
+        satellite_reference_node = satellite_reference;
+        ++satellite_count;
+    }
+
+    /* called from clear_parent() */
+    void satellite_deinit(void)
+    {
+        --satellite_count;
+        server_node::parent_hook::unlink();
+        satellite_reference_node = NULL;
+    }
+
+    server_node * satellite_reference_node;
+    uint32_t satellite_count;
+    server_node_list satellite_predecessors;
+    server_node_list satellite_successors;
+    /* @} */
+
 public:
     /* refcountable */
-    /* @{ */
     void add_ref(void)
     {
         ++use_count_;
@@ -231,7 +304,9 @@ enum node_position
     before = 2,
     after = 3,
     replace = 4,
-    insert = 5                  /* for pgroups */
+    insert = 5,                  /* for pgroups */
+    satellite_before = 6,
+    satellite_after = 7
 };
 
 typedef std::pair<server_node *, node_position> node_position_constraint;

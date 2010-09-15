@@ -207,7 +207,7 @@ public:
 };
 
 
-inline void server_node::clear_parent(void)
+inline void server_node::node_deinit(void)
 {
     if (is_synth())
         --parent_->child_synths_;
@@ -215,16 +215,11 @@ inline void server_node::clear_parent(void)
         --parent_->child_groups_;
         static_cast<abstract_group*>(this)->unregister_as_child();
     }
-
-    parent_ = 0;
-    release();
 }
 
 inline void server_node::set_parent(abstract_group * parent)
 {
-    add_ref();
-    assert(parent_ == 0);
-    parent_ = parent;
+    init_parent(parent);
 
     if (is_synth())
         ++parent->child_synths_;
