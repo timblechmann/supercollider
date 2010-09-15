@@ -296,6 +296,28 @@ protected:
         );
     }
 
+    void pause_satellites(void)
+    {
+        std::for_each(satellite_predecessors.begin(), satellite_predecessors.end(),
+            boost::bind(static_cast<void (server_node::*)(void)>(&server_node::pause), _1)
+        );
+
+        std::for_each(satellite_successors.begin(), satellite_successors.end(),
+            boost::bind(static_cast<void (server_node::*)(void)>(&server_node::pause), _1)
+        );
+    }
+
+    void resume_satellites(void)
+    {
+        std::for_each(satellite_predecessors.begin(), satellite_predecessors.end(),
+            boost::bind(static_cast<void (server_node::*)(void)>(&server_node::resume), _1)
+        );
+
+        std::for_each(satellite_successors.begin(), satellite_successors.end(),
+            boost::bind(static_cast<void (server_node::*)(void)>(&server_node::resume), _1)
+        );
+    }
+
 private:
     void satellite_init(server_node * satellite_reference, abstract_group * parent)
     {
