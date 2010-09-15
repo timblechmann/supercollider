@@ -29,12 +29,12 @@
 namespace nova
 {
 
-void node_graph::add_node(server_node * n, node_position_constraint const & constraint)
+void node_graph::add_node(server_node * node, node_position_constraint const & constraint)
 {
-    server_node * node = constraint.first;
+    server_node * reference_node = constraint.first;
     node_position position = constraint.second;
 
-    std::pair< node_set_type::iterator, bool > inserted = node_set.insert(*n);
+    std::pair< node_set_type::iterator, bool > inserted = node_set.insert(*node);
 
     assert(inserted.second == true); /* node id already present (should be checked earlier)! */
 
@@ -42,42 +42,40 @@ void node_graph::add_node(server_node * n, node_position_constraint const & cons
     {
     case before:
     case after: {
-        abstract_group * parent = node->parent_;
-        parent->add_child(n, constraint);
+        abstract_group * parent = reference_node->parent_;
+        parent->add_child(node, constraint);
         break;
     }
 
     case head:
     case tail: {
-        abstract_group * group = static_cast<abstract_group*>(node);
-        group->add_child(n, position);
+        abstract_group * group = static_cast<abstract_group*>(reference_node);
+        group->add_child(node, position);
         break;
     }
 
     case insert: {
-        abstract_group * group = static_cast<abstract_group*>(node);
-        group->add_child(n);
+        abstract_group * group = static_cast<abstract_group*>(reference_node);
+        group->add_child(node);
         break;
     }
+
+    case satellite_before:
+        reference_node->add_sat_before(node);
+        break;
+
+    case satellite_after:
+        reference_node->add_sat_after(node);
+        break;
 
     default:
         assert(false);      /* this point should not be reached! */
     }
 
-    if (n->is_synth())
+    if (node->is_synth())
         synth_count_ += 1;
     else
         group_count_ += 1;
-}
-
-namespace
-{
-
-inline void remove_node_by_reference(node_graph * ng, server_node & n)
-{
-    ng->remove_node(&n);
-}
-
 }
 
 void node_graph::add_node(server_node * n)
@@ -88,6 +86,12 @@ void node_graph::add_node(server_node * n)
     to_root.second = head;
 
     add_node(n, to_root);
+}
+
+
+static inline void remove_node_by_reference(node_graph * ng, server_node & n)
+{
+    ng->remove_node(&n);
 }
 
 void node_graph::remove_node(server_node * n)
