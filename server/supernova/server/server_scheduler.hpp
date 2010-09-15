@@ -20,7 +20,7 @@
 #define SERVER_SCHEDULER_HPP
 
 #include "dsp_thread_queue/dsp_thread.hpp"
-#include "group.hpp"
+#include "node_graph.hpp"
 #include "memory_pool.hpp"
 #include "utilities/branch_hints.hpp"
 #include "utilities/callback_system.hpp"

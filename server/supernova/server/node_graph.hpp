@@ -32,6 +32,10 @@
 namespace nova
 {
 
+typedef nova::dsp_queue_node<rt_pool_allocator<void*> > queue_node;
+typedef nova::dsp_thread_queue<dsp_queue_node<rt_pool_allocator<void*> >,
+                               rt_pool_allocator<void*> > thread_queue;
+
 class node_graph
 {
 private:
@@ -41,7 +45,6 @@ private:
     static const std::size_t node_set_bucket_count = 4096;
 
 public:
-    typedef thread_queue_item dsp_thread_queue_item;
     typedef thread_queue dsp_thread_queue;
 
     /** \brief ctor

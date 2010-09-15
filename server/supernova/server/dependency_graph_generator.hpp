@@ -27,8 +27,13 @@ namespace nova
 class dependency_graph_generator
 {
     typedef node_graph::dsp_thread_queue dsp_thread_queue;
+
+    typedef nova::dsp_thread_queue_item<dsp_queue_node<rt_pool_allocator<void*> >,
+                                        rt_pool_allocator<void*> > thread_queue_item;
+
     typedef thread_queue_item::successor_list successor_container;
     typedef std::vector<server_node*, rt_pool_allocator<abstract_synth*> > sequential_child_list;
+
 
 public:
     dsp_thread_queue * operator()(node_graph * graph)
@@ -101,8 +106,7 @@ private:
         sequential_child_list sequential_children;
         sequential_children.reserve(g.child_synths_);
 
-        for (r_iterator it = g.child_nodes.rbegin();
-            it != g.child_nodes.rend(); ++it)
+        for (r_iterator it = g.child_nodes.rbegin(); it != g.child_nodes.rend(); ++it)
         {
             server_node & node = *it;
 

@@ -23,19 +23,11 @@
 
 #include "memory_pool.hpp"
 #include "node_types.hpp"
-#include "dsp_thread_queue_node.hpp"
 
-#include "dsp_thread_queue/dsp_thread_queue.hpp"
 #include "utilities/exists.hpp"
 
 namespace nova
 {
-
-typedef nova::dsp_queue_node<rt_pool_allocator<void*> > queue_node;
-typedef nova::dsp_thread_queue_item<dsp_queue_node<rt_pool_allocator<void*> >,
-                                    rt_pool_allocator<void*> > thread_queue_item;
-typedef nova::dsp_thread_queue<dsp_queue_node<rt_pool_allocator<void*> >,
-                               rt_pool_allocator<void*> > thread_queue;
 
 struct abstract_group_tag;
 
