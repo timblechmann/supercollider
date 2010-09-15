@@ -90,6 +90,16 @@ public:
             data->size = size;
         }
 
+        successor_list (uint32_t size, dsp_thread_queue_item ** items)
+        {
+            data = array_allocator().allocate(2*sizeof(uint32_t) + size * sizeof(dsp_thread_queue_item*));
+            data->count = 1;
+            data->size = size;
+
+            //std::copy(items, items + size, data->content);
+            memcpy(data->content, items, size * sizeof(dsp_thread_queue_item *));
+        }
+
         successor_list(successor_list const & rhs):
             data(rhs.data)
         {
