@@ -88,6 +88,7 @@ public:
     }
 
     /* returns true, if this or any of the child group has synth children */
+    /// TODO: should parse satellite nodes!
     bool has_synth_children(void) const
     {
         if (child_synths_)

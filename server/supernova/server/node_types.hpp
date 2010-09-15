@@ -243,6 +243,16 @@ public:
         return satellite_count != 0;
     }
 
+    bool has_satellite_predecessor(void) const
+    {
+        return !satellite_predecessors.empty();
+    }
+
+    bool has_satellite_successor(void) const
+    {
+        return !satellite_successors.empty();
+    }
+
 protected:
     void set_on_satellites(slot_index_t slot_id, float val)
     {
@@ -311,6 +321,7 @@ private:
     uint32_t satellite_count;
     server_node_list satellite_predecessors;
     server_node_list satellite_successors;
+    friend class dependency_graph_generator;
     /* @} */
 
 public:
