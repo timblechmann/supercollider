@@ -70,6 +70,16 @@ void node_graph::add_node(server_node * n, node_position_constraint const & cons
         group_count_ += 1;
 }
 
+namespace
+{
+
+inline void remove_node_by_reference(node_graph * ng, server_node & n)
+{
+    ng->remove_node(&n);
+}
+
+}
+
 void node_graph::add_node(server_node * n)
 {
     node_position_constraint to_root;
@@ -90,8 +100,18 @@ void node_graph::remove_node(server_node * n)
      *        for now this is done by the auto-unlink hook
      * */
 
-    abstract_group * parent = n->parent_;
-    parent->remove_child(n);
+    if (n->is_satellite()) {
+        if (n->has_satellite()) {
+            // recursively remove all satellites
+            n->apply_on_satellites(boost::bind(remove_node_by_reference, this, _1));
+        }
+        server_node * reference = n->satellite_reference_node;
+        reference->remove_satellite(n);
+    } else {
+        abstract_group * parent = n->parent_;
+        parent->remove_child(n);
+    }
+
     if (n->is_synth())
         synth_count_ -= 1;
     else

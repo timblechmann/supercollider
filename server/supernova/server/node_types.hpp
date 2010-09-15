@@ -228,14 +228,9 @@ public:
         node->satellite_init(this, parent_);
     }
 
-    void remove_sat_before(server_node * node)
+    void remove_satellite(server_node * node)
     {
-        clear_parent();
-    }
-
-    void remove_sat_after(server_node * node)
-    {
-        clear_parent();
+        node->clear_parent();
     }
 
     bool is_satellite(void) const
