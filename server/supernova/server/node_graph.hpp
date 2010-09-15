@@ -68,7 +68,6 @@ public:
         return group_count_;
     }
 
-
     void add_node(server_node * s, node_position_constraint const & constraint);
     void add_node(server_node * s);
 
