@@ -297,6 +297,7 @@ private:
         if (!has_satellite())
             return; // fast path
 
+        assert(satellite_predecessors.size() + satellite_successors.size() == satellite_count);
         std::for_each(satellite_predecessors.begin(), satellite_predecessors.end(), f);
         std::for_each(satellite_successors.begin(), satellite_successors.end(), f);
     }
@@ -306,13 +307,13 @@ private:
         init_parent(parent);
 
         satellite_reference_node = satellite_reference;
-        ++satellite_count;
+        ++(satellite_reference_node->satellite_count);
     }
 
     /* called from clear_parent() */
     void satellite_deinit(void)
     {
-        --satellite_count;
+        --(satellite_reference_node->satellite_count);
         server_node::parent_hook::unlink();
         satellite_reference_node = NULL;
     }

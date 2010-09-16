@@ -89,11 +89,6 @@ void node_graph::add_node(server_node * n)
 }
 
 
-static inline void remove_node_by_reference(node_graph * ng, server_node & n)
-{
-    ng->remove_node(&n);
-}
-
 void node_graph::remove_node(server_node * n)
 {
     if (!n->is_synth())
@@ -104,11 +99,26 @@ void node_graph::remove_node(server_node * n)
      *        for now this is done by the auto-unlink hook
      * */
 
-    if (n->is_satellite()) {
-        if (n->has_satellite()) {
-            // recursively remove all satellites
-            n->apply_on_satellites(boost::bind(remove_node_by_reference, this, _1));
+    if (n->has_satellite()) {
+        // recursively remove all satellites
+        while (!n->satellite_predecessors.empty())
+        {
+            server_node * sat = &n->satellite_predecessors.front();
+            n->satellite_predecessors.pop_front();
+            remove_node(sat);
+            sat->release();
         }
+
+        while (!n->satellite_successors.empty())
+        {
+            server_node * sat = &n->satellite_successors.front();
+            n->satellite_successors.pop_front();
+            remove_node(sat);
+            sat->release();
+        }
+    }
+
+    if (n->is_satellite()) {
         server_node * reference = n->satellite_reference_node;
         reference->remove_satellite(n);
     } else {
