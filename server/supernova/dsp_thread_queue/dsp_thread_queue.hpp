@@ -21,15 +21,16 @@
 
 #include <algorithm>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <vector>
 
 #include <boost/atomic.hpp>
 #include <boost/cstdint.hpp>
+#include <boost/foreach.hpp>
 #include <boost/thread.hpp>
 
 #ifdef DEBUG_DSP_THREADS
-#include <boost/foreach.hpp>
 #include <cstdio>
 #endif
 
@@ -138,6 +139,14 @@ public:
             return data->content[index];
         }
 
+        void validate(void) const
+        {
+#ifndef NDEBUG
+            for (size_t i = 0; i != size(); ++i)
+                assert(operator[](i));
+#endif
+        }
+
         ~successor_list(void)
         {
             if (--data->count == 0)
@@ -199,6 +208,16 @@ public:
     }
 #endif
 
+    successor_list const & get_successors(void) const
+    {
+        return successors;
+    }
+
+    activation_limit_t get_activation_limit(void) const
+    {
+        return activation_limit;
+    }
+
 private:
     /** \brief update all successors and possibly mark them as runnable */
     dsp_thread_queue_item * update_dependencies(dsp_queue_interpreter & interpreter)
@@ -245,7 +264,9 @@ private:
     const activation_limit_t activation_limit;                 /**< number of precedessors */
 };
 
-template <typename runnable, typename Alloc = std::allocator<void*> >
+template <typename runnable,
+          typename Alloc = std::allocator<void*>
+         >
 class dsp_thread_queue
 {
     typedef boost::uint_fast16_t node_count_t;
@@ -272,6 +293,69 @@ public:
         std::cout << std::endl;
     }
 #endif
+
+    void validate_queue(void)
+    {
+        typedef std::map<const dsp_thread_queue_item*, unsigned int> activation_count_map_t;
+        activation_count_map_t activation_count_map;
+
+        for (unsigned int i = 0; i != total_node_count; ++i) {
+            const dsp_thread_queue_item* item = queue_items + i;
+            assert(item);
+
+            item->get_successors().validate();
+            activation_count_map[item] = item->get_activation_limit();
+        }
+
+        BOOST_FOREACH(const dsp_thread_queue_item * item, initially_runnable_items)
+        {
+            activation_count_map.erase(item);
+
+            for (int i = 0; i != item->get_successors().size(); ++i)
+            {
+                const dsp_thread_queue_item * successor = item->get_successors()[i];
+                assert(successor);
+
+                assert(activation_count_map.find(successor) != activation_count_map.end());
+
+                assert(activation_count_map[successor] > 0);
+                activation_count_map[successor] -= 1;
+            }
+        }
+        if (activation_count_map.empty())
+            return;
+
+        for(;;)
+        {
+            std::vector<const dsp_thread_queue_item*> runnable_items;
+
+            for (typename activation_count_map_t::iterator it = activation_count_map.begin();
+                 it != activation_count_map.end(); ++it)
+                if (it->second == 0)
+                    runnable_items.push_back(it->first);
+
+            if (runnable_items.size() == 0)
+                assert(false);
+
+            BOOST_FOREACH(const dsp_thread_queue_item * item, runnable_items)
+            {
+                activation_count_map.erase(item);
+
+                for (int i = 0; i != item->get_successors().size(); ++i)
+                {
+                    const dsp_thread_queue_item * successor = item->get_successors()[i];
+                    assert(successor);
+                    assert(activation_count_map.find(successor) != activation_count_map.end());
+
+                    assert(activation_count_map[successor] > 0);
+                    activation_count_map[successor] -= 1;
+                }
+            }
+
+            if (activation_count_map.empty())
+                return;
+        }
+    }
 
     /** preallocate node_count nodes */
     dsp_thread_queue(std::size_t node_count):
@@ -303,6 +387,7 @@ public:
         ++total_node_count;
 
         assert (total_node_count <= initially_runnable_items.capacity());
+        successors.validate();
         new (ret) dsp_thread_queue_item(job, successors, activation_limit);
         return ret;
     }

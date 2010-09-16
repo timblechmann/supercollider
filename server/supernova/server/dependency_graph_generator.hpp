@@ -50,6 +50,9 @@ public:
         q = new node_graph::dsp_thread_queue(graph->synth_count_);
 
         fill_queue(*graph->root_group());
+#ifndef NDEBUG
+        q->validate_queue();
+#endif
         return q;
     }
 
