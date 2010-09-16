@@ -128,6 +128,7 @@ private:
     template <typename iterator>
     iterator iterator_add(iterator it, std::ptrdiff_t count)
     {
+        assert(count > 0);
         for (std::ptrdiff_t i = 0; i != count; ++i)
             ++it;
         return it;
