@@ -206,27 +206,32 @@ private:
                               server_node_list & child_nodes,
                               sequential_child_list & sequential_children)
     {
+        sequential_children.push_back(&*it);
+        server_node_list::reverse_iterator previous = it;
+        ++it;
+
         for(;;)
         {
-            sequential_children.push_back(&*it);
-            ++it;
             if (it == child_nodes.rend())
-                break; // we found the beginning of this group
-
-            if (!it->is_synth())
-                break; // we hit a child group, later we may want to add it's nodes, too?
+                return previous; // we found the beginning of this group
 
             if (it->has_satellite_successor())
-                break; // synths with satellite successors should be part of the previous queue item
+                return previous; // synths with satellite successors should be part of the previous queue item
 
-            if (it->has_satellite_predecessor()) {
+            if (!it->is_synth())
+                return previous; // we hit a child group, later we may want to add it's nodes, too?
+
+            if (previous->has_satellite_predecessor())
                 // synths with satellite predecessors are the head of this queue item
-                sequential_children.push_back(&*it);
-                return it;
-            }
+                return previous;
+
+            // we consume this synth
+            sequential_children.push_back(&*it);
+
+            // advance
+            previous = it;
+            ++it;
         }
-        --it;
-        return it;
     }
 
     void sequential_group_handle_group(server_node_list::reverse_iterator const & it,
