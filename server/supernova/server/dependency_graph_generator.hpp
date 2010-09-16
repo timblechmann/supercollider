@@ -79,7 +79,7 @@ private:
                 return 1;
             else {
                 abstract_group & grp = static_cast<abstract_group&>(node);
-                size_t tail_nodes = grp.tail_nodes();
+                size_t tail_nodes = compute_tail_nodes(grp);
 
                 if (tail_nodes != 0) /* use tail nodes of previous group */
                     return tail_nodes;
@@ -92,6 +92,9 @@ private:
     successor_container fill_queue_recursive(abstract_group & grp, successor_container const & successors,
                                              size_t activation_limit)
     {
+        if (!grp.has_synth_children())
+            return handle_empty_group(grp, successors, activation_limit);
+
         if (grp.is_parallel())
             return fill_queue_recursive(static_cast<parallel_group&>(grp), successors, activation_limit);
         else
@@ -236,19 +239,19 @@ private:
 
     void sequential_group_handle_group(server_node_list::reverse_iterator const & it,
                                        server_node & node, group & g,
-                                       size_t & children, size_t previous_activation_limit,
+                                       size_t & children, size_t head_activation_limit,
                                        successor_container & successors)
     {
         abstract_group & grp = static_cast<abstract_group&>(node);
 
-        if (grp.has_synth_children())
-        {
-            int activation_limit = get_previous_activation_count(it, g.child_nodes.rend(), previous_activation_limit)
-                                   + count_satellite_predecessor_nodes(node);
+        if (grp.has_synth_children()) {
+            int activation_limit = get_previous_activation_count(it, g.child_nodes.rend(), head_activation_limit)
+                                    + count_satellite_predecessor_nodes(node);
 
             if (node.has_satellite_successor())
             {
-                successor_container satellites = fill_satellite_successors(node.satellite_successors, grp.tail_nodes());
+                successor_container satellites = fill_satellite_successors(node.satellite_successors,
+                                                                           compute_tail_nodes(grp));
                 successor_container group_successors = concat_successors(satellites, successors);
 
                 successors = fill_queue_recursive(grp, group_successors, activation_limit);
@@ -258,11 +261,23 @@ private:
             if (node.has_satellite_predecessor())
                 fill_satellite_predecessors(node.satellite_predecessors, successors);
         } else
-        {
-            // TODO: parse empty groups for successors
-        }
+            successors = handle_empty_group(grp, successors, head_activation_limit);
 
         children -= 1;
+    }
+
+    successor_container handle_empty_group(abstract_group & grp, successor_container const & successors,
+                                           size_t head_activation_limit)
+    {
+        successor_container ret = successors;
+        if (grp.has_satellite_predecessor())
+            fill_satellite_predecessors(grp.satellite_predecessors, successors);
+
+        if (grp.has_satellite_successor()) {
+            successor_container satellites = fill_satellite_successors(grp.satellite_successors, head_activation_limit);
+            ret = concat_successors(successors, satellites);
+        }
+        return ret;
     }
 
     successor_container fill_queue_recursive(parallel_group & g, successor_container const & successors_from_parent,
@@ -335,13 +350,22 @@ private:
                                      rt_item_vector & collected_nodes, size_t activation_limit)
     {
         abstract_group & grp = static_cast<abstract_group &>(node);
-        if (!grp.has_synth_children()) //TODO: parse empty groups for successors
-            return;
+        if (!grp.has_synth_children()) {
+            if (grp.has_satellite_successor()) {
+                successor_container satellites = fill_satellite_successors(grp.satellite_successors,
+                                                                           activation_limit);
 
-        if (node.has_satellite_successor()) {
-            successor_container satellites = fill_satellite_successors(node.satellite_successors,
-                                                                       grp.tail_nodes());
+                for (size_t i = 0; i != satellites.size(); ++i)
+                    collected_nodes.push_back(satellites[i]);
+            }
 
+            if (grp.has_satellite_predecessor())
+                fill_satellite_predecessors(grp.satellite_predecessors, successors);
+        }
+
+        if (grp.has_satellite_successor()) {
+            successor_container satellites = fill_satellite_successors(grp.satellite_successors,
+                                                                       compute_tail_nodes(grp));
             successor_container group_successors = fill_queue_recursive(grp,
                                                                         concat_successors(successors, satellites),
                                                                         activation_limit);
@@ -349,8 +373,8 @@ private:
             for (size_t i = 0; i != group_successors.size(); ++i)
                 collected_nodes.push_back(group_successors[i]);
 
-            if (node.has_satellite_predecessor())
-                fill_satellite_predecessors(node.satellite_predecessors, group_successors);
+            if (grp.has_satellite_predecessor())
+                fill_satellite_predecessors(grp.satellite_predecessors, group_successors);
 
         } else {
             successor_container group_successors = fill_queue_recursive(grp, successors, activation_limit);
@@ -358,8 +382,8 @@ private:
             for (size_t i = 0; i != group_successors.size(); ++i)
                 collected_nodes.push_back(group_successors[i]);
 
-            if (node.has_satellite_predecessor())
-                fill_satellite_predecessors(node.satellite_predecessors, group_successors);
+            if (grp.has_satellite_predecessor())
+                fill_satellite_predecessors(grp.satellite_predecessors, group_successors);
         }
     }
 
@@ -387,7 +411,7 @@ private:
         }
     }
 
-    size_t count_satellite_predecessor_nodes(server_node const & node)
+    static size_t count_satellite_predecessor_nodes(server_node const & node)
     {
         size_t ret = 0;
         for (server_node_list::const_iterator it = node.satellite_predecessors.begin();
@@ -397,19 +421,28 @@ private:
                 ret += 1;
             else {
                 abstract_group const & grp = static_cast<abstract_group const &>(*it);
-                ret += grp.tail_nodes();
+                ret += compute_tail_nodes(grp);
             }
         }
 
         return ret;
     }
 
-    successor_container concat_successors(successor_container const & lhs, successor_container const & rhs)
+    static successor_container concat_successors(successor_container const & lhs, successor_container const & rhs)
     {
         successor_container ret(lhs.size() + rhs.size());
         memcpy(ret.data->content,              lhs.data->content, lhs.size() * sizeof(thread_queue_item *));
         memcpy(ret.data->content + lhs.size(), rhs.data->content, rhs.size() * sizeof(thread_queue_item *));
         return ret;
+    }
+
+    static size_t compute_tail_nodes(abstract_group const & grp)
+    {
+        size_t tail_nodes = grp.tail_nodes();
+        if (tail_nodes == 0)
+            return count_satellite_predecessor_nodes(grp);
+        else
+            return tail_nodes;
     }
 };
 
