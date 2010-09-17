@@ -7,11 +7,60 @@
 using namespace nova;
 using namespace std;
 
-// one synth with 2 satellites
+// one synth with 1 satellite predecessor
 BOOST_AUTO_TEST_CASE( satellite_node_test_1 )
 {
     rt_pool.init(1024 * 1024);
+    node_graph n;
 
+    test_synth * s1 = new test_synth(1000, 0);
+    n.add_node(s1);
+
+    test_synth * s2 = new test_synth(1001, 0);
+    {
+        node_position_constraint position = std::make_pair(s1, satellite_before);
+        n.add_node(s2, position);
+        BOOST_REQUIRE(s1->has_satellite());
+        BOOST_REQUIRE(s1->has_satellite_predecessor());
+    }
+
+    {
+        auto_ptr<node_graph::dsp_thread_queue> q = n.generate_dsp_queue();
+        BOOST_REQUIRE_EQUAL(q->get_total_node_count(), 2u);
+    }
+
+    n.remove_node(s1);
+    BOOST_REQUIRE_EQUAL(n.synth_count(), 0);
+}
+
+// one synth with 1 satellite predecessor
+BOOST_AUTO_TEST_CASE( satellite_node_test_2 )
+{
+    node_graph n;
+
+    test_synth * s1 = new test_synth(1000, 0);
+    n.add_node(s1);
+
+    test_synth * s2 = new test_synth(1001, 0);
+    {
+        node_position_constraint position = std::make_pair(s1, satellite_after);
+        n.add_node(s2, position);
+        BOOST_REQUIRE(s1->has_satellite());
+        BOOST_REQUIRE(s1->has_satellite_successor());
+    }
+
+    {
+        auto_ptr<node_graph::dsp_thread_queue> q = n.generate_dsp_queue();
+        BOOST_REQUIRE_EQUAL(q->get_total_node_count(), 2u);
+    }
+
+    n.remove_node(s1);
+    BOOST_REQUIRE_EQUAL(n.synth_count(), 0);
+}
+
+// one synth with 2 satellites
+BOOST_AUTO_TEST_CASE( satellite_node_test_3 )
+{
     node_graph n;
 
     test_synth * s1 = new test_synth(1000, 0);
@@ -47,7 +96,7 @@ BOOST_AUTO_TEST_CASE( satellite_node_test_1 )
 }
 
 // 1 synth with both real and satellite predecessors and successors
-BOOST_AUTO_TEST_CASE( satellite_node_test_2 )
+BOOST_AUTO_TEST_CASE( satellite_node_test_4 )
 {
     node_graph n;
 
@@ -88,7 +137,7 @@ BOOST_AUTO_TEST_CASE( satellite_node_test_2 )
 }
 
 // 1 group with both real and satellite predecessors and successors
-BOOST_AUTO_TEST_CASE( satellite_node_test_3 )
+BOOST_AUTO_TEST_CASE( satellite_node_test_5 )
 {
     node_graph n;
 
@@ -141,7 +190,7 @@ BOOST_AUTO_TEST_CASE( satellite_node_test_3 )
 }
 
 // 1 parallel group with both real and satellite predecessors and successors
-BOOST_AUTO_TEST_CASE( satellite_node_test_4 )
+BOOST_AUTO_TEST_CASE( satellite_node_test_6 )
 {
     node_graph n;
 
@@ -193,8 +242,78 @@ BOOST_AUTO_TEST_CASE( satellite_node_test_4 )
     BOOST_REQUIRE_EQUAL(n.synth_count(), 2);
 }
 
+// 1 empty group with satellite predecessor
+BOOST_AUTO_TEST_CASE( satellite_node_test_7 )
+{
+    node_graph n;
+
+    group * grp = new group(1000);
+    n.add_node(grp);
+
+    test_synth * s2 = new test_synth(999, 0);
+    {
+        node_position_constraint position = std::make_pair(grp, before);
+        n.add_node(s2, position);
+    }
+
+    test_synth * s3 = new test_synth(1001, 0);
+    {
+        node_position_constraint position = std::make_pair(grp, after);
+        n.add_node(s3, position);
+    }
+
+    test_synth * sat1 = new test_synth(1900, 0);
+    {
+        node_position_constraint position = std::make_pair(grp, satellite_before);
+        n.add_node(sat1, position);
+    }
+
+    {
+        auto_ptr<node_graph::dsp_thread_queue> q = n.generate_dsp_queue();
+        BOOST_REQUIRE_EQUAL(q->get_total_node_count(), 3u);
+    }
+
+    n.remove_node(grp);
+    BOOST_REQUIRE_EQUAL(n.synth_count(), 2);
+}
+
+// 1 empty group with satellite successor
+BOOST_AUTO_TEST_CASE( satellite_node_test_8 )
+{
+    node_graph n;
+
+    group * grp = new group(1000);
+    n.add_node(grp);
+
+    test_synth * s2 = new test_synth(999, 0);
+    {
+        node_position_constraint position = std::make_pair(grp, before);
+        n.add_node(s2, position);
+    }
+
+    test_synth * s3 = new test_synth(1001, 0);
+    {
+        node_position_constraint position = std::make_pair(grp, after);
+        n.add_node(s3, position);
+    }
+
+    test_synth * sat1 = new test_synth(2100, 0);
+    {
+        node_position_constraint position = std::make_pair(grp, satellite_after);
+        n.add_node(sat1, position);
+    }
+
+    {
+        auto_ptr<node_graph::dsp_thread_queue> q = n.generate_dsp_queue();
+        BOOST_REQUIRE_EQUAL(q->get_total_node_count(), 3u);
+    }
+
+    n.remove_node(grp);
+    BOOST_REQUIRE_EQUAL(n.synth_count(), 2);
+}
+
 // 1 empty group with both real and satellite predecessors and successors
-BOOST_AUTO_TEST_CASE( satellite_node_test_5 )
+BOOST_AUTO_TEST_CASE( satellite_node_test_9 )
 {
     node_graph n;
 
@@ -235,7 +354,7 @@ BOOST_AUTO_TEST_CASE( satellite_node_test_5 )
 }
 
 // 1 empty parallel group with both real and satellite predecessors and successors
-BOOST_AUTO_TEST_CASE( satellite_node_test_6 )
+BOOST_AUTO_TEST_CASE( satellite_node_test_10 )
 {
     node_graph n;
 
