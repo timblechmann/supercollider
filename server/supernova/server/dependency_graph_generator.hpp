@@ -68,28 +68,33 @@ private:
     }
 
     template <typename reverse_iterator>
-    static inline size_t get_previous_activation_count(reverse_iterator it, reverse_iterator end,
-                                                       int previous_activation_limit)
+    static inline size_t get_previous_activation_count(reverse_iterator it, const reverse_iterator end,
+                                                       size_t head_activation_limit)
     {
         reverse_iterator prev = it;
+        const reverse_iterator last = iterator_sub(end, 1);
 
+        size_t collected_satellites = 0;
         for (;;)
         {
             ++prev;
             if (prev == end)
-                return previous_activation_limit; // we are the first item, so we use the previous activiation limit
+                 // we are the first item, so we use the head activiation limit
+                return head_activation_limit + collected_satellites;
 
-            server_node & node = *prev;
+            server_node const & node = *prev;
             if (node.is_synth())
-                return 1;
+                return collected_satellites + 1;
             else {
-                abstract_group & grp = static_cast<abstract_group&>(node);
+                abstract_group const & grp = static_cast<abstract_group const &>(node);
+
+                if (grp.empty()) {
+                    collected_satellites += count_satellite_predecessor_nodes(grp);
+                    continue;
+                }
                 size_t tail_nodes = count_tail_nodes(grp);
 
-                if (tail_nodes != 0) /* use tail nodes of previous group */
-                    return tail_nodes;
-                else                /* skip empty groups */
-                    continue;
+                return tail_nodes + collected_satellites;
             }
         }
     }
