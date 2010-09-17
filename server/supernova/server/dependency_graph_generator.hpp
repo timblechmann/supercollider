@@ -290,13 +290,15 @@ private:
                                            size_t head_activation_limit)
     {
         successor_container ret = successors;
-        if (grp.has_satellite_predecessor())
-            fill_satellite_predecessors(grp.satellite_predecessors, successors);
 
         if (grp.has_satellite_successor()) {
             successor_container satellites = fill_satellite_successors(grp.satellite_successors, head_activation_limit);
             ret = concat_successors(successors, satellites);
         }
+
+        if (grp.has_satellite_predecessor())
+            fill_satellite_predecessors(grp.satellite_predecessors, ret);
+
         return ret;
     }
 
