@@ -555,6 +555,24 @@ struct muladd_ugen:
         }                                                               \
     }
 
+#define DEFINE_UGEN_FUNCTION_WRAPPER_FWD(CLASS_NAME, FUNCTION_NAME, INDEX)  \
+    static void FUNCTION_NAME##_nop(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_i(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_k(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_a(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_add_i(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_add_k(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_add_a(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_i_add_i(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_i_add_k(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_k_add_i(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_k_add_k(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_i_add_a(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_a_add_i(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_a_add_k(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_k_add_a(CLASS_NAME * unit, int num_samples); \
+    static void FUNCTION_NAME##_mul_a_add_a(CLASS_NAME * unit, int num_samples); \
+    static UnitCalcFunc FUNCTION_NAME##_select(const CLASS_NAME * unit); \
 
 
 #endif /* SC_MULADD_HELPERS_HPP */
