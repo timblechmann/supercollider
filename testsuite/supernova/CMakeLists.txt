@@ -8,6 +8,7 @@ set(simple_tests
     server_dsp_thread_queue_test.cpp
     server_dsp_thread_test.cpp
     server_node_graph_test.cpp
+    server_node_graph_satellite_test.cpp
     server_scheduler_test.cpp
     server_synth_factory_test.cpp
     server_test.cpp

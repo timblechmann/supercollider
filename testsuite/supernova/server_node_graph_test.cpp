@@ -452,4 +452,3 @@ BOOST_AUTO_TEST_CASE( noid_test )
         n.remove_node(s);
     }
 }
-
