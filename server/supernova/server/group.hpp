@@ -65,9 +65,6 @@ public:
 
 
 public:
-    /* count the tail nodes to get activation count */
-    virtual int tail_nodes(void) const = 0;
-
     /* @{ */
     /** pause/resume handling (set pause/resume on children)  */
     virtual void pause(void);
@@ -268,24 +265,6 @@ private:
     void add_child(server_node * node, node_position);
 
     friend class dependency_graph_generator;
-
-    virtual int tail_nodes(void) const
-    {
-        if (empty())
-            return 0;
-
-        for (server_node_list::const_reverse_iterator it = child_nodes.rbegin(); it != child_nodes.rend(); ++it)
-        {
-            const server_node * tail = &*it;
-
-            if (tail->is_synth())
-                return 1;
-            const abstract_group * tail_group = static_cast<const abstract_group*>(tail);
-            if (!tail_group->empty())
-                return tail_group->tail_nodes();
-        }
-        return 0;
-    }
 };
 
 typedef intrusive_ptr<group> group_ptr;
@@ -301,8 +280,6 @@ public:
 private:
     void add_child(server_node * node, node_position_constraint const & constraint);
     void add_child(server_node * node, node_position);
-
-    virtual int tail_nodes(void) const;
 
     friend class dependency_graph_generator;
 };

@@ -88,7 +88,6 @@ void node_graph::add_node(server_node * n)
     add_node(n, to_root);
 }
 
-
 void node_graph::remove_node(server_node * n)
 {
     if (!n->is_synth())
@@ -262,18 +261,6 @@ void abstract_group::set(slot_index_t slot_id, size_t count, float * val)
         it->set(slot_id, count, val);
         it->set_on_satellites(slot_id, count, val);
     }
-}
-
-
-int parallel_group::tail_nodes(void) const
-{
-    int ret = child_synths_;
-    for(group_list::const_iterator it = child_groups.begin();
-        it != child_groups.end(); ++it)
-    {
-        ret += it->tail_nodes();
-    }
-    return ret;
 }
 
 void group::add_child(server_node * node, node_position_constraint const & constraint)
