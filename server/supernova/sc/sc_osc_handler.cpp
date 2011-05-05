@@ -83,8 +83,9 @@ void fill_notification(const server_node * node, osc::OutboundPacketStream & p)
     /* previous/next */
     if (parent_node->is_parallel())
         p << -2 << -2; /* we are in a parallel group, so we have no notion of previous/next */
-    else
-    {
+    else if(node->is_satellite()) {
+        p << -2 << -2; /* FIXME: how to notify clients about satellite nodes? */
+    } else {
         const server_node * prev_node = node->previous_node();
         if (prev_node)
             p << prev_node->id();
