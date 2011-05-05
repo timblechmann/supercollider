@@ -20,6 +20,7 @@
 #define SERVER_NODE_TYPES_HPP
 
 #include <boost/detail/atomic_count.hpp>
+#include <boost/bind.hpp>
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/unordered_set.hpp>
 #include <boost/intrusive_ptr.hpp>
@@ -240,6 +241,59 @@ public:
     bool is_satellite(void) const
     {
         return satellite_reference_node != NULL;
+    }
+
+protected:
+    void set_on_satellites(slot_index_t slot_id, float val)
+    {
+        std::for_each(satellite_predecessors.begin(), satellite_predecessors.end(),
+            boost::bind(static_cast<void (server_node::*)(slot_index_t, float)>(&server_node::set),
+                        _1, slot_id, val)
+        );
+
+        std::for_each(satellite_successors.begin(), satellite_successors.end(),
+            boost::bind(static_cast<void (server_node::*)(slot_index_t, float)>(&server_node::set),
+                        _1, slot_id, val)
+        );
+    }
+
+    void set_on_satellites(slot_index_t slot_id, size_t n, float * values)
+    {
+        std::for_each(satellite_predecessors.begin(), satellite_predecessors.end(),
+            boost::bind(static_cast<void (server_node::*)(slot_index_t, size_t, float*)>(&server_node::set),
+                        _1, slot_id, n, values)
+        );
+
+        std::for_each(satellite_successors.begin(), satellite_successors.end(),
+            boost::bind(static_cast<void (server_node::*)(slot_index_t, size_t, float*)>(&server_node::set),
+                        _1, slot_id, n, values)
+        );
+    }
+
+    void set_on_satellites(const char * slot_str, size_t hashed_str, float val)
+    {
+        std::for_each(satellite_predecessors.begin(), satellite_predecessors.end(),
+            boost::bind(static_cast<void (server_node::*)(const char*, size_t, float)>(&server_node::set),
+                        _1, slot_str, hashed_str, val)
+        );
+
+        std::for_each(satellite_successors.begin(), satellite_successors.end(),
+            boost::bind(static_cast<void (server_node::*)(const char*, size_t, float)>(&server_node::set),
+                        _1, slot_str, hashed_str, val)
+        );
+    }
+
+    void set_on_satellites(const char * slot_str, size_t hashed_str, size_t n, float * values)
+    {
+        std::for_each(satellite_predecessors.begin(), satellite_predecessors.end(),
+            boost::bind(static_cast<void (server_node::*)(const char*, size_t, size_t, float*)>(&server_node::set),
+                        _1, slot_str, hashed_str, n, values)
+        );
+
+        std::for_each(satellite_successors.begin(), satellite_successors.end(),
+            boost::bind(static_cast<void (server_node::*)(const char*, size_t, size_t, float*)>(&server_node::set),
+                        _1, slot_str, hashed_str, n, values)
+        );
     }
 
 private:

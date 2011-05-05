@@ -193,14 +193,20 @@ void abstract_group::set(const char * slot_str, std::size_t hashed_str, float va
 {
     for(server_node_list::iterator it = child_nodes.begin();
         it != child_nodes.end(); ++it)
+    {
         it->set(slot_str, hashed_str, val);
+        it->set_on_satellites(slot_str, hashed_str, val);
+    }
 }
 
 void abstract_group::set(const char * slot_str, std::size_t hashed_str, size_t count, float * val)
 {
     for(server_node_list::iterator it = child_nodes.begin();
         it != child_nodes.end(); ++it)
+    {
         it->set(slot_str, hashed_str, count, val);
+        it->set_on_satellites(slot_str, hashed_str, count, val);
+    }
 }
 
 
@@ -208,14 +214,20 @@ void abstract_group::set(slot_index_t slot_id, float val)
 {
     for(server_node_list::iterator it = child_nodes.begin();
         it != child_nodes.end(); ++it)
+    {
         it->set(slot_id, val);
+        it->set_on_satellites(slot_id, val);
+    }
 }
 
 void abstract_group::set(slot_index_t slot_id, size_t count, float * val)
 {
     for(server_node_list::iterator it = child_nodes.begin();
         it != child_nodes.end(); ++it)
+    {
         it->set(slot_id, count, val);
+        it->set_on_satellites(slot_id, count, val);
+    }
 }
 
 
