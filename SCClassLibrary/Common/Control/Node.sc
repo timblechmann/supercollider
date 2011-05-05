@@ -1,5 +1,4 @@
 Node {
-
 	var <>nodeID, <>server, <>group;
 	var <>isPlaying = false, <>isRunning = false;
 	classvar <addActions;
@@ -11,10 +10,12 @@ Node {
 			addBefore: 2,
 			addAfter: 3,
 			addReplace: 4,
+			addPreceding: 6,
+			addSucceeding: 7,
 			h: 0,
 			t: 1,
 				// valid action numbers should stay the same
-			0: 0, 1: 1, 2: 2, 3: 3, 4: 4
+			0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 6: 6, 7: 7
 		);
 	}
 
@@ -289,11 +290,13 @@ AbstractGroup : Node {
 	}
 
 
-	*after { arg aNode;    ^this.new(aNode, \addAfter) }
+	*after { arg aNode;     ^this.new(aNode, \addAfter) }
 	*before {  arg aNode; 	^this.new(aNode, \addBefore) }
 	*head { arg aGroup; 	^this.new(aGroup, \addToHead) }
 	*tail { arg aGroup; 	^this.new(aGroup, \addToTail) }
 	*replace { arg nodeToReplace; ^this.new(nodeToReplace, \addReplace) }
+	*preceding { arg aNode;       ^this.new(aNode, \addPreceding) }
+	*succeeding { arg aNode; 	  ^this.new(aNode, \addSucceeding) }
 
     // move Nodes to this group
     moveNodeToHead { arg aNode;
@@ -472,6 +475,13 @@ Synth : Node {
 	*replace { arg nodeToReplace, defName, args;
 		^this.new(defName, args, nodeToReplace, \addReplace)
 	}
+	*preceding { arg aGroup, defName, args;
+		^this.new(defName, args, aGroup, \addPreceding);
+	}
+	*succeeding { arg aGroup, defName, args;
+		^this.new(defName, args, aGroup, \addSucceeding);
+	}
+
 	// for bundling
 	addToHeadMsg { arg aGroup, args;
 		// if aGroup is nil set to default group of server specified when basicNew was called
