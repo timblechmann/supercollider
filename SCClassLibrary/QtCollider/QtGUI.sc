@@ -35,8 +35,9 @@ QtGUI {
   *listView { ^QListView }
   *popUpMenu { ^QPopUpMenu }
   *textView { ^QTextView; }
-  *freqScope { ^QFreqScopeWindow }
-  *freqScopeView { ^QFreqScope }
+
+  *freqScope     { ^PlusFreqScopeWindow }
+  *freqScopeView { ^PlusFreqScope }
   *scopeView { ^QScope }
   *stethoscope { ^QStethoscope }
   *soundFileView { ^QSoundFileView }
@@ -51,9 +52,9 @@ QtGUI {
   *pen { ^QPen; }
   *font { ^QFont }
 
-  *dragSource { ^this.notImplemented( "DragSource"); }
-  *dragSink { ^this.notImplemented( "DragSink"); }
-  *dragBoth { ^this.notImplemented( "DragBoth"); }
+  *dragSource { ^QDragSource; }
+  *dragSink { ^QDragSink; }
+  *dragBoth { ^QDragBoth; }
 
   *dialog { ^QDialog }
 
@@ -70,6 +71,16 @@ QtGUI {
   }
 
   //////////////////////////////////////////////////////////////////////
+
+  *availableStyles {
+    _Qt_AvailableStyles
+    ^this.primitiveFailed;
+  }
+
+  *style_ { arg styleName;
+    _Qt_SetStyle
+    ^this.primitiveFailed;
+  }
 
   *stringBounds { arg aString, aFont;
     var bounds = this.prStringBounds( aString, aFont, Rect.new );

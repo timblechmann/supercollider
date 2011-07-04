@@ -185,7 +185,13 @@ SCDocHTMLRenderer : SCDocRenderer {
             },
             'subsection', {
                 file.write("<h3><a class='anchor' name='"++this.class.simplifyName(node.text)++"'>"++this.escapeSpecialChars(node.text)++"</a></h3>\n");
-                do_children.();
+                if(node.makeDiv.isNil) {
+                    do_children.();
+                } {
+                    file.write("<div id='"++node.makeDiv++"'>");
+                    do_children.();
+                    file.write("</div>");
+                };
             },
             'classmethods', {
                 if(node.children.select{|n|n.tag!=\private}.notEmpty) { //FIXME use detect
@@ -358,28 +364,7 @@ SCDocHTMLRenderer : SCDocRenderer {
                 file.write("<span class='soft'>"++this.escapeSpecialChars(node.text)++"</span>");
             },
             'link', {
-                if("^[a-zA-Z]+://.+".matchRegexp(node.text) or: (node.text.first==$/),{
-                    #n, m, f = node.text.split($#); // link, anchor, label
-                    if(f.size<1) {f=node.text};
-                    file.write("<a href=\""++node.text++"\">"++this.escapeSpecialChars(f)++"</a>");
-                },{
-                    #n, m, f = node.text.split($#); // link, anchor, label
-                    c = if(n.size>0) {baseDir+/+n++".html"} {""}; // url
-                    if(m.size>0) {c=c++"#"++m}; // add #anchor
-                    if(f.size<1) { // no label
-                        if(n.size>0) {
-                            f = if(SCDoc.docMap[n].notNil)
-                                {SCDoc.docMap[n].title} // use doc title
-                                {n.basename}; // use filename
-                            if(m.size>0) {
-                                f = f++":"+m;
-                            }
-                        } {
-                            f = if(m.size>0) {m} {"(empty link)"};
-                        };
-                    };
-                    file.write("<a href=\""++c++"\">"++this.escapeSpecialChars(f)++"</a>");
-                });
+                file.write(this.htmlForLink(node.text));
             },
             'anchor', {
                 file.write("<a class='anchor' name='"++node.text++"'>&nbsp;</a>");
@@ -565,7 +550,10 @@ SCDocHTMLRenderer : SCDocRenderer {
     renderHTMLHeader {|f,name,type,subtarget,toc=true|
         var x, cats, m, z;
         var folder = subtarget.dirname;
-        f.write("<html><head><title>"++name++"</title><link rel='stylesheet' href='"++baseDir++"/scdoc.css' type='text/css' />");
+        f.write("<html><head><title>"++name++"</title>");
+        f.write("<link rel='stylesheet' href='"++baseDir++"/scdoc.css' type='text/css' />");
+        f.write("<link rel='stylesheet' href='"++baseDir++"/frontend.css' type='text/css' />");
+        f.write("<link rel='stylesheet' href='"++baseDir++"/custom.css' type='text/css' />");
         f.write("<meta http-equiv='Content-Type' content='text/html; charset=UTF-8' />");
         f.write("<script src='" ++ baseDir ++ "/scdoc.js' type='text/javascript'></script>");
         f.write("<script src='" ++ baseDir ++ "/docmap.js' type='text/javascript'></script>");
@@ -610,7 +598,7 @@ SCDocHTMLRenderer : SCDocRenderer {
                 m = currentClass.filenameSymbol.asString;
                 f.write("<div id='filename'>Source: "++m.dirname++"/<a href='file://"++m++"'>"++m.basename++"</a></div>");
                 if(currentClass != Object) {
-                    f.write("<div class='inheritance'>");
+                    f.write("<div id='superclasses'>");
                     f.write("Inherits from: ");
                     f.write(currentClass.superclasses.collect {|c|
                         "<a href=\"../Classes/"++c.name++".html\">"++c.name++"</a>"
@@ -618,11 +606,16 @@ SCDocHTMLRenderer : SCDocRenderer {
                     f.write("</div>");
                 };
                 if(currentClass.subclasses.notNil) {
-                    f.write("<div class='inheritance'>");
+                    f.write("<div id='subclasses'>");
                     f.write("Subclasses: ");
-                    f.write(currentClass.subclasses.collect {|c|
-                        "<a href=\"../Classes/"++c.name++".html\">"++c.name++"</a>"
+                    z = false;
+                    f.write(currentClass.subclasses.collect(_.name).sort.collect {|c,i|
+                        if(i==12,{z=true;"<span id='hiddensubclasses' style='display:none;'>"},{""})
+                        ++"<a href=\"../Classes/"++c++".html\">"++c++"</a>"
                     }.join(", "));
+                    if(z) {
+                        f.write("</span><a class='subclass_toggle' href='#' onclick='javascript:showAllSubclasses(this); return false'>&hellip;&nbsp;see&nbsp;all</a>");
+                    };
                     f.write("</div>");
                 };
                 if(currentImplClass.notNil) {
@@ -640,11 +633,7 @@ SCDocHTMLRenderer : SCDocRenderer {
         if(x.text.notEmpty, {
             f.write("<div id='related'>");
             f.write("See also: ");
-            f.write(SCDoc.splitList(x.text).collect {|r|
-                z = r.split($#);
-                m = if(z[1].size>0, {"#"++z[1]}, {""});
-                "<a href=\""++baseDir +/+ z[0]++".html"++m++"\">"++r.split($/).last++"</a>"
-            }.join(", "));
+            f.write(SCDoc.splitList(x.text).collect {|r| this.htmlForLink(r)}.join(", "));
             f.write("</div>");
         });
 
@@ -657,15 +646,51 @@ SCDocHTMLRenderer : SCDocRenderer {
         if(toc, {this.renderTOC(f,name)});
     }
 
-    addUndocumentedMethods {|class,tag|
+    htmlForLink {|link|
+        var n, m, f, c;
+        #n, m, f = link.split($#); // link, anchor, label
+        ^if ("^[a-zA-Z]+://.+".matchRegexp(link) or: (link.first==$/)) {
+            if(f.size<1) {f=link};
+            "<a href=\""++link++"\">"++this.escapeSpecialChars(f)++"</a>";
+        } {
+            #n, m, f = link.split($#); // link, anchor, label
+            c = if(n.size>0) {baseDir+/+n++".html"} {""}; // url
+            if(m.size>0) {c=c++"#"++m}; // add #anchor
+            if(f.size<1) { // no label
+                if(n.size>0) {
+                    f = if(SCDoc.docMap[n].notNil)
+                        {SCDoc.docMap[n].title} // use doc title
+                        {n.basename}; // use filename
+                    if(m.size>0) {
+                        f = f++":"+m;
+                    }
+                } {
+                    f = if(m.size>0) {m} {"(empty link)"};
+                };
+            };
+            "<a href=\""++c++"\">"++this.escapeSpecialChars(f)++"</a>";
+        };
+    }
+
+    addUndocumentedMethods {|class,tag,title|
         var node = parser.findNode(tag);
-        var mets = parser.generateUndocumentedMethods(class, node, "Undocumented methods");
+        var mets = parser.generateUndocumentedMethods(class, node, title);
         mets !? {
             if(node.tag.isNil, { //no subtree, create one
                 parser.root = parser.root.add(node = (tag:tag, children:List.new));
             });
-            node.children.add(mets);
+            node.children = node.children.add(mets);
         };
+        ^node;
+    }
+
+    addInheritedMethods {|tag,div,title|
+        var node = parser.findNode(tag);
+        var mets = (tag:\subsection, text:title, children:[], makeDiv:div);
+        if(node.tag.isNil, { //no subtree, create one
+            parser.root = parser.root.add(node = (tag:tag, children:List.new));
+        });
+        node.children = node.children.add(mets);
         ^node;
     }
 
@@ -674,7 +699,9 @@ SCDocHTMLRenderer : SCDocRenderer {
 
         parser = p;
 
-//        File.delete(filename);
+        if(filename.endsWith(".html").not) {
+            MethodError(this.class.name.asString+"will only render .html files",filename).throw;
+        };
         f = File.open(filename, "w");
 
         //folder is the directory path of the file relative to the help tree,
@@ -693,8 +720,14 @@ SCDocHTMLRenderer : SCDocRenderer {
             currentImplClass = nil;
 
             currentClass !? {
-                this.addUndocumentedMethods(currentClass.class,\classmethods);
-                this.addUndocumentedMethods(currentClass,\instancemethods);
+                if(currentClass != Object) {
+                    this.addInheritedMethods(\classmethods,"inheritedclassmets","Inherited class methods");
+                    this.addInheritedMethods(\instancemethods,"inheritedinstmets","Inherited instance methods");
+                };
+
+                // FIXME: should probably get undocumented methods of implementing class?
+                this.addUndocumentedMethods(currentClass.class,\classmethods,"Undocumented class methods");
+                this.addUndocumentedMethods(currentClass,\instancemethods,"Undocumented instance methods");
                 //TODO: add methods from +ClassName.schelp (recursive search)
 
                 x = parser.findNode(\redirect).text.stripWhiteSpace;
@@ -715,10 +748,6 @@ SCDocHTMLRenderer : SCDocRenderer {
                     { n.sort = x = x + 1 }
                 );
             };
-            if(currentClass != Object) {
-                parser.root = parser.root.add((tag:\section, text:"Inherited class methods", children:[], sort:5, makeDiv:"inheritedclassmets")); // or 1?
-                parser.root = parser.root.add((tag:\section, text:"Inherited instance methods", children:[], sort:6, makeDiv:"inheritedinstmets")); // or 2?
-            };
             parser.root = parser.root.sort {|a,b| a.sort<b.sort};
 
             this.renderHTMLHeader(f,name,\class,subtarget,toc);
@@ -732,7 +761,9 @@ SCDocHTMLRenderer : SCDocRenderer {
 
         this.renderFootNotes(f);
 
-        f.write("<div class='doclink'>link::"++subtarget++"::</div>");
+        parser.currentFile !? {
+            f.write("<div class='doclink'>source: <a href='file://"++parser.currentFile++"'>"++parser.currentFile++"</a></div>");
+        };
         //f.write("<div class='version'>SuperCollider version "++Main.version++"</div>");
         f.write("</div></body></html>");
         f.close;

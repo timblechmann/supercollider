@@ -873,7 +873,11 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 
 	CGContextRef cgc = (CGContextRef)[[NSGraphicsContext currentContext] graphicsPort];
 	CGContextSaveGState(cgc);
+#if (MAC_OS_X_VERSION_MIN_REQUIRED <= MAC_OS_X_VERSION_10_4)
+	QDDrawBevelRect(cgc, (*(CGRect *)&([self bounds])), 1, true);
+#else
 	QDDrawBevelRect(cgc, NSRectToCGRect([self bounds]), 1, true);
+#endif
 	CGContextRestoreGState(cgc);
 
 }
@@ -1113,39 +1117,76 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 	loadCount = 0;
 }
 
+- (BOOL)shouldCloseWithWindow {
+	mSCWebView = nil;
+	[[SCVirtualMachine sharedInstance] removeDeferredOperationsFor:self];
+	return YES;
+}
+
 // delegate methods
 - (void)webView:(WebView *)sender didFinishLoadForFrame:(WebFrame *)frame
 {
-	//NSLog(@"frame load finished");
 	loadCount = loadCount - 1;
-	if(loadCount < 0) loadCount = 0;
-	if (loadCount == 0 && mSCWebView) {
-		//NSLog(@"all load finished");
-		mSCWebView->doOnLoadAction();
+	if (loadCount <= 0 && mSCWebView) {
+		loadCount = 0;
+		SEL selector = @selector(doLoadAction);
+		NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
+									[sender methodSignatureForSelector: selector]];
+		[invocation setTarget:sender];
+		[invocation setSelector: selector];
+		
+		[[SCVirtualMachine sharedInstance] defer: invocation];
 	}
 }
 
 - (void)webView:(WebView *)sender didStartProvisionalLoadForFrame:(WebFrame *)frame
 {
 	loadCount = loadCount + 1;
-	//NSLog(@"load started");
 }
 
 - (void)webView:(WebView *)sender didFailProvisionalLoadWithError:(NSError *)error forFrame:(WebFrame *)frame
 {
 	NSLog(@"didFailProvisionalLoadWithError: %@",[error localizedDescription]);
+	if (error.code == NSURLErrorCancelled) return; // this is Error -999
 	if (mSCWebView) {
 		post("SCWebView load request failed: '%s'\n", [[error localizedDescription] cString]);
+		SEL selector = @selector(doFailAction);
+		NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
+									[sender methodSignatureForSelector: selector]];
+		[invocation setTarget:sender];
+		[invocation setSelector: selector];
+		
+		[[SCVirtualMachine sharedInstance] defer: invocation];
+	}
+}
+
+- (void)doFailAction
+{
+	if (mSCWebView) {
 		mSCWebView->doLoadFailedAction();
+	}
+}
+
+- (void)doLoadAction
+{
+	if (mSCWebView) {
+		mSCWebView->doOnLoadAction();
 	}
 }
 
 - (void)webView:(WebView *)sender didFailLoadWithError:(NSError *)error
 {
 	NSLog(@"didFailLoadWithError: %@",[error localizedDescription]);
+	if (error.code == NSURLErrorCancelled) return; // this is Error -999
 	if (mSCWebView) {
 		post("SCWebView load request failed: '%s'\n", [[error localizedDescription] cString]);
-		mSCWebView->doLoadFailedAction();
+		SEL selector = @selector(doFailAction);
+		NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
+									[sender methodSignatureForSelector: selector]];
+		[invocation setTarget:sender];
+		[invocation setSelector: selector];
+		
+		[[SCVirtualMachine sharedInstance] defer: invocation];
 	}
 }
 
@@ -1163,8 +1204,16 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 		} else {
 			//NSLog(@"fire action");
 			[listener ignore];
-			NSString *urlString = [[request URL] absoluteString];
-			[self doLinkAction:urlString];
+			NSString *urlString = [[[request URL] absoluteString] retain];
+
+			SEL selector = @selector(doLinkAction:);
+			NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
+										[webView methodSignatureForSelector: selector]];
+			[invocation setTarget:webView];
+			[invocation setSelector: selector];
+			[invocation setArgument:&urlString atIndex:2];
+			
+			[[SCVirtualMachine sharedInstance] defer: invocation];
 		}
 	} else { 
 		[listener use];
@@ -1185,37 +1234,7 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 	const char * cstr = [urlString UTF8String];
 	PyrString *string = newPyrString(g->gc, cstr, 0, true);
 	mSCWebView->doLinkClickedAction(string);
-}
-
-- (BOOL)webView:(WebView *)aWebView doCommandBySelector:(SEL)aSelector
-{
-
-	NSEvent *currentEvent = [NSApp currentEvent];
-	unsigned short keycode = [currentEvent keyCode];
-	NSUInteger modFlags = [currentEvent modifierFlags];
-	
-	//printf("keycode: %d\n", keycode);
-	
-	// Exec on Ctrl c or Enter
-	if ( (aSelector == @selector(insertNewline:) && enterExecutesSelection && (keycode == 76)) || ( keycode == 8 && (modFlags & NSControlKeyMask)) ) {
-			
-			if (!compiledOK) {
-				return NO;
-			}
-			
-			NSString* selection = [self stringByEvaluatingJavaScriptFromString:@"(function (){selObj = window.getSelection(); string = selObj.toString(); selObj.collapseToEnd(); return string })();"];
-			const char *text = [selection UTF8String];
-			int textlength = strlen(text);
-			
-			[[SCVirtualMachine sharedInstance] setCmdLine: text length: textlength];
-			
-			pthread_mutex_lock(&gLangMutex);
-			runLibrary(getsym("interpretPrintCmdLine"));
-			pthread_mutex_unlock(&gLangMutex);
-			
-			return YES;
-		} 
-	return NO;
+	[urlString release];
 }
 
 - (BOOL)webView:(WebView *)webView shouldInsertText:(NSString *)insertText replacingDOMRange:(DOMRange *)range givenAction:(WebViewInsertAction)action
@@ -1232,6 +1251,12 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 		[[self window] keyDown:event];
 	}
 	mSCWebView->keyDown(character, modifiers,[event keyCode]);
+	if ([characters isEqual: @"\03"] ||
+		(([characters isEqual: @"\n"] || [characters isEqual: @"\r"]) && ([event modifierFlags] & (NSControlKeyMask | NSShiftKeyMask)))) {
+		[self executeSelection: self];
+		return NO;
+	}
+	
 	return YES;
 }
 
@@ -1247,12 +1272,71 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 		[[self window] keyDown:event];
 	}
 	mSCWebView->keyDown(character, modifiers,[event keyCode]);
-	[super keyDown:event];
+	if ([characters isEqual: @"\03"] ||
+		(([characters isEqual: @"\n"] || [characters isEqual: @"\r"]) && ([event modifierFlags] & (NSControlKeyMask | NSShiftKeyMask)))) {
+		[self executeSelection: self];
+	} else {
+		[super keyDown:event];
+	}
+	
 }
 
 - (void) setEnterExecutesSelection: (BOOL) flag
 {
 	enterExecutesSelection = flag;
+}
+
+- (void)sendSelection: (char*) methodName
+{
+    if (!compiledOK) {
+        return;
+    }
+	
+	[self setSelection];
+	
+    pthread_mutex_lock(&gLangMutex);
+    runLibrary(getsym(methodName));
+    pthread_mutex_unlock(&gLangMutex);
+	
+}
+
+- (void)setSelection;
+{
+	NSString* selection = [self stringByEvaluatingJavaScriptFromString:@"(function (){selectLine(); selObj = window.getSelection(); string = selObj.toString(); selObj.collapseToEnd(); return string })();"];
+	const char *text = [selection UTF8String];
+	int textlength = strlen(text);
+	
+	[[SCVirtualMachine sharedInstance] setCmdLine: text length: textlength];
+}
+
+- (IBAction)openCode:(id)sender
+{
+    [self sendSelection: "openCodeFile"];
+}
+
+- (IBAction) showHelpFor: (id) sender
+{
+	[self sendSelection: "showHelp"];
+}
+
+- (IBAction)showHelpSearch:(id)sender {
+	[self sendSelection: "showHelpSearch"];
+}
+
+- (IBAction)methodTemplates: (id)sender
+{
+    [self sendSelection: "methodTemplates"];
+}
+
+- (IBAction)methodReferences: (id)sender
+{
+    [self sendSelection: "methodReferences"];
+}
+
+- (IBAction)executeSelection: (id) sender
+{
+	if(enterExecutesSelection)
+		[self sendSelection: "interpretPrintCmdLine" ];
 }
 
 @end
@@ -2512,6 +2596,8 @@ SCWebView::SCWebView(SCContainerView *inParent, PyrObject* inObj, SCRect inBound
 SCWebView::~SCWebView()
 {
 	[mWebView removeFromSuperview];
+	[mWebView close];
+	[[SCVirtualMachine sharedInstance] removeDeferredOperationsFor:mWebView];
 	[mWebView release];
 }
 

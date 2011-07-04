@@ -11,6 +11,12 @@ if (NOT CMAKE_BUILD_TYPE)
 	set(CMAKE_BUILD_TYPE "Release")
 endif()
 
+if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
+	message(FATAL_ERROR "Rejecting in-place build:\n"
+		"please remove ${CMAKE_SOURCE_DIR}/CMakeCache.txt ${CMAKE_SOURCE_DIR}/CMakeFiles and try again with a build directory")
+endif()
+
+
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules
                       ${CMAKE_MODULE_PATH})
 
@@ -49,6 +55,10 @@ if(APPLE)
 	MESSAGE( STATUS "Using HID Utilities from folder '${HID_UTIL_DIR}'")
 endif()
 
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+	set(LINUX 1)
+endif()
+
 #############################################
 # Compiler flags etc
 
@@ -57,12 +67,10 @@ if (${CMAKE_COMPILER_IS_GNUCXX})
 
 	add_definitions("-fschedule-insns2" "-fomit-frame-pointer")
 
+	add_definitions("-Wreturn-type")
+
 	if (${_gcc_version} VERSION_GREATER 4.0.99)
 		add_definitions("-ffast-math")
-	endif()
-
-	if (${_gcc_version} VERSION_GREATER 4.5.99)
-		add_definitions("-fpermissive") # boost.atomic is using a deprecated syntax
 	endif()
 
 	option(DSO_VISIBILITY "DSO visibility support for gcc" OFF)
@@ -85,6 +93,16 @@ if (${CMAKE_COMPILER_IS_GNUCXX})
 		add_definitions("-pthread")
 	endif()
 endif ()
+
+if (${CMAKE_CXX_COMPILER} MATCHES icpc)
+	set(CMAKE_COMPILER_IS_INTEL 1)
+	add_definitions(-Wno-unknown-pragmas)
+	add_definitions(-simd)
+endif()
+
+if (${CMAKE_CXX_COMPILER} MATCHES clang)
+	set(CMAKE_COMPILER_IS_CLANG 1)
+endif()
 
 if(APPLE)
 	set_property(DIRECTORY
@@ -149,7 +167,8 @@ option(SSE41 "Compile with support for SSE4.1 instructions.")
 option(SSE42 "Compile with support for SSE4.2 instructions.")
 
 
-option(SC_DOC "Generate SCDoc documentation." OFF)
+option(INSTALL_HELP "Install help docs and examples along with the software" ON)
+option(SC_DOC_RENDER "Pre-render SCDoc documentation. (For putting online, etc)" OFF)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     option(SUPERNOVA "Build with supernova as optional audio synthesis server" ON)
@@ -185,25 +204,50 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     option(LTO "Use GCC's link time optimizer' (experimental).")
 endif()
 
+option(SC_SYMLINK_CLASSLIB "Place a symlink of SCCLassLibrary instead of copying" OFF)
+option(SC_OX "Try to compile with support for C++0x (experimental, mainly related to supernova)" OFF)
+
 #############################################
 # some preprocessor flags
-if(CMAKE_COMPILER_IS_GNUCXX)
-  if(SSE)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse -mfpmath=sse")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -mfpmath=sse")
-  endif()
-  if(SSE41)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.1")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.1")
-  endif()
-  if(SSE42)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.2")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.2")
-  endif()
-  if(NATIVE)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-  endif()
+if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
+	if (SSE)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse -mfpmath=sse")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -mfpmath=sse")
+	endif()
+	if (SSE41)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.1")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.1")
+	endif()
+	if (SSE42)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.2")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.2")
+	endif()
+	if (NATIVE)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+	endif()
+
+	if (SC_OX)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+	endif()
+endif()
+
+if (CMAKE_COMPILER_IS_INTEL AND NOT WIN32)
+	if (SSE42)
+		add_definitions(-xSSE4.2)
+	elseif (SSE41)
+		add_definitions(-xSSE4.1)
+	elseif (SSE)
+		add_definitions(-mia32)
+	endif()
+	if (SC_OX)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+	endif()
+
+	# disable warnings
+	add_definitions(-diag-disable 170) # pointer points outside of underlying object ... used heavily in sclang
+	add_definitions(-diag-disable 279) # controlling expression is constant
+
 endif()
 
 if (SC_MEMORY_DEBUGGING)
@@ -212,12 +256,12 @@ endif()
 
 #############################################
 # subdirectories
+add_subdirectory(external_libraries)
 add_subdirectory(server)
 add_subdirectory(lang)
 add_subdirectory(bindings)
 add_subdirectory(platform)
 add_subdirectory(editors)
-add_subdirectory(external_libraries)
 
 if (SC_QT)
   message( STATUS "Compiling with Qt GUI" )
@@ -256,14 +300,62 @@ else()
 	set(SCCLASSLIB_EXCLUDE_REGEX "IGNOREME")
 endif()
 
-install(DIRECTORY SCClassLibrary
-	DESTINATION ${auxresourcesdir}
-	REGEX ${SCCLASSLIB_EXCLUDE_REGEX} EXCLUDE
-)
+if(APPLE)
+	#if directory contains symlinks, unlink them.
+	if(EXISTS "${auxresourcesdir}/SCClassLibrary")
+		file(GLOB classlibraryfolders "${auxresourcesdir}/SCClassLibrary/[^.]*")
+		foreach(onedirectory ${classlibraryfolders})
+			if(IS_SYMLINK "${onedirectory}")
+				install( CODE "EXECUTE_PROCESS(COMMAND unlink ${onedirectory} )" )
+			endif()
+		endforeach(onedirectory)
+	endif()
 
-install(DIRECTORY Help examples sounds HelpSource
+	if(SC_SYMLINK_CLASSLIB)
+
+		#if there are folders inside SCCLassLibrary abort cmake.
+		file(GLOB classlibraryfolders "${auxresourcesdir}/SCClassLibrary/[^.]*")
+		foreach(onedirectory ${classlibraryfolders})
+			if(NOT IS_SYMLINK "${onedirectory}")
+				message(FATAL_ERROR "Symlinking will fail ! SCClassLibrary folder already exists and has directories inside, please delete it first." )
+			endif()
+		endforeach(onedirectory)
+
+		message(STATUS "Will create symlink of SCClassLibrary to ${auxresourcesdir}/SCClassLibrary" )
+		if(NOT EXISTS "${auxresourcesdir}/SCClassLibrary")
+			install( CODE "EXECUTE_PROCESS(COMMAND mkdir ${auxresourcesdir}/SCClassLibrary)" )
+		endif()
+		#symlink the folders inside SCCLassLibrary. Check if QtCollider folder should be symlinked or not.
+		file(GLOB classlibraryfolders RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary" "SCClassLibrary/[^.]*")
+		foreach(onedirectory ${classlibraryfolders})
+			if(NOT "${onedirectory}" MATCHES "${SCCLASSLIB_EXCLUDE_REGEX}")
+				install( CODE
+					"EXECUTE_PROCESS(COMMAND ln -s ${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary/${onedirectory} ${auxresourcesdir}/SCClassLibrary/${onedirectory} )" )
+			endif()
+		endforeach(onedirectory)
+	else()
+		message(STATUS "Will copy SCCLassLibrary to ${auxresourcesdir}")
+		install(DIRECTORY SCClassLibrary
+			DESTINATION ${auxresourcesdir}
+			REGEX ${SCCLASSLIB_EXCLUDE_REGEX} EXCLUDE
+		)
+	endif()
+else()
+	install(DIRECTORY SCClassLibrary
+		DESTINATION ${auxresourcesdir}
+		REGEX ${SCCLASSLIB_EXCLUDE_REGEX} EXCLUDE
+	)
+endif()
+
+
+install(DIRECTORY sounds
 	DESTINATION ${auxresourcesdir}
 )
+if(INSTALL_HELP)
+	install(DIRECTORY Help examples HelpSource
+		DESTINATION ${auxresourcesdir}
+	)
+endif()
 
 #############################################
 #
@@ -276,10 +368,6 @@ list(APPEND BUILD_CLASSLIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary/Def
 list(APPEND BUILD_CLASSLIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary/JITLib")
 list(APPEND BUILD_CLASSLIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary/backwards_compatibility")
 
-if(SC_QT AND NOT CMAKE_SYSTEM_NAME MATCHES "Linux") ## on linux, we don't include qtcollider to avoid connecting with the x server
-	list(APPEND BUILD_CLASSLIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary/QtCollider")
-endif()
-
 # this folder has an extension to Platform that disables the loadStartupFiles method
 list(APPEND BUILD_CLASSLIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/platform/disable_startup_files")
 
@@ -289,14 +377,14 @@ endforeach()
 
 configure_file(build_sclang.cfg.in ${CMAKE_CURRENT_BINARY_DIR}/build_sclang.cfg)
 
-if(SC_DOC)
+if(SC_DOC_RENDER)
 	file(GLOB_RECURSE SCDocSources RELATIVE HelpSource .*[^~])
 	file(GLOB_RECURSE SCDocClasses RELATIVE SCClassLibrary/SCDoc *.sc)
 
 	add_custom_target(doc ALL
 					COMMAND ${CMAKE_CURRENT_BINARY_DIR}/lang/sclang${CMAKE_EXECUTABLE_SUFFIX}
 							-l ${CMAKE_CURRENT_BINARY_DIR}/build_sclang.cfg
-							HelpSource/compileHelp.scd ${CMAKE_CURRENT_SOURCE_DIR}/HelpSource ${CMAKE_CURRENT_BINARY_DIR}/HelpBase
+							platform/renderAllHelp.scd ${CMAKE_CURRENT_SOURCE_DIR}/HelpSource ${CMAKE_CURRENT_BINARY_DIR}/RenderedHelp
 					WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 					DEPENDS sclang ${SCDocSources} ${SCDocClasses})
 
@@ -304,7 +392,7 @@ endif()
 
 set_directory_properties(
 	PROPERTIES
-	ADDITIONAL_MAKE_CLEAN_FILES "HelpBase")
+	ADDITIONAL_MAKE_CLEAN_FILES "RenderedHelp")
 
 #############################################
 #

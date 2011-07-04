@@ -17,6 +17,7 @@ set( QT_COLLIDER_HDRS
   QObjectProxy.h
   QWidgetProxy.h
   widgets/BasicWidgets.h
+  widgets/QcTreeWidget.h
   widgets/QcScrollArea.h
   widgets/QcNumberBox.h
   widgets/QcSlider.h
@@ -35,6 +36,7 @@ set( QT_COLLIDER_HDRS
 )
 
 set( QT_COLLIDER_SRCS
+  debug.cpp
   interface.cpp
   QcApplication.cpp
   Common.cpp
@@ -48,6 +50,7 @@ set( QT_COLLIDER_SRCS
   primitives/prim_misc.cpp
   primitives/prim_QWidget.cpp
   widgets/BasicWidgets.cpp
+  widgets/QcTreeWidget.cpp
   widgets/QcScrollArea.cpp
   widgets/QcAbstractStepValue.cpp
   widgets/QcNumberBox.cpp
@@ -66,6 +69,7 @@ set( QT_COLLIDER_SRCS
   widgets/QcWebView.cpp
   layouts/classic_layouts.cpp
   layouts/layouts.cpp
+  style/ProxyStyle.cpp
 )
 
 set( QT_USE_QTWEBKIT TRUE )

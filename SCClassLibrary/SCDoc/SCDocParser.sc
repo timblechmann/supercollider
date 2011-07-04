@@ -11,7 +11,7 @@ SCDocParser {
     var isWS;
     var stripFirst;
     var proseDisplay;
-    var currentFile;
+    var <>currentFile;
     var <methodList, <keywordList;
     classvar copyMethodCache;
 
@@ -272,7 +272,7 @@ SCDocParser {
     }
 
     parse {|string|
-        var lines = string.split($\n); //split lines
+        var lines = string.replace("\r","").split($\n); //split lines
 //        var lines = string.findRegexp("[^\n]+").flop[1]; //doesn't work for empty lines
 
         var w, split, split2, word;
@@ -306,6 +306,30 @@ SCDocParser {
         currentFile = filename;
         this.parse(file.readAllString);
         file.close;
+    }
+
+    merge {|p2|
+        var n;
+        var sects = IdentitySet[\classmethods,\instancemethods,\section,\subsection,\examples];
+        var do_children = {|dest,children|
+            var res;
+            children !? {
+                children.do {|node|
+                    if(sects.includes(node.tag)) {
+                        n = dest.detect {|x| (x.tag==node.tag) and: {x.text==node.text}};
+                        if(n.isNil) {
+                            dest = dest.add(node);
+                        } {
+                            n.children = do_children.(n.children,node.children);
+                        }
+                    } {
+                        dest = dest.add(node);
+                    }
+                }
+            };
+            dest;
+        };
+        root = do_children.(root,p2.root);
     }
 
     parseMetaData {|path|
@@ -351,7 +375,11 @@ SCDocParser {
                                     if("[a-z][a-zA-Z0-9_]*|[-<>@|&%*+/!?=]+".matchRegexp(name).not) {
                                         warn("Methodname not valid: '"++name++"' in"+path);
                                     } {
-                                        m = name.asSymbol.asGetter;
+                                        m = name.asSymbol;
+                                        if(m.isSetter) {
+                                            warn("Methods should be given as getters, without the _ suffix:"+name+"in"+path);
+                                            m = m.asGetter;
+                                        };
                                         methods = methods.add("_"++pfx++m);
                                         switch(pfx,
                                             "*", {cmets.add(m)},

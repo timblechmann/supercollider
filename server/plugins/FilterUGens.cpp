@@ -2421,20 +2421,18 @@ void RHPF_next_1(RHPF* unit, int inNumSamples)
 
 void LPF_Ctor(LPF* unit)
 {
-	////printf("LPF_Reset\n");
-
-	if (unit->mBufLength == 1) {
+	if (unit->mBufLength == 1)
 		SETCALC(LPF_next_1);
-	} else {
+	else
 		SETCALC(LPF_next);
-		unit->m_a0 = 0.f;
-		unit->m_b1 = 0.f;
-		unit->m_b2 = 0.f;
-		unit->m_y1 = 0.f;
-		unit->m_y2 = 0.f;
-		unit->m_freq = 0.f;
-		ZOUT0(0) = 0.f;
-	}
+
+	unit->m_a0 = 0.f;
+	unit->m_b1 = 0.f;
+	unit->m_b2 = 0.f;
+	unit->m_y1 = 0.f;
+	unit->m_y2 = 0.f;
+	unit->m_freq = 0.f;
+	ZOUT0(0) = 0.f;
 }
 
 
@@ -4710,6 +4708,20 @@ federico.fontana@univr.it
 
 Ported to C++ for SuperCollider by Dan Stowell - August 2007
 http://www.mcld.co.uk/
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301  USA
 */
 //////////////////////////////////////////////////////////////////
 

@@ -1,6 +1,6 @@
 SCDoc {
     // Increment this whenever we make a change to the SCDoc system so that all help-files should be processed again
-    classvar version = 9;
+    classvar version = 17;
 
     classvar <helpTargetDir;
     classvar <helpSourceDir;
@@ -10,9 +10,7 @@ SCDoc {
     classvar <undocumentedClasses;
     classvar <>verbose = false;
     classvar doWait;
-    classvar progressText = nil, progressWindow = nil;
     classvar progressCount = 0, progressMax = 0;
-    classvar progressTopic = nil, progressBar = nil, closeButton = nil;
     classvar new_classes = nil;
     classvar didRun = false;
     classvar isProcessing = false;
@@ -32,18 +30,9 @@ SCDoc {
         helpTargetDir = path.standardizePath;
     }
 
-    *postProgress {|string,setTopic=false|
+    *postProgress {|string|
         var prg = "";
         if(progressMax>0) {prg = (progressCount/progressMax*100).round(0.1).asString ++ "% "};
-        if(progressWindow.notNil) {
-            if(setTopic, {
-                progressTopic.string = string;
-                progressText.string = prg;
-            }, {
-                progressText.string = prg+string;
-            });
-            if(progressMax>0) {progressBar.lo_(0).hi_(progressCount/progressMax)};
-        };
         if(verbose) {("SCDoc:"+prg++string).postln};
         this.maybeWait;
     }
@@ -101,7 +90,7 @@ SCDoc {
             mets.do {|m| //need to iterate over mets to keep the order
                 name = m.name;
                 if (name.isSetter.not or: {syms.includes(name.asGetter).not}) {
-                    l = l.add(name.asString);
+                    l = l.add(name.asGetter.asString);
                 };
             };
         };
@@ -113,7 +102,7 @@ SCDoc {
     }
 
     *addToDocMap {|parser, path|
-        var c, folder = path.dirname, classname = parser.findNode(\class).text;
+        var folder = path.dirname, classname = parser.findNode(\class).text;
         var doc = (
             path:path,
             summary:parser.findNode(\summary).text,
@@ -171,7 +160,7 @@ SCDoc {
         var f, path = this.helpTargetDir +/+ "version";
         if(path.load != version) {
             // FIXME: should we call this.syncNonHelpFiles here to ensure that helpTargetDir exists?
-            this.postProgress("SCDoc: version update, refreshing timestamp");
+            this.postProgress("version update, refreshing timestamp");
             // this will update the mtime of the version file, triggering re-rendering and clean doc_map
             f = File.open(path,"w");
             f.write(version.asCompileString);
@@ -186,7 +175,7 @@ SCDoc {
         var verpath = this.helpTargetDir +/+ "version";
 
         if(this.checkVersion or: {("test"+verpath.escapeChar($ )+"-nt"+path.escapeChar($ )).systemCmd==0}) {
-            this.postProgress("SCDoc: not reading scdoc_cache due to version timestamp update");
+            this.postProgress("not reading scdoc_cache due to version timestamp update");
             doc_map = nil;
         } {
             doc_map = path.load;
@@ -214,59 +203,53 @@ SCDoc {
         ^doc_map;
     }
 
-    *makeProgressWindow {
-        if(GUI.scheme.name != \QtGUI, {^nil});
-
-        if(progressWindow.isNil) {
-            progressWindow = Window("Documentation update",500@200).alwaysOnTop_(true).userCanClose_(false).layout_(QVLayout.new);
-            progressWindow.onClose = {progressWindow = nil};
-            StaticText(progressWindow).string_("Please wait while updating help files...");
-            progressBar = RangeSlider(progressWindow,300@20).orientation_(\horizontal).background_(Color(0.8,0.8,0.8)).knobColor_(Color(0.5,0.5,0.8));
-            progressTopic = StaticText(progressWindow).font = Font(Font.defaultSansFace,12).boldVariant;
-            progressText = TextView(progressWindow).editable_(false);
-            closeButton = Button(progressWindow).states_([["Close"]]).enabled_(false).action = {progressWindow.close; progressWindow = nil};
-            progressWindow.front;
-        };
-    }
-
     *tickProgress { progressCount = progressCount + 1 }
 
     *maybeWait {
         var t;
-        if(doWait and: {(t = Main.elapsedTime)-lastUITick > 0.2}) {
+        if(doWait and: {(t = Main.elapsedTime)-lastUITick > 0.1}) {
             0.wait;
             lastUITick = t;
         }
     }
 
     *parseAndRender {|src,dest,subtarget|
+        var p2;
         SCDoc.postProgress(src+"->"+dest);
         p.parseFile(src);
+
+        doc_map[subtarget].additions.do {|ext|
+            p2 = p2 ?? {p.class.new};
+            p2.parseFile(ext);
+            p.merge(p2);
+        };
+
         r.render(p,dest,subtarget);
     }
 
-    *renderAll {|force=false,gui=true,threaded=true,findExtensions=true,doneFunc|
-        var count, count2, func, x, fileList, subtarget, dest, t = Main.elapsedTime;
+    *renderAll {|force=false,threaded=true,findExtensions=true,doneFunc|
+        var count, count2, func, x, fileList, subtarget, dest, t = Main.elapsedTime, oldVerbose = verbose;
 
         func = {
             progressMax = 100;
             progressCount = 0;
+            verbose = true;
 
+            this.cleanState(force);
             if(findExtensions) {
                 this.findHelpSourceDirs;
             } {
                 helpSourceDirs = Set[helpSourceDir];
             };
             this.tickProgress;
-            this.cleanState(force);
             this.getAllMetaData;
             this.tickProgress;
 
             fileList = Dictionary.new;
             count = 0;
-            this.postProgress("Updating all files",true);
+            this.postProgress("Updating all files");
             helpSourceDirs.do {|dir|
-                fileList[dir] = ("find -L"+dir.escapeChar($ )+"-type f -name '*.schelp'")
+                fileList[dir] = ("find -L"+dir.escapeChar($ )+"-type f -name '*.schelp' -not -name '*.ext.schelp'")
                     .unixCmdGetStdOutLines.reject(_.isEmpty).asSet;
                 count = count + fileList[dir].size;
             };
@@ -274,7 +257,7 @@ SCDoc {
             progressCount = 3 * ((count+count2)/progressMax);
             progressMax = count+count2+progressCount;
 
-            this.postProgress("Found"+count+"help files",true);
+            this.postProgress("Found"+count+"help files");
             helpSourceDirs.do {|dir|
                 x = fileList[dir].size;
                 if(x>0) {
@@ -291,7 +274,7 @@ SCDoc {
                     };
                 };
             };
-            this.postProgress("Found"+count2+"undocumented classes",true);
+            this.postProgress("Found"+count2+"undocumented classes");
             undocumentedClasses.do {|name|
                 dest = helpTargetDir+/+"Classes"+/+name++".html";
                 if(this.makeClassTemplate(name.asString,dest).not) {
@@ -300,15 +283,11 @@ SCDoc {
                 this.tickProgress;
             };
             this.postProgress("Done! time spent:"+(Main.elapsedTime-t)+"sec");
+            verbose = oldVerbose;
             doneFunc.value();
-            progressWindow !? {
-                progressWindow.userCanClose = true;
-                closeButton.enabled = true;
-            };
         };
 
-        doWait = threaded or: gui;
-        if(gui){this.makeProgressWindow};
+        doWait = threaded;
         if(doWait, {
             Routine(func).play(AppClock);
         }, func);
@@ -318,21 +297,24 @@ SCDoc {
         didRun = false;
         helpSourceDirs = nil;
         if(noCache) {
-            doWait = false;
+            doWait = thisThread.isKindOf(Routine);
             this.syncNonHelpFiles; // ensure helpTargetDir exists
             ("touch"+(helpTargetDir+/+"version").escapeChar($ )).systemCmd;
         }
     }
 
-    *prepareHelpForURL {|url,doYield=false|
+    *prepareHelpForURL {|url|
         var proto, path, anchor;
-        var subtarget, src, c;
+        var subtarget, src, c, cmd;
         var verpath = this.helpTargetDir +/+ "version";
 
-        doWait = doYield;
+        doWait = thisThread.isKindOf(Routine);
 
         if(isProcessing) {
             "SCDoc: prepareHelpForURL already running.. waiting for the first to finish.".warn;
+            if(doWait.not) {
+                Error("SCDoc: cannot wait for already running prepareHelpForURL, this call was not made inside a Routine").throw;
+            };
             c = Condition.new;
             Routine {
                 while {0.5.wait; isProcessing};
@@ -391,9 +373,13 @@ SCDoc {
                     ^nil;
                 };
             } {
-                if(src.notNil and:
-                {("test"+src.escapeChar($ )+"-nt"+path.escapeChar($ )
-                 +"-o"+verpath.escapeChar($ )+"-nt"+path.escapeChar($ )).systemCmd==0}) {
+                cmd = {
+                    ("test" + ([src,verpath]++doc_map[subtarget].additions).collect {|x|
+                        x.escapeChar($ )+"-nt"+path.escapeChar($ )
+                    }.join(" -o ")).systemCmd == 0
+                };
+
+                if(src.notNil and: cmd) {
                     // target file and helpsource exists, and helpsource is newer than target
                     this.parseAndRender(src,path,subtarget);
                     isProcessing = false;
@@ -404,16 +390,21 @@ SCDoc {
             };
         } {
             isProcessing = false;
-        }
+        };
         ^url;
     }
 
     *makeClassTemplate {|name,path|
         var class = name.asSymbol.asClass;
         var n, m, cats, f;
-//        f = class.filenameSymbol.asString.escapeChar($ );
-        f = (helpTargetDir+/+"version").escapeChar($ );
-        if(class.notNil and: {("test"+f+"-nt"+path.escapeChar($ )+"-o ! -e"+path.escapeChar($ )).systemCmd==0}) {
+
+        doWait = thisThread.isKindOf(Routine);
+
+        if(class.notNil and: {path.isNil
+            or: {
+                ("test"+(helpTargetDir+/+"version").escapeChar($ )+"-nt"+path.escapeChar($ )+"-o ! -e"+path.escapeChar($ )).systemCmd==0
+            }
+        }) {
             this.postProgress("Undocumented class:"+name+", generating stub and template");
             cats = "Undocumented classes";
             if(this.classHasArKrIr(class)) {
@@ -477,31 +468,52 @@ SCDoc {
                 txt;
             };
 
+            m = "CLASS::"+name
+                ++"\nsummary:: (put short description here)\n"
+                ++"categories::"+cats
+                ++"\nrelated:: Classes/SomeRelatedClass, Reference/SomeRelatedStuff, etc.\n\n"
+                ++"DESCRIPTION::\n(put long description here)\n\n"
+                ++ f.(\classmethods) ++ f.(\instancemethods)
+                ++"\nEXAMPLES::\n\ncode::\n(some example code)\n::\n";
+
             n = n.add((
                 tag:\section, text:"Help Template", children:[
                     (tag:\prose, display:\block,
-                    text:"Fill out and save the template below to HelpSource/Classes/"++name++".schelp"),
+                    text:"Copy the template below or run"),
                     (tag:\code,
-                    text:"CLASS::"+name
-                    ++"\nsummary:: (put short description here)\n"
-                    ++"categories::"+cats
-                    ++"\nrelated:: Classes/SomeRelatedClass, Reference/SomeRelatedStuff, etc.\n\n"
-                    ++"DESCRIPTION::\n(put long description here)\n\n"
-                    ++ f.(\classmethods) ++ f.(\instancemethods)
-                    ++"\nEXAMPLES::\n\ncode::\n(some example code)\n::\n",
+                    text:"Document.new(string:SCDoc.makeClassTemplate(\\"++name++"))",
+                    display:\block),
+                    (tag:\prose,
+                    text:"to open a new Document with the template.\nSave it to HelpSource/Classes/"++name++".schelp",
+                    display:\block),
+                    (tag:\code,
+                    text:m,
                     display:\block)
                 ]
             ));
-            p.root = n;
-            r.render(p,path,"Classes/"++name);
-            ^true;
+
+            if(path.notNil) {
+                p.root = n;
+                p.currentFile = nil;
+                r.render(p,path,"Classes/"++name);
+                ^true;
+            } {
+                ^m;
+            };
         };
-        ^false;
+        ^if(path.notNil,false,nil);
+    }
+
+    *checkSystemCmd {|cmd|
+        if(("which"+cmd+"> /dev/null").systemCmd != 0) {
+            Error("'"++cmd++"' is not installed. Please install it and try again.").throw;
+        };
     }
 
     *findHelpSourceDirs {
         if(helpSourceDirs.notNil) {^this};
         this.postProgress("Finding HelpSource folders...");
+        this.checkSystemCmd("find");
         helpSourceDirs = Set[helpSourceDir];
         [thisProcess.platform.userExtensionDir, thisProcess.platform.systemExtensionDir].do {|dir|
             helpSourceDirs = helpSourceDirs | ("find -L"+dir.escapeChar($ )+"-name 'HelpSource' -type d -prune")
@@ -511,67 +523,117 @@ SCDoc {
     }
 
     *syncNonHelpFiles {
+        var cmd, c;
+
+        doWait = thisThread.isKindOf(Routine);
         this.findHelpSourceDirs;
-        this.postProgress("Synchronizing non-schelp files");
-        helpSourceDirs.do {|dir|
-            ("rsync -rlt --exclude '*.schelp' --exclude '.*'"+dir.escapeChar($ )++"/"+helpTargetDir.escapeChar($ )+"2>/dev/null").systemCmd;
+        this.postProgress("Synchronizing non-schelp files...");
+        this.checkSystemCmd("rsync");
+
+        cmd = "rsync -rlt --exclude '*.schelp' --exclude '.*' %/ %";
+
+        if(doWait) {
+            c = Condition.new;
+            helpSourceDirs.do {|dir|
+                cmd.format(dir.escapeChar($ ),helpTargetDir.escapeChar($ )).unixCmd({c.unhang},false);
+                c.hang;
+            };
+        } {
+            helpSourceDirs.do {|dir|
+                cmd.format(dir.escapeChar($ ),helpTargetDir.escapeChar($ )).systemCmd;
+            };
         };
+        this.postProgress("Synchronizing non-schelp files: Done");
     }
 
     *getAllMetaData {
         var subtarget, classes, cats, t = Main.elapsedTime;
-        var update = false, doc, ndocs = 0;
+        var update = false, doc, ndocs;
 
         this.syncNonHelpFiles; // ensure that helpTargetDir exist
-
+        classes = Class.allClasses.collectAs(_.name,IdentitySet).reject(_.isMetaClassName);
+        this.readDocMap;
         this.postProgress("Getting metadata for all docs...");
 
-        classes = Class.allClasses.collectAs(_.name,IdentitySet).reject(_.isMetaClassName);
+        //FIXME: if classtree changed, force total re-render (touch version timestamp)
 
-        this.readDocMap;
-
-        this.postProgress("Parsing metadata...");
-        // parse all files in fileList
+        ndocs = 0;
         helpSourceDirs.do {|dir|
-            var path, mtime, ext, sym, class;
+            var x, path, mtime, ext, sym, class;
             ext = (dir != helpSourceDir);
             this.postProgress("- Collecting from"+dir);
             Platform.case(
 //                \linux, {"find -L"+dir.escapeChar($ )+"-type f -name '*.schelp' -printf '%p;%T@\n'"},
-                \linux, {"find -L"+dir.escapeChar($ )+"-type f -name '*.schelp' -exec stat -c \"%n;%Z\" {} +"},
-                \osx, {"find -L"+dir.escapeChar($ )+"-type f -name '*.schelp' -exec stat -f \"%N;%m\" {} +"}
+                \linux, {"find -L"+dir.escapeChar($ )+"-type f -name '*.schelp' -not -name '*.ext.schelp' -exec stat -c \"%n;%Z\" {} +"},
+                \osx, {"find -L"+dir.escapeChar($ )+"-type f -name '*.schelp' -not -name '*.ext.schelp' -exec stat -f \"%N;%m\" {} +"}
             ).unixCmdGetStdOutLines.do {|line|
                 #path, mtime = line.split($;);
                 subtarget = path[dir.size+1 ..].drop(-7);
                 doc = doc_map[subtarget];
+
+                if(subtarget.dirname=="Classes") {
+                    sym = subtarget.basename.asSymbol;
+                    class = sym.asClass;
+                } {
+                    sym = nil;
+                };
+
+                //FIXME: if implementor class changed since last time, force a re-render.
+                //if doc.redirect && doc.implementor != class.tryPerform(doc.redirect.asSymbol).asSymbol
+
                 if(doc.isNil or: {mtime != doc.mtime}) {
                     p.parseMetaData(path);
-                    //FIXME: if doc uses 'classtree::', force a re-render by setting mtime=0 ??
                     this.addToDocMap(p,subtarget);
                     doc = doc_map[subtarget];
                     doc.methods = p.methodList;
                     doc.keywords = p.keywordList;
                     doc.mtime = mtime;
                     doc.installed = if(ext){\extension}{\standard};
+                    if(sym.notNil) { // doc is a class-doc
+                        if(class.notNil) { // class exists
+                            doc.superclasses = class.superclasses.collect(_.name).reject(_.isMetaClassName);
+                            doc.subclasses = class.subclasses.collect(_.name).reject(_.isMetaClassName);
+                            x = p.findNode(\redirect).text.stripWhiteSpace;
+                            if(x.notEmpty) {
+                                x = class.tryPerform(x.asSymbol);
+                                x !? { doc.implementor = x.asSymbol };
+                            };
+                        } {
+                            doc.installed = \missing;
+                        };
+                    };
                     update = true;
                     ndocs = ndocs + 1;
                 };
                 doc.keep = true;
-                if(subtarget.dirname=="Classes") {
-                    sym = subtarget.basename.asSymbol;
-                    class = sym.asClass;
-                    if(class.notNil) {
-                        classes.remove(sym);
-                        doc.superclasses = class.superclasses.collect(_.name).reject(_.isMetaClassName);
-                        doc.subclasses = class.subclasses.collect(_.name).reject(_.isMetaClassName);
-                    } {
-                        doc.installed = \missing;
-                    };
+                if(sym.notNil) {
+                    classes.remove(sym);
                 };
                 this.maybeWait;
             };
         };
         this.postProgress("Added"+ndocs+"new documents");
+
+        ndocs = 0;
+        helpSourceDirs.do {|dir|
+            var old;
+            ("find -L"+dir.escapeChar($ )+"-type f -name '*.ext.schelp'").unixCmdGetStdOutLines.do {|file|
+                subtarget = file[dir.size+1 ..].drop(-11);
+                doc = doc_map[subtarget];
+                if(doc.notNil) {
+                    // FIXME: if this doc adds a method to a non-class doc, it will not show up in doc.methods...
+                    old = doc.additions.copy;
+                    doc.additions = doc.additions.add(file).asSet;
+                    update = update or: {doc.additions != old};
+                    ndocs = ndocs + 1;
+                    this.postProgress("Addition for"+subtarget+":"+file);
+                } {
+                    warn("SCDoc: Ignoring additions for non-existing document:"+file);
+                };
+                this.maybeWait;
+            }
+        };
+        this.postProgress("Found"+ndocs+"document additions");
 
         this.postProgress("Processing"+classes.size+"undocumented classes");
         undocumentedClasses = classes;
@@ -616,6 +678,7 @@ SCDoc {
         this.postProgress("Generated metadata for"+ndocs+"undocumented classes");
         // NOTE: If we remove a Classes/Name.schelp for an existing class, the doc_map won't get updated.
         // but this shouldn't happen in real-life anyhow..
+
         ndocs = 0;
         doc_map.pairsDo{|k,e|
             if(e.keep!=true, {
@@ -642,9 +705,10 @@ SCDoc {
 
 + String {
     stripWhiteSpace {
+        var ws = [$\n, $\r, $\t, $\ ];
         var a=0, b=this.size-1;
-        while({(this[a]==$\n) or: (this[a]==$\ ) or: (this[a]==$\t)},{a=a+1});
-        while({(this[b]==$\n) or: (this[b]==$\ ) or: (this[b]==$\t)},{b=b-1});
+        while({ ws.includes(this[a])},{a=a+1});
+        while({ ws.includes(this[b])},{b=b-1});
         ^this.copyRange(a,b);
     }
 	unixCmdGetStdOutLines {

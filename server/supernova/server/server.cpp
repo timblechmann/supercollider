@@ -48,7 +48,7 @@ class nova_server * instance = 0;
 
 nova_server::nova_server(server_arguments const & args):
     scheduler<nova::scheduler_hook, thread_init_functor>(args.threads, !args.non_rt),
-    buffer_manager(1024), sc_osc_handler(args)
+    buffer_manager(1024), sc_osc_handler(args), dsp_queue_dirty(false)
 {
     assert(instance == 0);
     io_interpreter.start_thread();
@@ -57,6 +57,8 @@ nova_server::nova_server(server_arguments const & args):
 
     /** todo: backend may force sample rate */
     time_per_tick = time_tag::from_samples(args.blocksize, args.samplerate);
+
+    start_receive_thread();
 }
 
 void nova_server::prepare_backend(void)
@@ -86,7 +88,8 @@ nova_server::~nova_server(void)
 
     close_client();
 #endif
-    io_interpreter.terminate();
+    scheduler<scheduler_hook, thread_init_functor>::terminate();
+    io_interpreter.join_thread();
     instance = 0;
 }
 
@@ -185,8 +188,12 @@ void nova_server::register_prototype(synth_prototype_ptr const & prototype)
 void nova_server::rebuild_dsp_queue(void)
 {
     assert(dsp_queue_dirty);
-    std::auto_ptr<dsp_thread_queue> new_queue = node_graph::generate_dsp_queue();
+    node_graph::dsp_thread_queue_ptr new_queue = node_graph::generate_dsp_queue();
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+    scheduler<scheduler_hook, thread_init_functor>::reset_queue_sync(std::move(new_queue));
+#else
     scheduler<scheduler_hook, thread_init_functor>::reset_queue_sync(new_queue);
+#endif
     dsp_queue_dirty = false;
 }
 

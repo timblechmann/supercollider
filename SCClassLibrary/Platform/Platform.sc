@@ -105,9 +105,12 @@ Platform
 		var outpath;
 		if ( devpath.isNil ){ ^inpath };
 		outpath = inpath.copyToEnd( inpath.find( "SuperCollider") );
-		outpath = outpath.replace( "SuperCollider", devpath +/+ "build");
+		outpath = outpath.replace( "SuperCollider", devpath );
 		^outpath;
 	}
+	
+	// hook for clients to write frontend.css
+	writeClientCSS {}
 
 }
 

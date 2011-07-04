@@ -342,6 +342,13 @@ If EOB-P is non-nil, positions cursor at end of buffer."
   (sclang-kill)
   (sclang-release-command-fifo))
 
+(defun sclang-recompile ()
+  "Recompile class library."
+  (interactive)
+  (when (sclang-get-process)
+    (process-send-string sclang-process "\x18")
+    ))
+
 ;; =====================================================================
 ;; command process
 ;; =====================================================================
@@ -549,10 +556,11 @@ if PRINT-P is non-nil. Return STRING if successful, otherwise nil."
 (defun sclang-eval-document (&optional silent-p)
   "Execute the whole document as SuperCollider code."
   (interactive "P")
-  (mark-whole-buffer)
-  (sclang-eval-string
-   (buffer-substring-no-properties (region-beginning) (region-end))
-   (not silent-p)))
+  (save-excursion
+    (mark-whole-buffer)
+    (sclang-eval-string
+     (buffer-substring-no-properties (region-beginning) (region-end))
+     (not silent-p))))
 
 (defvar sclang-eval-results nil
   "Save results of sync SCLang evaluation.")

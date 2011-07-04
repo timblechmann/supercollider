@@ -425,7 +425,11 @@ public:
     typedef boost::uint_fast8_t thread_count_t;
     typedef boost::uint_fast16_t node_count_t;
 
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+    typedef std::unique_ptr<dsp_thread_queue> dsp_thread_queue_ptr;
+#else
     typedef std::auto_ptr<dsp_thread_queue> dsp_thread_queue_ptr;
+#endif
 
     dsp_queue_interpreter(thread_count_t tc):
         runnable_set(1024), node_count(0)
@@ -465,6 +469,32 @@ public:
         return ret;
     }
 
+#ifdef __GXX_EXPERIMENTAL_CXX0X__
+    dsp_thread_queue_ptr reset_queue(dsp_thread_queue_ptr && new_queue)
+    {
+        dsp_thread_queue_ptr ret(std::move(queue));
+
+        queue = std::move(new_queue);
+        if (queue.get() == 0)
+            return ret;
+
+        queue->reset_activation_counts();
+
+#ifdef DEBUG_DSP_THREADS
+        queue->dump_queue();
+#endif
+
+        thread_count_t thread_number =
+            std::min(thread_count_t(std::min(total_node_count(),
+                                             node_count_t(std::numeric_limits<thread_count_t>::max()))),
+                     thread_count);
+
+        used_helper_threads = thread_number - 1; /* this thread is not waked up */
+        return ret;
+    }
+
+#else
+
     dsp_thread_queue_ptr reset_queue(dsp_thread_queue_ptr & new_queue)
     {
         dsp_thread_queue_ptr ret(queue.release());
@@ -486,6 +516,7 @@ public:
         used_helper_threads = thread_number - 1; /* this thread is not waked up */
         return ret;
     }
+#endif
 
     node_count_t total_node_count(void) const
     {
@@ -556,7 +587,7 @@ private:
     int run_next_item(thread_count_t index)
     {
         dsp_thread_queue_item * item;
-        bool success = runnable_set.pop(&item);
+        bool success = runnable_set.pop(item);
 
         if (!success)
             return fifo_empty;

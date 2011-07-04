@@ -189,7 +189,7 @@ ServerOptions
 	}
 }
 
-Server : Model {
+Server {
 	classvar <>local, <>internal, <default, <>named, <>set, <>program, <>sync_s = true;
 
 	var <name, <>addr, <clientID=0;
@@ -438,7 +438,7 @@ Server : Model {
 				((serverRunning.not
 				  or: (serverBooting and: mBootNotifyFirst.not))
 				 and: {(limit = limit - 1) > 0})
-				and: pid.pidRunning
+				and: { pid.tryPerform(\pidRunning) == true }
 			},{
 				0.2.wait;
 			});
@@ -486,24 +486,28 @@ Server : Model {
 	}
 
 	addStatusWatcher {
-		statusWatcher =
-			OSCProxy({ arg msg;
-				var cmd, one;
-				if(notify){
-					if(notified.not){
-						this.sendNotifyRequest;
-						"Receiving notification messages from server %\n".postf(this.name);
-					}
-				};
-				alive = true;
-				#cmd, one, numUGens, numSynths, numGroups, numSynthDefs,
-					avgCPU, peakCPU, sampleRate, actualSampleRate = msg;
-				{
-					this.serverRunning_(true);
-					this.changed(\counts);
-					nil // no resched
-				}.defer;
-			}, '/status.reply', addr).fix;
+		if(statusWatcher.isNil) {
+			statusWatcher =
+				OSCProxy({ arg msg;
+					var cmd, one;
+					if(notify){
+						if(notified.not){
+							this.sendNotifyRequest;
+							"Receiving notification messages from server %\n".postf(this.name);
+						}
+					};
+					alive = true;
+					#cmd, one, numUGens, numSynths, numGroups, numSynthDefs,
+						avgCPU, peakCPU, sampleRate, actualSampleRate = msg;
+					{
+						this.serverRunning_(true);
+						this.changed(\counts);
+						nil // no resched
+					}.defer;
+				}, '/status.reply', addr).fix;
+		} {
+			statusWatcher.enable;
+		};
 	}
 	// Buffer objects are cached in an Array for easy
 	// auto buffer info updating
@@ -533,8 +537,8 @@ Server : Model {
 	cachedBufferAt { |bufnum| ^Buffer.cachedBufferAt(this, bufnum) }
 
 	startAliveThread { arg delay=0.0;
+		this.addStatusWatcher;
 		^aliveThread ?? {
-			this.addStatusWatcher;
 			aliveThread = Routine({
 				// this thread polls the server to see if it is alive
 				delay.wait;
@@ -580,6 +584,9 @@ Server : Model {
 		bootNotifyFirst = true;
 		this.doWhenBooted({
 			serverBooting = false;
+			if (sendQuit.isNil) {
+				sendQuit = not(this.inProcess) and: {this.isLocal};
+			};
 			this.initTree;
 			(volume.volume != 0.0).if({
 				volume.play;
@@ -658,6 +665,26 @@ Server : Model {
 	}
 
 	quit {
+		var	serverReallyQuitWatcher, serverReallyQuit = false;
+		statusWatcher !? {
+			statusWatcher.disable;
+			if(notified) {
+				serverReallyQuitWatcher = OSCProxy({ |msg|
+					if(msg[1] == '/quit') {
+						statusWatcher.enable;
+						serverReallyQuit = true;
+						serverReallyQuitWatcher.free;
+					};
+				}, '/done', addr);
+				// don't accumulate quit-watchers if /done doesn't come back
+				AppClock.sched(3.0, {
+					if(serverReallyQuit.not) {
+						"Server % failed to quit after 3.0 seconds.".format(this.name).warn;
+						serverReallyQuitWatcher.free;
+					};
+				});
+			};
+		};
 		addr.sendMsg("/quit");
 		if (inProcess, {
 			this.quitInProcess;
@@ -666,9 +693,11 @@ Server : Model {
 			"/quit sent\n".inform;
 		});
 		alive = false;
+		notified = false;
 		dumpMode = 0;
 		pid = nil;
 		serverBooting = false;
+		sendQuit = nil;
 		this.serverRunning = false;
 		if(scopeWindow.notNil) { scopeWindow.quit };
 		RootNode(this).freeAll;
@@ -680,12 +709,10 @@ Server : Model {
 
 	*quitAll {
 		set.do({ arg server;
-			if ((server.sendQuit === true)
-				or: { server.sendQuit.isNil and: { server.remoteControlled }}) {
+			if (server.sendQuit === true) {
 				server.quit
 			};
 		})
-		//		set.do({ arg server; if(server.isLocal or: {server.inProcess} ) {server.quit}; })
 	}
 	*killAll {
 		// if you see Exception in World_OpenUDP: unable to bind udp socket
@@ -803,7 +830,7 @@ Server : Model {
 			}{
 				recordNode.run(true)
 			};
-			"Recording".postln;
+			"Recording: %\n".postf(recordBuf.path);
 		};
 	}
 
@@ -812,13 +839,15 @@ Server : Model {
 	}
 
 	stopRecording {
-		recordNode.notNil.if({
+		if(recordNode.notNil) {
 			recordNode.free;
 			recordNode = nil;
 			recordBuf.close({ arg buf; buf.free; });
+			"Recording Stopped: %\n".postf(recordBuf.path);
 			recordBuf = nil;
-			"Recording Stopped".postln },
-		{ "Not Recording".warn });
+		} {
+			"Not Recording".warn
+		};
 	}
 
 	prepareForRecord { arg path;
@@ -838,6 +867,7 @@ Server : Model {
 		recordBuf = Buffer.alloc(this, 65536, recChannels,
 			{arg buf; buf.writeMsg(path, recHeaderFormat, recSampleFormat, 0, 0, true);},
 			this.options.numBuffers + 1); // prevent buffer conflicts by using reserved bufnum
+		recordBuf.path = path;
 		SynthDef("server-record", { arg bufnum;
 			DiskOut.ar(bufnum, In.ar(0, recChannels))
 		}).send(this);

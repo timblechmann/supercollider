@@ -37,7 +37,11 @@ class QcNumberBox : public QLineEdit, QcHelper, QcAbstractStepValue
   Q_PROPERTY( float altScale READ dummyFloat WRITE setAltScale );
 
   Q_PROPERTY( int decimals READ decimals WRITE setDecimals );
+  Q_PROPERTY( int maxDecimals READ maxDecimals WRITE setMaxDecimals );
+  Q_PROPERTY( int minDecimals READ minDecimals WRITE setMinDecimals );
   Q_PROPERTY( double value READ value WRITE setValue );
+  Q_PROPERTY( int valueType READ valueType );
+  Q_PROPERTY( QString text READ text WRITE setTextValue );
 
   Q_PROPERTY( float step READ dummyFloat WRITE setStep )
   Q_PROPERTY( float scrollStep READ dummyFloat WRITE setScrollStep )
@@ -47,31 +51,58 @@ class QcNumberBox : public QLineEdit, QcHelper, QcAbstractStepValue
   Q_PROPERTY( QColor editingColor READ dummyColor WRITE setEditedTextColor );
 
   public:
+
+    enum ValueType {
+      Number,
+      Infinite,
+      InfiniteNegative,
+      NaN,
+      Text
+    };
+
     QcNumberBox();
     void setStep( float step_ ) { step = step_;}
     void setScrollStep( float step_ ) { scrollStep = step_; }
     void setScroll( bool b ) { scroll = b; }
     void setLocked( bool );
-    void setEditedTextColor( const QColor& c ) { editedTextColor = c; }
-    void setTextColor( const QColor& c ) { normalTextColor = c; }
+    void setTextColor( const QColor& c );
+    void setEditedTextColor( const QColor& c );
     void setValue( double );
+    Q_INVOKABLE void setInfinite( bool positive = true );
+    Q_INVOKABLE void setNaN();
+    void setTextValue( const QString & );
     double value() const;
+    int valueType() const { return (int) _valueType; }
+    int decimals() const { return maxDecimals(); }
+    int minDecimals() const { return _minDec; }
+    int maxDecimals() const { return _maxDec; }
     void setDecimals( int );
-    int decimals() const { return _validator->decimals(); }
+    void setMinDecimals( int );
+    void setMaxDecimals( int );
+
+  public Q_SLOTS:
+    void increment( float factor );
+    void decrement( float factor );
+
   Q_SIGNALS:
     void scrolled( int steps );
     void valueChanged();
     void action();
+
   private Q_SLOTS:
     void onEditingFinished();
-    void onValueChanged();
+    void updateText();
   protected:
     virtual void keyPressEvent ( QKeyEvent * event );
     virtual void mouseDoubleClickEvent ( QMouseEvent * event );
     virtual void mousePressEvent ( QMouseEvent * event );
     virtual void mouseMoveEvent ( QMouseEvent * event );
+    virtual void wheelEvent ( QWheelEvent * event );
   private:
     void stepBy( int steps, float stepSize );
+    double roundedVal( double val );
+    QString stringForVal( double val );
+    void updateTextColor();
     inline void doAction();
 
     bool scroll;
@@ -82,7 +113,11 @@ class QcNumberBox : public QLineEdit, QcHelper, QcAbstractStepValue
     QDoubleValidator *_validator;
     float step;
     float scrollStep;
+    float dragDist;
     double _value;
+    ValueType _valueType;
+    int _minDec;
+    int _maxDec;
 };
 
 #if 0

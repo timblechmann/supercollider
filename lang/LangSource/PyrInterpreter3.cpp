@@ -100,6 +100,9 @@ extern PyrClass *gClassList;
 // 	runLibrary
 // 	interpretCmdLine
 
+static void endInterpreter(VMGlobals *g);
+
+
 SC_DLLEXPORT_C void runInterpreter(VMGlobals *g, PyrSymbol *selector, int numArgsPushed)
 {
 		//postfl("->runInterpreter\n");
@@ -407,12 +410,13 @@ bool initInterpreter(VMGlobals *g, PyrSymbol *selector, int numArgsPushed)
 }
 
 
-void endInterpreter(VMGlobals *g)
+static void endInterpreter(VMGlobals *g)
 {
 	slotCopy(&g->result, g->sp);
 //	dumpObjectSlot(&g->result);
 	g->gc->Stack()->size = 0;
 	g->sp = g->gc->Stack()->slots - 1;
+	g->gc->LazyCollect();
 }
 
 
@@ -502,7 +506,11 @@ static inline void checkStackDepth(VMGlobals* g, PyrSlot * sp)
 #endif
 }
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+#define LABELS_AS_VALUES
+#endif
+
+#ifdef LABELS_AS_VALUES
 #define dispatch_opcode \
 	op1 = ip[1];		\
 	++ip;				\
@@ -534,7 +542,7 @@ void Interpret(VMGlobals *g)
 	PyrMethod *meth;
 	int m,mmax;
 
-#ifdef __GNUC__
+#ifdef LABELS_AS_VALUES
 	static void * opcode_labels[] = {
 		&&handle_op_0,
 		&&handle_op_1,

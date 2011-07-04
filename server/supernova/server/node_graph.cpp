@@ -131,12 +131,12 @@ void node_graph::remove_node(server_node * n)
         group_count_ -= 1;
 }
 
-std::auto_ptr<node_graph::dsp_thread_queue> node_graph::generate_dsp_queue(void)
+node_graph::dsp_thread_queue_ptr node_graph::generate_dsp_queue(void)
 {
     dependency_graph_generator gen;
 
     node_graph::dsp_thread_queue * ret = gen(this);
-    return std::auto_ptr<node_graph::dsp_thread_queue>(ret);
+    return dsp_thread_queue_ptr(ret);
 }
 
 void node_graph::synth_reassign_id(int32_t node_id)
@@ -210,57 +210,67 @@ void abstract_group::remove_child(server_node * node)
     node->clear_parent();
 }
 
+void abstract_group::set(slot_index_t slot_id, float val)
+{
+    for(server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it)
+        it->set(slot_id, val);
+    set_on_satellites(slot_id, val);
+}
+
 void abstract_group::set(const char * slot_str, float val)
 {
     size_t hashed_str = string_hash(slot_str);
     set(slot_str, hashed_str, val);
 }
 
-void abstract_group::set(const char * slot_str, size_t count, float * val)
-{
-    size_t hashed_str = string_hash(slot_str);
-    set(slot_str, hashed_str, count, val);
-}
-
 void abstract_group::set(const char * slot_str, std::size_t hashed_str, float val)
 {
-    for(server_node_list::iterator it = child_nodes.begin();
-        it != child_nodes.end(); ++it)
-    {
+    for(server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it)
         it->set(slot_str, hashed_str, val);
-        it->set_on_satellites(slot_str, hashed_str, val);
-    }
-}
 
-void abstract_group::set(const char * slot_str, std::size_t hashed_str, size_t count, float * val)
-{
-    for(server_node_list::iterator it = child_nodes.begin();
-        it != child_nodes.end(); ++it)
-    {
-        it->set(slot_str, hashed_str, count, val);
-        it->set_on_satellites(slot_str, hashed_str, count, val);
-    }
+    set_on_satellites(slot_str, hashed_str, val);
 }
 
 
-void abstract_group::set(slot_index_t slot_id, float val)
+void abstract_group::set_control_array(const char * slot_str, size_t count, float * val)
 {
-    for(server_node_list::iterator it = child_nodes.begin();
-        it != child_nodes.end(); ++it)
-    {
-        it->set(slot_id, val);
-        it->set_on_satellites(slot_id, val);
-    }
+    size_t hashed_str = string_hash(slot_str);
+    set_control_array(slot_str, hashed_str, count, val);
 }
 
-void abstract_group::set(slot_index_t slot_id, size_t count, float * val)
+void abstract_group::set_control_array(const char * slot_str, std::size_t hashed_str, size_t count, float * val)
 {
-    for(server_node_list::iterator it = child_nodes.begin();
-        it != child_nodes.end(); ++it)
-    {
-        it->set(slot_id, count, val);
-        it->set_on_satellites(slot_id, count, val);
-    }
+    for(server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it)
+        it->set_control_array(slot_str, hashed_str, count, val);
+    set_control_array_on_satellites(slot_str, hashed_str, count, val);;
+}
+
+void abstract_group::set_control_array(slot_index_t slot_id, size_t count, float * val)
+{
+    for(server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it)
+        it->set_control_array(slot_id, count, val);
+    set_control_array_on_satellites(slot_id, count, val);;
+}
+
+
+void abstract_group::set_control_array_element(const char * slot_str, size_t index, float val)
+{
+    size_t hashed_str = string_hash(slot_str);
+    set_control_array_element(slot_str, hashed_str, index, val);
+}
+
+void abstract_group::set_control_array_element(const char * slot_str, std::size_t hashed_str, size_t index, float val)
+{
+    for(server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it)
+        it->set_control_array_element(slot_str, hashed_str, index, val);
+    set_control_array_element_on_satellites(slot_str, hashed_str, index, val);;
+}
+
+void abstract_group::set_control_array_element(slot_index_t slot_id, size_t index, float val)
+{
+    for(server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it)
+        it->set_control_array_element(slot_id, index, val);
+    set_control_array_element_on_satellites(slot_id, index, val);;
 }
 
 void group::add_child(server_node * node, node_position_constraint const & constraint)
@@ -293,9 +303,8 @@ void group::add_child(server_node * node, node_position position)
 {
     assert (not has_child(node));
 
-    if (position == head) {
+    if (position == head)
         child_nodes.push_front(*node);
-    }
     else {
         assert(position == tail);
         child_nodes.push_back(*node);

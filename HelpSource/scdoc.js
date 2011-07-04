@@ -79,7 +79,11 @@ function addInheritedMethods() {
     if(!document.getElementById("filename")) return; // hackish trick, only class-docs has a 'filename' div.
     var doc = docmap["Classes/"+document.title];
     if(!doc) return;
-    var sups = doc.superclasses;
+    if(doc.implementor) {
+        var sups = docmap["Classes/"+doc.implementor].superclasses;
+    } else {
+        var sups = doc.superclasses;
+    }
     if(!sups) return;
     var divs = [document.getElementById("inheritedclassmets"), document.getElementById("inheritedinstmets")];
     for(var i=0;i<sups.length;i++) {
@@ -136,24 +140,190 @@ function addInheritedMethods() {
     }
 }
 
-function fixTOC() {
-// make all code examples editable!
+function showAllSubclasses(a) {
+    var e = document.getElementById("hiddensubclasses");
+    e.style.display = "";
+    a.style.display = "none";
+}
+
+/*
+This key event handler selects the whole line when pressing shift/ctrl-enter with no selection.
+But the problem is that it does not update the selection sent to the client.
+This is probably because the WebView catches the key event before javascript does!
+A fix might be to expose a function to JS that evaluates selection, and call it here.
+Or can the WebView make sure that JS has responded to all key events before getting the selection?
+*/
+function selectLine() {
+    var s =  window.getSelection();
+    var r = s.getRangeAt();
+
+    function findleft(p) {
+        var y, j;
+        while(p) {
+            if(p.nodeName == "BR")
+                return [p,j];
+            if(p.childNodes.length>0) {
+                for(var i=p.childNodes.length-1;i>=0;i--) {
+                    y = findleft(p.childNodes[i]);
+                    if(y) return y;
+                }
+            }
+            p = p.previousSibling;
+        }
+        return null;
+    };
+
+    function findright(p) {
+        var y, j;
+        while(p) {
+            if(p.nodeName == "BR")
+                return [p,j];
+            for(var i=0;i<p.childNodes.length;i++) {
+                y = findright(p.childNodes[i]);
+                if(y) return y;
+            }
+            p = p.nextSibling;
+        }
+        return null;
+    };
+
+
+    if(r.collapsed) {
+        var r2 = document.createRange();
+        var top = r.startContainer;
+        while(top && top.nodeName != "PRE")
+            top = top.parentNode;
+
+        var p = r.startContainer;
+        while(!p.previousSibling && p != top) {
+            p = p.parentNode;
+        }
+        if(p==top) {
+            r2.setStartBefore(top.firstChild);
+        } else {
+            var found = findleft(p.previousSibling);
+            if(found) {
+                r2.setStartAfter(found[0]);
+            } else {
+                r2.setStartBefore(top.firstChild);
+            }
+        }
+        var p = r.startContainer;
+        while(!p.nextSibling && p != top) {
+            p = p.parentNode;
+        }
+        if(p==top) {
+            r2.setEndAfter(top.lastChild);
+        } else {
+            var found = findright(p.nextSibling);
+            if(found) {
+                r2.setEndBefore(found[0]);
+            } else {
+                r2.setEndAfter(top.lastChild);
+            }
+        }
+        s.removeAllRanges();
+        s.addRange(r2);
+    }
+}
+
+function countChar(str,chr) {
+    var x = 0, a, b;
+    for(var i=0;i<str.length;i++) {
+        if(str[i]==chr) {
+            if(a==undefined) a = i;
+            b = i;
+            x++;
+        }
+    }
+    // return count, first occurence and last occurence
+    return [x,a,b];
+}
+
+function selectParens(ev) {
+    var s =  window.getSelection();
+    var r = s.getRangeAt();
+    var r2 = document.createRange();
+    var j;
+
+    // FIXME: it always selects from the left paren, so clicking on the right-par does not select from the matching left-par
+    // need to abort lpar search if rpar was found and then start with the rpar to the right (or closest) instead
+    function findlpar(x) {
+        var p = x;
+        var y, j;
+        while(p) {
+            if(j = p.nodeValue) {
+                j = countChar(j,"(");
+                if(j[0]>0) {
+                    return [p, j[2]];
+                }
+            }
+            for(var i=0;i<p.childNodes.length;i++) {
+                y = findlpar(p.childNodes[i]);
+                if(y) return y;
+            }
+            p = p.previousSibling;
+        }
+        return null;
+    }
+
+    function findrpar(x,count) {
+        var p = x;
+        var y, j;
+        count = count || [0];
+        while(p) {
+            if(j = p.nodeValue) {
+                count[0] += countChar(j,"(")[0];
+                j = countChar(j,")");
+                if(j[0]>0) {
+                    if(count[0]==0)
+                        return [p,j[1]];
+                    else
+                        count[0] -= j[0];
+                }
+            }
+            for(var i=0;i<p.childNodes.length;i++) {
+                y = findrpar(p.childNodes[i],count);
+                if(y) return y;
+            }
+            p = p.nextSibling;
+        }
+        return null;
+    }
+
+    var p = r.startContainer;
+    if(p.nodeValue && (j = p.nodeValue.indexOf("("))>=0) {
+        r2.setStart(p,j+1);
+        p = p.parentNode.nextSibling;
+    } else {
+        while(!p.previousSibling && p != ev.target) {
+            p = p.parentNode;
+        }
+        if(p==ev.target)
+            return;
+        var found = findlpar(p);
+        if(found)
+            r2.setStart(found[0],found[1]+1);
+    }
+
+    var found = findrpar(p);
+    if(found)
+        r2.setEnd(found[0],found[1]);
+
+    s.removeAllRanges();
+    s.addRange(r2);
+}
+
+function fixTOC() {        
     var x = document.getElementsByClassName("lang-sc");
     for(var i=0;i<x.length;i++) {
         var e = x[i];
+
+        // make all code examples editable!
         e.setAttribute("contentEditable",true);
-/* FIXME: select whole line. hopefully this happens before WebView responds to the key event??
-        e.onkeydown = function(ev) {
-            if(ev.keycode == 13 && ev.ctrlKey == true || ev.shiftKey == true) {
-                // s =  window.getSelection()
-                // if(s.isCollapsed) {
-                // find nodes at start and end of (or start of next) line
-                // s.removeAllRanges();
-                // r=document.createRange(); r.setStart(start,0); r.setEnd(end,0); s.addRange(r)
-                // }
-            }
-        }
-*/
+
+        // select parenthesis on double-click
+        e.ondblclick = selectParens;
     }
 
     addInheritedMethods();

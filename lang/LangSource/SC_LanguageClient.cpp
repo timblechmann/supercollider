@@ -158,7 +158,6 @@ void SC_LanguageClient::shutdownLibrary()
 
 void SC_LanguageClient::recompileLibrary()
 {
-	shutdownLibrary();
 	compileLibrary();
 }
 
@@ -302,6 +301,15 @@ void SC_LanguageClient::tick()
     flush();
 }
 
+bool SC_LanguageClient::tickLocked( double * nextTime )
+{
+	if (isLibraryCompiled()) {
+		::runLibrary(s_tick);
+	}
+	int err = slotDoubleVal( &gMainVMGlobals->result, nextTime );
+	return ( err == 0 );
+}
+
 void SC_LanguageClient::onInitRuntime()
 {
 }
@@ -359,12 +367,12 @@ void postfl(const char *fmt, ...)
 
 void postText(const char *str, long len)
 {
-	SC_LanguageClient::instance()->postText(str, len);
+	SC_LanguageClient::instance()->postFlush(str, len);
 }
 
 void postChar(char c)
 {
-	SC_LanguageClient::instance()->postText(&c, sizeof(char));
+	SC_LanguageClient::instance()->postFlush(&c, sizeof(char));
 }
 
 void error(const char *fmt, ...)

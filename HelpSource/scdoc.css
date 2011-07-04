@@ -52,6 +52,10 @@ a:hover {
     text-decoration: underline;
 }
 
+#inheritedclassmets, #inheritedinstmets {
+    margin-top: 1em;
+}
+
 .inheritedmets_class {
     font-weight: bold;
     color: #555;
@@ -79,6 +83,16 @@ a.inheritedmets_toggle {
 }
 
 a.inheritedmets_toggle:hover {
+    text-decoration: none;
+    color: #000;
+}
+
+a.subclass_toggle {
+    color: #555;
+    font-weight: normal;
+}
+
+a.subclass_toggle:hover {
     text-decoration: none;
     color: #000;
 }
@@ -392,12 +406,14 @@ td p {
 
 .doclink {
     font-size: 9pt;
-/*    font-family: Andale Mono, monospace;*/
     color: #888;
     text-align: right;
     margin-top: 2em;
     margin-bottom: 2em;
-    border-top: 1px solid #bbb;
+    border-top: 1px solid #ddd;
+}
+.doclink a {
+    color: #444;
 }
 
 #sidetoc {
@@ -533,13 +549,12 @@ a.clslnk {
 .com { color: #822; } /* comments */
 .typ { color: #008; } /* class names */
 .lit { color: #066; } /* numbers and character literals */
-.pun { color: #777; } /* punctuation */
+.pun { color: #555; } /* punctuation */
 .pln { color: #000; } /* plain text, methods and variable names */
-.tag { color: #038; } /* special variables like super, thisProcess... */
+.tag { color: #059; } /* special variables like super, thisProcess... */
 .dec { color: #508; } /* declarations like var, const... */
-.atn { color: #286; } /* symbols */
-.atv { color: #080; } /* --- not used --- */
-
+.atn { color: #285; } /* symbols */
+.atv { color: #750; } /* environment vars */
 
 /* Specify class=linenums on a pre to get line numbering */
 ol.linenums { margin-top: 0; margin-bottom: 0 } /* IE indents via margin-left */

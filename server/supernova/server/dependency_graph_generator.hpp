@@ -21,6 +21,12 @@
 
 #include "node_graph.hpp"
 
+#ifdef BOOST_HAS_RVALUE_REFS
+#define MOVE(X) std::move(X)
+#else
+#define MOVE(X) X
+#endif
+
 namespace nova
 {
 
@@ -188,15 +194,14 @@ private:
 
         thread_queue_item * q_item;
 
-        if (last_node->has_satellite_successor())
-        {
+        if (last_node->has_satellite_successor()) {
             successor_container satellites = fill_satellite_successors(last_node->satellite_successors, 1);
             successor_container combined_successors = concat_successors(satellites, successors);
 
-            q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth*>(*seq_it++), node_count),
+            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(*seq_it++))), node_count),
                                             combined_successors, activation_limit);
         } else
-            q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth*>(*seq_it++), node_count),
+            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(*seq_it++))), node_count),
                                             successors, activation_limit);
 
         queue_node & q_node = q_item->get_job();
@@ -346,11 +351,11 @@ private:
         if (node.has_satellite_successor()) {
             successor_container satellites = fill_satellite_successors(node.satellite_successors, 1);
 
-            q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth *>(&node)),
+            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(&node)))),
                                             concat_successors(successors, satellites),
                                             activation_limit);
         } else {
-            q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth *>(&node)),
+            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(&node)))),
                                             successors, activation_limit);
         }
 
@@ -419,7 +424,7 @@ private:
             server_node & node = const_cast<server_node &>(*it);
 
             if (node.is_synth()) {
-                thread_queue_item * q_item = q->allocate_queue_item(queue_node(static_cast<abstract_synth *>(&node)),
+                thread_queue_item * q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth *>(&node)))),
                                              successors, activation_limit);
 
                 q->add_initially_runnable(q_item);

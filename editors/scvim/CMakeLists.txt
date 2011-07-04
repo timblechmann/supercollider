@@ -1,4 +1,4 @@
-install(FILES bin/sclangpipe_app bin/scvim bin/scvim_make_help
+install(FILES bin/sclangpipe_app bin/scvim
 		DESTINATION bin
 		PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
@@ -11,8 +11,19 @@ install(DIRECTORY indent
 install(DIRECTORY syntax
 		DESTINATION share/vim/addons)
 
-install(FILES scclasses/SCVim.sc
-		DESTINATION share/SuperCollider/Extensions/scvim)
+configure_file(registry/supercollider-vim.yaml.in registry/supercollider-vim.yaml)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/registry/supercollider-vim.yaml
+		DESTINATION share/vim/registry)
 
-install(FILES scvimrc
+IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+	install(FILES scclasses/SCVim.sc
+			DESTINATION /Library/Application\ Support/SuperCollider/Extensions/scvim
+			PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+ELSE()
+	install(FILES scclasses/SCVim.sc
+         DESTINATION share/SuperCollider/Extensions/scvim
+			PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+ENDIF()
+
+install(FILES scvimrc SCVim.scd
 		DESTINATION share/scvim)

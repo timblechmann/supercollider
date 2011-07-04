@@ -1,7 +1,7 @@
 SCVIM
   created by Alex Norman, it is in its early stages, use at your own risk
-  this is SCVIM-svn
-  the webpage is here: http://www.x37v.info/scvim/
+  this is SCVIM-git
+  the webpage is here: http://www.x37v.info/projects/scvim/
   if you have improvements/suggestions email alex at x37v dot info
 ________________________________________________________________________________
 
@@ -9,93 +9,30 @@ REQUIREMENTS:
 - vim
 - supercollider (sclang)
 - ruby
-- unhtml*
+- cmake
 
 OPTIONAL:
-- unrtf [recommended to make help docs from RTF formatted help files - most helpfiles are now html but there are occasionally some rtfs in plugin packs]
-- gvim
-- links (for alternative help file formatting, see bin/scvim_make_help)
-
-  * it is best to use your distro's unhtml package but in case your distro
-    doesn't have it, I've placed a version here:
-    http://www.x37v.info/scvim/files/
+- gvim or MacVim
 ________________________________________________________________________________
 
 INSTALLATION STEPS:
 
-Automatic (simple):
+Note:  If you installed SuperCollider from source and didn't disable scvim when
+running cmake, scvim should already be installed.
 
-To install everything in the default locations, after installing the
-dependencies above, simply do:
+If you'd like to install scvim directly, without using the whole SuperCollider
+install process you can do:
 
-scons install-user
-sudo scons install-system
+cmake . && sudo make install
 
-optional (but recommended):
-scons build-help
+You will have to enter your password in order to finalize the installation.
 
-install-user will install the scvim vim files in ~/.vim and create the cache
-dir [for inline docs, syntax highlighting updates, etc] at ~/.scvim
-install-system will install the 'executable' files in PREFIX/bin, a system-wide
-configuration file in PREFIX/share/scvim/ and the SCVim class file into
-PREFIX/share/SuperCollider/Extensions/scvim
+some people prefer to use a build directory [though scvim doesn't actually
+build anything, but cmake does create some output files] to do that, from the
+scvim directory, type:
 
-Then, make sure the SCVim class is sourced in your library [see step 4 below].
-
-
-Install target descriptions:
-
-Below is a brief description of the install targets that are defined.
-See scons -h for the configuration variables.
-Note, install-system and install-user aggregate several install targets, you
-can call those individually.. ie scons install-rc will just install the
-system-wide rc file
-
-install-system is made up of:
-	install-bin [installs the files that are located in bin/]
-	install-rc [installs the systemwide scvimrc in PREFIX/share/scvim/
-	install-classes
-		[installs the SCVim supercollider class file in PREFIX/share/SuperCollider/Extensions/scvim/]
-
-install-user is made up of:
-	install-vimfiles [installs the vimfiles (syntax/* ftplugin/* indent/* in VIMFILE_DIR]
-	install-doc
-		[installs the SCVim.scd file into CACHE_DIR/doc/, creates CACHE_DIR if it doesn't exist]
-
-build-help
-	[executes ./bin/scvim_make_help to create the inline help docs for scvim]
-
-
-Manual Install:
-
-1) copy the contents of bin/ somewhere in your path.. for example
-   sudo cp bin/* /usr/local/bin/
-
-2) copy the folders ftplugin/ syntax/ indent/ somewhere in your vim runtimepath
-   *the runtimepath differs depending on your distribution.
-    type :help runtimepath in vim for more info
-
-   to install for just one user the easiest place to put it is in ~/.vim
-   ie (after creating the directory ~/.vim if it doesn't exist)
-   cp -r ftplugin/ syntax/ indent/ ~/.vim
-
-3) copy the scvimrc file to one of these locations:
-   ~/.scvimrc
-   /usr/local/share/scvim/scvimrc
-   /usr/share/scvim/scvimrc
-   (you can then customize this file as you wish)
-
-4) Put the ("scclasses") directory into your SuperCollider Extensions directory.
-    (on linux, typically /usr/local/share/SuperCollider/Extensions)
-   ie do this:
-   cp -r scclasses /usr/local/share/SuperCollider/Extensions/scvim
-
-   Make sure that this folder is sourced in your .sclang.cfg file.
-   +/usr/local/share/SuperCollider/Extensions/scvim
-   * You can put the scvim directory somewhere else if you please, just make
-     sure that you have the SCVim supercollider class sourced in your
-     .sclang.cfg ie:
-   +/usr/local/share/scvim/scclasses
+mkdir build && cd build
+cmake .. && sudo make install
 
 Now you should be ready to use scvim, e.g. by running "scvim" or "scvim -g" from
 a command prompt.
@@ -104,26 +41,27 @@ ________________________________________________________________________________
 OPTIONAL EXTRA INSTALLATION STEPS:
 
 * If you want to be able to read supercollider files with syntax highlighting,
-	have the ability to start the language and have the keybindings you've set
-	up during a normal vim editing session [without launching as 'scvim'] then
-	source your scvimrc file in your ~/.vimrc
+   have the ability to start the language and have the keybindings you've set
+   up during a normal vim editing session [without launching as 'scvim'] then
+   source your scvimrc file in your ~/.vimrc
    for example, if you have a ~/.scvimrc file you could put this line in your ~/.vimrc
    so ~/.scvimrc
 
 * I put this in my ~/.sclang.sc so that each time I start sclang I have updated
-    Object completion and highlighting, as well as Object Definition Lookup:
-    //set up the scvim stuff
-    SCVim.updateCaches;
-  You'll probably want to execute this at least once after an install of
-  supercollider to get the most up-to-date Object info
+   Object completion and highlighting, as well as Object Definition Lookup:
+   //set up the scvim stuff
+   SCVim.updateCaches;
+   You'll probably want to execute this at least once after an install of
+   supercollider to get the most up-to-date Object info
 
-* sclang's working directory defaults to /tmp when using scvim. If you want to
-    set it to something else you can set the bash environment variable
-    SCLANG_RUNDIR
+* sclang's working directory defaults to /tmp on linux and
+   /Applications/SuperCollider on mac when using scvim. If you want to
+   set it to something else you can set the bash environment variable
+   SCLANG_RUNDIR
 
 * I've put the colorscheme that I use in the "extra" folder.  This makes
-    strings, symbols and chars variations on the same color but all look
-    different.  Feel free to use/modify it to your liking.
+   strings, symbols and chars variations on the same color but all look
+   different.  Feel free to use/modify it to your liking.
 ________________________________________________________________________________
 
 USAGE:
@@ -161,24 +99,11 @@ line in sclang:
 
   SCVim.updateHelpCache;
 
-This actually calls a Ruby script called scvim_make_help, so can be used
-outside SC if desired. You can do something like:
-
-  ./scvim_make_help -c -s /usr/local/share/SuperCollider/Help
-
-This will delete any help docs that are in your scvim/docs dir, and copy in the
-more up to date [hopefully] docs from /usr/local/share/SuperCollider/Help to
-that dir [after they are formatted].  If you have help docs in more than one
-location you can now copy in more help docs by doing
-
-  ./scvim_make_help -s <other location>
-
-or you can do it all in one go by specifying multiple sources
-
-  ./scvim_make_help -c -s /usr/local/share/SuperCollider/Help -s <other location>
-________________________________________________________________________________
 
 TROUBLE SHOOTING:
+
+If you cannot find the scvim executable, make sure that "/usr/local/bin" is in
+your PATH, this is where scvim is installed by default.
 
 If you get errors about _FileWrite (like the error printed below) when you run
 SCVim.updateHelpCache or SCVim.updateCaches it is likely that you don't have
@@ -203,5 +128,5 @@ Dan Stowell for his help:
    into the SuperCollider svn, etc.
 John Yates for providing the indent functionality [which I have changed slightly] and
    help with the help file processor
-Andrzej Kopec for work on removing html from help [though scvim ended up using unhtml]
+Andrzej Kopec for work on removing html from help
 Renick Bell for testing out the install process and providing notes.

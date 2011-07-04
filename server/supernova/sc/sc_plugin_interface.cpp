@@ -17,7 +17,6 @@
 //  Boston, MA 02111-1307, USA.
 
 #include <cstdarg>
-#include <cstdio>
 
 #include "sndfile.hh"
 
@@ -68,7 +67,7 @@ void free_node_and_preceding(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of preceding nodes" << std::endl;
+        log("parallel groups have no notion of preceding nodes\n");
         return;
     }
 
@@ -83,7 +82,7 @@ void free_node_and_pause_preceding(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of preceding nodes" << std::endl;
+        log("parallel groups have no notion of preceding nodes\n");
         return;
     }
 
@@ -98,7 +97,7 @@ void free_node_and_preceding_children(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of preceding nodes" << std::endl;
+        log("parallel groups have no notion of preceding nodes");
         return;
     }
 
@@ -120,7 +119,7 @@ void free_node_and_preceding_deep(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of preceding nodes" << std::endl;
+        log("parallel groups have no notion of preceding nodes\n");
         return;
     }
 
@@ -141,12 +140,11 @@ void free_node_and_all_preceding(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of preceding nodes" << std::endl;
+        log("parallel groups have no notion of preceding nodes\n");
         return;
     }
 
-    for(;;)
-    {
+    for(;;) {
         node = node->previous_node();
         if (node)
             sc_factory->add_done_node(node);
@@ -161,7 +159,7 @@ void free_node_and_following(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of following nodes" << std::endl;
+        log("parallel groups have no notion of following nodes\n");
         return;
     }
 
@@ -176,7 +174,7 @@ void free_node_and_pause_following(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of following nodes" << std::endl;
+        log("parallel groups have no notion of following nodes\n");
         return;
     }
 
@@ -191,7 +189,7 @@ void free_node_and_following_children(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of following nodes" << std::endl;
+        log("parallel groups have no notion of following nodes\n");
         return;
     }
 
@@ -212,7 +210,7 @@ void free_node_and_following_deep(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of following nodes" << std::endl;
+        log("parallel groups have no notion of following nodes\n");
         return;
     }
 
@@ -233,12 +231,11 @@ void free_node_and_all_following(Unit * unit)
     sc_factory->add_done_node(node);
 
     if (node->get_parent()->is_parallel()) {
-        std::cerr << "parallel groups have no notion of following nodes" << std::endl;
+        log("parallel groups have no notion of following nodes\n");
         return;
     }
 
-    for(;;)
-    {
+    for(;;) {
         node = node->previous_node();
         if (node)
             sc_factory->add_done_node(node);
@@ -261,7 +258,6 @@ void free_parent_group(Unit * unit)
     abstract_group * group = const_cast<abstract_group*>(node->get_parent());
     sc_factory->add_done_node(group);
 }
-
 
 } /* namespace */
 } /* namespace nova */
@@ -302,8 +298,7 @@ bool define_unitcmd(const char * unitClassName, const char * cmdName, UnitCmdFun
 
 bool define_plugincmd(const char * name, PlugInCmdFunc func, void * user_data)
 {
-    std::cerr << "plugin commands not implemented: " << name << std::endl;
-    return false;
+    return nova::sc_factory->register_cmd_plugin(name, func, user_data);
 }
 
 void * rt_alloc(World * dummy, size_t size)
@@ -363,22 +358,17 @@ int print(const char *fmt, ...)
     va_list vargs;
     va_start(vargs, fmt);
 
-    char data[1024];
-
-    vsprintf(data, fmt, vargs);
-
-    std::cout << data << std::endl;
+    bool status = nova::instance->log_printf(fmt, vargs);
 
     va_end(vargs);
-    return 0;
+    return (status == true) ? 0 : -1;
 }
 
 /* todo: we need to implement most of the done actions */
 void done_action(int done_action, struct Unit *unit)
 {
     using namespace nova;
-    switch(done_action)
-    {
+    switch(done_action) {
     case 0:
         // do nothing when the UGen is finished
         return;
@@ -485,6 +475,18 @@ void send_node_reply(Node* node, int reply_id, const char* command_name, int arg
     nova::instance->send_node_reply(node->mID, reply_id, command_name, argument_count, values);
 }
 
+int do_asynchronous_command(World *inWorld, void* replyAddr, const char* cmdName, void *cmdData,
+                            AsyncStageFn stage2, // stage2 is non real time
+                            AsyncStageFn stage3, // stage3 is real time - completion msg performed if stage3 returns true
+                            AsyncStageFn stage4, // stage4 is non real time - sends done if stage4 returns true
+                            AsyncFreeFn cleanup,
+                            int completionMsgSize, void* completionMsgData)
+{
+    nova::instance->do_asynchronous_command(inWorld, replyAddr, cmdName, cmdData,
+                                            stage2, stage3, stage4, cleanup,
+                                            completionMsgSize, completionMsgData);
+    return 0;
+};
 
 } /* extern "C" */
 
@@ -567,6 +569,8 @@ void sc_plugin_interface::initialize(server_arguments const & args)
     sc_interface.fSCfftDoFFT = &scfft_dofft;
     sc_interface.fSCfftDoIFFT = &scfft_doifft;
 
+    /* osc plugins */
+    sc_interface.fDoAsynchronousCommand = &do_asynchronous_command;
 
     /* initialize world */
     /* control busses */
@@ -1000,17 +1004,9 @@ void sc_plugin_interface::buffer_zero(uint32_t index)
     zerovec(buf->data + unrolled, remain);
 }
 
-sample * sc_plugin_interface::buffer_generate(uint32_t index, const char* cmd_name, struct sc_msg_iter & msg)
+sample * sc_plugin_interface::buffer_generate(uint32_t buffer_index, const char* cmd_name, struct sc_msg_iter & msg)
 {
-    SndBuf * buf = World_GetNRTBuf(&world, index);
-    sample * data = buf->data;
-
-    BufGenFunc bufgen = sc_factory->find_bufgen(cmd_name);
-    (bufgen)(&world, buf, &msg);
-    if (data == buf->data)
-        return NULL;
-    else
-        return data;
+    return sc_factory->run_bufgen(&world, cmd_name, buffer_index, &msg);
 }
 
 void sc_plugin_interface::buffer_sync(uint32_t index)

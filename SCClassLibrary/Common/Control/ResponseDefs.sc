@@ -21,17 +21,17 @@ AbstractResponderProxy {
 	
 	func_ {|newFunc|  
 		func = newFunc; 
-		dispatcher.updateFuncForProxy(this);
+		this.changed(\function);
 	}
 	
 	gui { this.subclassResponsibility(thisMethod) }
 	
-	cmdPeriod { this.clear }
+	cmdPeriod { this.free }
 	
 	oneShot {
 		var oneShotFunc, wrappedFunc;
 		wrappedFunc = func;
-		oneShotFunc = { arg ...args; wrappedFunc.value(*args); this.clear };
+		oneShotFunc = { arg ...args; wrappedFunc.value(*args); this.free };
 		this.func_(oneShotFunc);
 	}
 	
@@ -42,7 +42,7 @@ AbstractResponderProxy {
 	
 	fix { this.permanent_(true) }
 	
-	clear { allProxies.remove(this); this.disable }
+	free { allProxies.remove(this); this.disable }
 	
 	*allProxies { 
 		var result;
@@ -79,19 +79,47 @@ AbstractResponderProxy {
 	
 }
 
+// defines the required interface
 AbstractDispatcher {
 	classvar <>all;
 	var registered = false;
-	var <active, <wrappedFuncs;
 	
 	*new { ^super.new.init; }
 	
-	init { all.add(this); active = IdentityDictionary.new; wrappedFuncs = IdentityDictionary.new; }
+	init { all.add(this);}
 		
 	*initClass { all = IdentitySet.new }
 	
+	add {|proxy| this.subclassResponsibility(thisMethod) } // proxies call this to add themselves to this dispatcher; should register this if needed
+	
+	remove {|proxy| this.subclassResponsibility(thisMethod) } // proxies call this to remove themselves from this dispatcher; should unregister if needed
+		
+	value { this.subclassResponsibility(thisMethod) }
+	
+	valueArray {arg args; ^this.value(*args) } // needed to work in FunctionLists
+	
+	register { this.subclassResponsibility(thisMethod) } // register this dispatcher to listen for its message type
+	
+	unregister { this.subclassResponsibility(thisMethod) } // unregister this dispatcher so it no longer listens
+	
+	free { this.unregister; all.remove(this) } // I'm done
+	
+	typeKey { this.subclassResponsibility(thisMethod) } // a Symbol
+	
+	update { } // code here to update any changed state in this dispatcher's proxies, e.g. a new function; default does nothing
+
+}
+
+// basis for the default dispatchers
+// uses function wrappers for matching
+AbstractWrappingDispatcher :  AbstractDispatcher {
+	var active, <wrappedFuncs;
+	
+	init { super.init; active = IdentityDictionary.new; wrappedFuncs = IdentityDictionary.new; }
+	
 	add {|proxy| 
 		var func, keys;
+		proxy.addDependant(this);
 		func = this.wrapFunc(proxy);
 		wrappedFuncs[proxy] = func;
 		keys = this.getKeysForProxy(proxy);
@@ -101,6 +129,7 @@ AbstractDispatcher {
 	
 	remove {|proxy|
 		var func, keys;
+		proxy.removeDependant(this);
 		keys = this.getKeysForProxy(proxy);
 		func = wrappedFuncs[proxy];
 		keys.do({|key| active[key] = active[key].removeFunc(func) }); // support multiple keys
@@ -108,7 +137,7 @@ AbstractDispatcher {
 		if(active.size == 0, {this.unregister});
 	}
 	
-	// old Funk vs. new Funk
+		// old Funk vs. new Funk
 	updateFuncForProxy {|proxy|
 		var func, oldFunc, keys;
 		func = this.wrapFunc(proxy);
@@ -121,22 +150,14 @@ AbstractDispatcher {
 	wrapFunc { this.subclassResponsibility(thisMethod) }
 	
 	getKeysForProxy { this.subclassResponsibility(thisMethod) }
-		
-	value { this.subclassResponsibility(thisMethod) }
 	
-	valueArray {arg args; ^this.value(*args) } // needed to work in FunctionLists
+	update {|proxy, what| if(what == \function, { this.updateFuncForProxy(proxy) }) }
 	
-	register { this.subclassResponsibility(thisMethod) }
-	
-	unregister { this.subclassResponsibility(thisMethod) }
-	
-	clear { this.unregister; all.remove(this) }
-	
-	typeKey { this.subclassResponsibility(thisMethod) } // a Symbol
+	free { wrappedFuncs.keys.do({|proxy| proxy.removeDependant(this) }); super.free }
 	
 }
 
-// Proxies below store by the 'most significant' message argument for fast lookup
+// The default dispatchers below store by the 'most significant' message argument for fast lookup
 // These are for use when more than just the 'most significant' argument needs to be matched
 AbstractMessageMatcher {
 	var <>func;
@@ -149,16 +170,24 @@ AbstractMessageMatcher {
 
 ///////////////////// OSC
 
-OSCMessageDispatcher : AbstractDispatcher {
+OSCMessageDispatcher : AbstractWrappingDispatcher {
 	
-	wrapFunc {|proxy| ^if(proxy.srcID.notNil, {
-			OSCProxyMessageMatcher(proxy.srcID, proxy.func);
-		}, { proxy.func });
+	wrapFunc {|proxy|
+		var func, srcID, recvPort;
+		func = proxy.func;
+		srcID = proxy.srcID;
+		recvPort = proxy.recvPort;
+		^case(
+			{ srcID.notNil && recvPort.notNil }, { OSCProxyBothMessageMatcher(srcID, recvPort, func) },
+			{ srcID.notNil }, { OSCProxyAddrMessageMatcher(srcID, func) },
+			{ recvPort.notNil }, { OSCProxyRecvPortMessageMatcher(recvPort, func) },
+			{ func }
+		);
 	}
 	
 	getKeysForProxy {|proxy| ^[proxy.path];}
 	
-	value {|time, addr, msg| active[msg[0]].value(msg, time, addr);}
+	value {|time, addr, recvPort, msg| active[msg[0]].value(msg, time, addr, recvPort);}
 	
 	register { 
 		thisProcess.recvOSCfunc = thisProcess.recvOSCfunc.addFunc(this); 
@@ -170,61 +199,66 @@ OSCMessageDispatcher : AbstractDispatcher {
 		registered = false;
 	}
 	
-	typeKey { ^('OSC ' ++ \unmatched).asSymbol }
+	typeKey { ^('OSC unmatched').asSymbol }
 	
 }
 
 OSCMessagePatternDispatcher : OSCMessageDispatcher {
 	
-	value {|time, addr, msg| 
+	value {|time, addr, recvPort, msg| 
 		var pattern;
 		pattern = msg[0];
 		active.keysValuesDo({|key, func|
-			if(key.matchOSCAddressPattern(pattern), {func.value(msg, time, addr);});
+			if(key.matchOSCAddressPattern(pattern), {func.value(msg, time, addr, recvPort);});
 		})
 	}
 	
-	typeKey { ^('OSC ' ++ \matched).asSymbol }
+	typeKey { ^('OSC matched').asSymbol }
 	
 }
 
 OSCProxy : AbstractResponderProxy {
-	classvar <>defaultDispatcher, <>defaultMatchingDispatcher, traceFunc;
-	var <path;
+	classvar <>defaultDispatcher, <>defaultMatchingDispatcher, traceFunc, traceRunning = false;
+	var <path, <recvPort;
 	
 	*initClass {
 		defaultDispatcher = OSCMessageDispatcher.new;
 		defaultMatchingDispatcher = OSCMessagePatternDispatcher.new;
-		traceFunc = {|time, replyAddr, msg|
-			"OSC Message Received:\n\ttime: %\n\taddress: %\n\t msg: %\n\n".postf(time, replyAddr, msg);
+		traceFunc = {|time, replyAddr, recvPort, msg|
+			"OSC Message Received:\n\ttime: %\n\taddress: %\n\trecvPort: %\n\tmsg: %\n\n".postf(time, replyAddr, recvPort, msg);
 		}
 	}
 	
-	*new { arg func, path, srcID, dispatcher;
-		^super.new.init(func, path, srcID, dispatcher ? defaultDispatcher);
+	*new { arg func, path, srcID, recvPort, dispatcher;
+		^super.new.init(func, path, srcID, recvPort, dispatcher ? defaultDispatcher);
 	}
 	
-	*newMatching { arg func, path, srcID;
-		^super.new.init(func, path, srcID, defaultMatchingDispatcher);
+	*newMatching { arg func, path, srcID, recvPort;
+		^super.new.init(func, path, srcID, recvPort, defaultMatchingDispatcher);
 	}
 	
 	*trace {|bool = true| 
 		if(bool, {
-			thisProcess.addOSCFunc(traceFunc);
-			CmdPeriod.add(this);
+			if(traceRunning.not, {
+				thisProcess.addOSCFunc(traceFunc);
+				CmdPeriod.add(this);
+				traceRunning = true;
+			});
 		}, {
 			thisProcess.removeOSCFunc(traceFunc);
 			CmdPeriod.remove(this);
+			traceRunning = false;
 		});
 	}
 	
 	*cmdPeriod { this.trace(false) }
 	
-	init {|argfunc, argpath, argsrcID, argdisp|
+	init {|argfunc, argpath, argsrcID, argrecvPort, argdisp|
 		path = (argpath ? path).asString;
 		if(path[0] != $/, {path = "/" ++ path}); // demand OSC compliant paths
 		path = path.asSymbol;
 		srcID = argsrcID ? srcID;
+		recvPort = argrecvPort ? recvPort;
 		func = argfunc;
 		dispatcher = argdisp ? dispatcher;
 		this.enable;
@@ -243,16 +277,16 @@ OSCdef : OSCProxy {
 		all = IdentityDictionary.new;
 	}
 	
-	*new { arg key, func, path, srcID;
+	*new { arg key, func, path, srcID, recvPort, dispatcher;
 		var res = all.at(key);
 		if(res.isNil) {
-			^super.new(func, path, srcID).addToAll(key);
+			^super.new(func, path, srcID, recvPort, dispatcher).addToAll(key);
 		} {
 			if(func.notNil) { 
 				if(res.enabled, {
 					res.disable;
-					res.init(func, srcID, path);
-				}, { res.init(func, srcID, path).disable; });
+					res.init(func, path, srcID, recvPort, dispatcher);
+				}, { res.init(func, path, srcID, recvPort, dispatcher).disable; });
 			}
 		}
 		^res
@@ -260,22 +294,51 @@ OSCdef : OSCProxy {
 	
 	addToAll {|argkey| key = argkey; all.put(key, this) }
 	
-	clear { all[key] = nil; super.clear; }
+	free { all[key] = nil; super.free; }
 	
 }
 
 
 // if you need to test for address func gets wrapped in this
-OSCProxyMessageMatcher : AbstractMessageMatcher {
+OSCProxyAddrMessageMatcher : AbstractMessageMatcher {
 	var addr;
 	
 	*new {|addr, func| ^super.new.init(addr, func);}
 	
 	init {|argaddr, argfunc| addr = argaddr; func = argfunc; }
 	
-	value {|time, msg, testAddr| 
+	value {|msg, time, testAddr, recvPort| 
 		if(testAddr.addr == addr.addr and: {addr.port.matchItem(testAddr.port)}, {
-			func.value(time, msg, testAddr)
+			func.value(msg, time, testAddr, recvPort)
+		})
+	}
+}
+
+// if you need to test for recvPort func gets wrapped in this
+OSCProxyRecvPortMessageMatcher : AbstractMessageMatcher {
+	var recvPort;
+	
+	*new {|recvPort, func| ^super.new.init(recvPort, func);}
+	
+	init {|argrecvPort, argfunc| recvPort = argrecvPort; func = argfunc; }
+	
+	value {|msg, time, addr, testRecvPort| 
+		if(testRecvPort == recvPort, {
+			func.value(msg, time, addr, testRecvPort)
+		})
+	}
+}
+
+OSCProxyBothMessageMatcher : AbstractMessageMatcher {
+	var addr, recvPort;
+	
+	*new {|addr, recvPort, func| ^super.new.init(addr, recvPort, func);}
+	
+	init {|argaddr, argrecvPort, argfunc| addr = argaddr; recvPort = argrecvPort; func = argfunc; }
+	
+	value {|msg, time, testAddr, testRecvPort| 
+		if(testAddr.addr == addr.addr and: {addr.port.matchItem(testAddr.port)} and: {testRecvPort == recvPort}, {
+			func.value(msg, time, testAddr, testRecvPort)
 		})
 	}
 }
@@ -283,7 +346,7 @@ OSCProxyMessageMatcher : AbstractMessageMatcher {
 ///////////////////// MIDI
 
 // for \noteOn, \noteOff, \control, \polytouch
-MIDIMessageDispatcher : AbstractDispatcher {
+MIDIMessageDispatcher : AbstractWrappingDispatcher {
 	var <>messageType;
 	
 	*new {|messageType| ^super.new.messageType_(messageType) }
@@ -458,7 +521,7 @@ MIDIdef : MIDIProxy {
 	
 	addToAll {|argkey| key = argkey; all.put(key, this) }
 	
-	clear { all[key] = nil; super.clear; }
+	free { all[key] = nil; super.free; }
 	
 }
 

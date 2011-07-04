@@ -109,16 +109,26 @@ public:
         return !synth_;
     }
 
-    /** set a slot */
     /* @{ */
+    /* set a scalar slot */
     virtual void set(slot_index_t slot_id, float val) = 0;
-    virtual void set(slot_index_t slot_str, size_t n, float * values) = 0;
     virtual void set(const char * slot_str, float val) = 0;
-    virtual void set(const char * slot_str, size_t n, float * values) = 0;
     virtual void set(const char * slot_str, size_t hashed_str, float val) = 0;
-    virtual void set(const char * slot_str, size_t hashed_str, size_t n, float * values) = 0;
     /* @} */
 
+    /* @{ */
+    /* set an arrayed slot from array */
+    virtual void set_control_array(slot_index_t slot_str, size_t n, float * values) = 0;
+    virtual void set_control_array(const char * slot_str, size_t n, float * values) = 0;
+    virtual void set_control_array(const char * slot_str, size_t hashed_str, size_t n, float * values) = 0;
+    /* @} */
+
+    /* @{ */
+    /* set an element of an arrayed slot */
+    virtual void set_control_array_element(slot_index_t slot_str, size_t n, float values) = 0;
+    virtual void set_control_array_element(const char * slot_str, size_t n, float values) = 0;
+    virtual void set_control_array_element(const char * slot_str, size_t hashed_str, size_t n, float values) = 0;
+    /* @} */
 
     /* @{ */
     /** group traversing */
@@ -260,22 +270,34 @@ protected:
                                         _1, slot_id, val));
     }
 
-    void set_on_satellites(slot_index_t slot_id, size_t n, float * values)
-    {
-        apply_on_satellites(boost::bind(static_cast<void (server_node::*)(slot_index_t, size_t, float*)>(&server_node::set),
-                                        _1, slot_id, n, values));
-    }
-
     void set_on_satellites(const char * slot_str, size_t hashed_str, float val)
     {
         apply_on_satellites(boost::bind(static_cast<void (server_node::*)(const char*, size_t, float)>(&server_node::set),
                                         _1, slot_str, hashed_str, val));
     }
 
-    void set_on_satellites(const char * slot_str, size_t hashed_str, size_t n, float * values)
+    void set_control_array_on_satellites(slot_index_t slot_id, size_t n, float * values)
     {
-        apply_on_satellites(boost::bind(static_cast<void (server_node::*)(const char*, size_t, size_t, float*)>(&server_node::set),
+        apply_on_satellites(boost::bind(static_cast<void (server_node::*)(slot_index_t, size_t, float*)>(&server_node::set_control_array),
+                                        _1, slot_id, n, values));
+    }
+
+    void set_control_array_on_satellites(const char * slot_str, size_t hashed_str, size_t n, float * values)
+    {
+        apply_on_satellites(boost::bind(static_cast<void (server_node::*)(const char*, size_t, size_t, float*)>(&server_node::set_control_array),
                                         _1, slot_str, hashed_str, n, values));
+    }
+
+    void set_control_array_element_on_satellites(slot_index_t slot_id, size_t n, float value)
+    {
+        apply_on_satellites(boost::bind(static_cast<void (server_node::*)(slot_index_t, size_t, float)>(&server_node::set_control_array_element),
+                                        _1, slot_id, n, value));
+    }
+
+    void set_control_array_element_on_satellites(const char * slot_str, size_t hashed_str, size_t n, float value)
+    {
+        apply_on_satellites(boost::bind(static_cast<void (server_node::*)(const char*, size_t, size_t, float)>(&server_node::set_control_array_element),
+                                        _1, slot_str, hashed_str, n, value));
     }
 
     void pause_satellites(void)

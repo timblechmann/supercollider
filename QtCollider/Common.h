@@ -19,37 +19,10 @@
 *
 ************************************************************************/
 
-
 #ifndef _SC_QT_COMMON_H
 #define _SC_QT_COMMON_H
 
-#include <cstdarg>
-
-namespace QtCollider {
-  int debugLevel();
-  void setDebugLevel( int );
-}
-
-#include <QString>
-
-extern void postfl(const char *fmt, ...);
-extern void error(const char *fmt, ...);
-
-#ifdef QC_DEBUG
-  #define qcDebugMsg( LEVEL, MSG ) \
-    if( LEVEL <= QtCollider::debugLevel() ) { \
-      postfl( "Qt:: %s\n", QString(MSG).toStdString().c_str() ); \
-    }
-#else
-  #define qcDebugMsg( LEVEL, MSG )
-#endif
-
-#define qcSCObjectDebugMsg( LEVEL, OBJ, MSG ) \
-  qcDebugMsg( LEVEL, QString("[%1] %2") \
-                    .arg( OBJ ? slotRawSymbol( &OBJ->classptr->name )->name : "null" ) \
-                    .arg(MSG) )
-
-#define qcErrorMsg( MSG ) error( "Qt: %s\n", QString(MSG).toStdString().c_str() )
+#include "debug.h"
 
 #include <QList>
 #include <QVariant>
@@ -76,45 +49,31 @@ namespace QtCollider {
   };
 
   enum EventType {
-    Event_ScMethodCall = QEvent::User,
+    Event_SCRequest_Input = QEvent::User,
+    Event_SCRequest_Sched,
+    Event_SCRequest_Quit,
+    Event_SCRequest_Recompile,
+    Event_ScMethodCall,
     Event_Refresh,
     Event_Proxy_SetProperty,
     Event_Proxy_Destroy,
     Event_Proxy_BringFront,
     Event_Proxy_SetFocus,
-    Event_Proxy_SetAlwaysOnTop
+    Event_Proxy_SetAlwaysOnTop,
+    Event_Proxy_StartDrag
   };
 
   enum Synchronicity {
     Synchronous,
     Asynchronous
   };
-}
-
-struct ScMethodCallEvent : public QEvent
-{
-  ScMethodCallEvent( PyrSymbol *m,
-                     const QList<QVariant> &l = QList<QVariant>(),
-                     bool b_locked = false )
-  : QEvent( (QEvent::Type) QtCollider::Event_ScMethodCall ),
-    method( m ),
-    args( l ),
-    locked( b_locked )
-  {}
-
-  PyrSymbol *method;
-  QList<QVariant> args;
-  bool locked;
-};
-
-namespace QtCollider {
 
   void lockLang();
 
   inline static void unlockLang()
   {
     pthread_mutex_unlock(&gLangMutex);
-    //printf("UNLOCKED\n");
+    qcDebugMsg(2,"unlocked");
   }
 
   int wrongThreadError ();
@@ -134,6 +93,7 @@ namespace QtCollider {
   extern PyrSymbol *s_QFont;
   extern PyrSymbol *s_QObject;
   extern PyrSymbol *s_QLayout;
+  extern PyrSymbol *s_QTreeViewItem;
 
 #define class_Rect s_Rect->u.classobj
 #define class_Point s_Point->u.classobj
@@ -147,6 +107,8 @@ namespace QtCollider {
 #define class_QFont s_QFont->u.classobj
 #define class_QObject s_QObject->u.classobj
 #define class_QLayout s_QLayout->u.classobj
+#define class_QTreeViewItem s_QTreeViewItem->u.classobj
+
 }
 
 #endif //_SC_QT_COMMON_H

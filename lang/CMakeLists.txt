@@ -1,7 +1,15 @@
 find_package(FFTW3f)
 
+if(SC_QT)
+	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}  -DQC_DEBUG")
+	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -DQC_DEBUG")
+endif()
+
 include_directories(${CMAKE_SOURCE_DIR}/include/common
                     ${CMAKE_SOURCE_DIR}/include/lang
+                    ${CMAKE_SOURCE_DIR}/external_libraries/boost_lockfree
+                    ${CMAKE_SOURCE_DIR}/external_libraries/boost
+                    ${CMAKE_SOURCE_DIR}/external_libraries/threadpool
                     ${CMAKE_SOURCE_DIR}/include/plugin_interface
                     LangSource/Bison)
 
@@ -228,7 +236,7 @@ endif()
 if (APPLE)
 	target_link_libraries(libsclang "-framework Carbon")
 	target_link_libraries(libsclang "-framework CoreAudio")
-	target_link_libraries(libsclang "-framework CoreMidi")
+	target_link_libraries(libsclang "-framework CoreMIDI")
 	target_link_libraries(libsclang "-framework IOKit")
 	target_link_libraries(libsclang "-framework CoreServices")
 endif()
@@ -261,10 +269,10 @@ if (GC_SANITYCHECK)
 	add_definitions(-DGC_SANITYCHECK)
 endif()
 
-target_link_libraries(libsclang ${PTHREADS_LIBRARY})
+target_link_libraries(libsclang ${PTHREADS_LIBRARY} supercollider_boost_thread)
 
 add_executable(sclang LangSource/cmdLineFuncs.cpp)
-target_link_libraries(sclang libsclang)
+target_link_libraries(sclang libsclang boost_thread)
 
 set_property(TARGET sclang
 	APPEND

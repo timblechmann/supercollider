@@ -1,5 +1,5 @@
 QNumberBox : QAbstractStepValue {
-  var <clipLo, <clipHi, <scroll, <scroll_step, <decimals;
+  var <clipLo, <clipHi, <scroll, <scroll_step;
   var <align, <buttonsVisible = false;
   var <normalColor, <typingColor;
 
@@ -19,6 +19,33 @@ QNumberBox : QAbstractStepValue {
     normalColor = Color.black;
     typingColor = Color.red;
   }
+
+  value {
+    var type = this.getProperty( \valueType );
+    var val;
+    switch( type,
+      0 /* Number */, { val = this.getProperty( \value ) },
+      1 /* Inf */, { val = inf },
+      2 /* -Inf */, { val = -inf },
+      3 /* NaN */, { val = 0 },
+      4 /* Text */, { val = 0 }
+    );
+    ^val;
+  }
+
+  value_ { arg value;
+    case
+      // isNaN has to be on the first plase, because a NaN is also equal to inf and -inf
+      { value.isNaN } { this.invokeMethod( \setNaN ); }
+      { value == inf } { this.invokeMethod( \setInfinite, true ); }
+      { value == -inf } { this.invokeMethod( \setInfinite, false ); }
+      { this.setProperty( \value, value.asFloat ); }
+    ;
+  }
+
+  string { ^this.getProperty( \text ); }
+
+  string_ { arg string; this.setProperty( \text, string ); }
 
   clipLo_ { arg aFloat;
     clipLo = aFloat;
@@ -40,10 +67,13 @@ QNumberBox : QAbstractStepValue {
     this.setProperty( \scrollStep, aFloat );
   }
 
-  decimals_ {  arg anInt;
-    decimals = anInt;
-    this.setProperty( \decimals, anInt );
-  }
+  decimals { ^this.getProperty(\decimals); }
+  minDecimals { ^this.getProperty(\minDecimals); }
+  maxDecimals { ^this.getProperty(\maxDecimals); }
+
+  decimals_ {  arg decimals; this.setProperty( \decimals, decimals ); }
+  minDecimals_ { arg decimals; this.setProperty( \minDecimals, decimals ); }
+  maxDecimals_ { arg decimals; this.setProperty( \maxDecimals, decimals ); }
 
   align_ { arg alignment;
     align = alignment;
@@ -79,5 +109,11 @@ QNumberBox : QAbstractStepValue {
   buttonsVisible_ { arg aBool;
     buttonsVisible = aBool;
     this.setProperty( \buttonsVisible, aBool );
+  }
+
+  defaultGetDrag { ^this.value; }
+  defaultCanReceiveDrag { ^QView.currentDrag.isNumber; }
+  defaultReceiveDrag {
+    this.valueAction = QView.currentDrag;
   }
 }
