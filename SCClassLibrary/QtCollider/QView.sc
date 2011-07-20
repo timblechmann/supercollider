@@ -17,6 +17,8 @@ QView : QObject {
   var <mouseDownAction, <mouseUpAction, <mouseOverAction, <mouseMoveAction;
   var <keyDownAction, <keyUpAction, <keyModifiersChangedAction;
   var <>keyTyped;
+  // focus
+  var <focusGainedAction, <focusLostAction;
   // drag-and-drop
   var <>dragLabel;
   var <beginDragAction, <canReceiveDragHandler, <receiveDragHandler;
@@ -99,6 +101,10 @@ QView : QObject {
     this.setProperty(\geometry, rect.asRect )
   }
 
+  sizeHint { ^this.getProperty(\sizeHint) }
+
+  minSizeHint { ^this.getProperty(\minimumSizeHint) }
+
   // a Point can be passed instead of a Size
   maxSize_ { arg size;
     var max = QLimits(\maxWidgetSize);
@@ -107,7 +113,13 @@ QView : QObject {
   }
 
   // a Point can be passed instead of a Size
-  setMinSize_ { arg size; this.setProperty( \minimumSize, size.asSize ); }
+  minSize_ { arg size; this.setProperty( \minimumSize, size.asSize ); }
+
+  fixedSize_ { arg size;
+    size = size.asSize;
+    this.setProperty( \minimumSize, size );
+    this.setProperty( \maximumSize, size );
+  }
 
   maxWidth_ { arg width;
     this.setProperty( \maximumWidth, min( width, QLimits(\maxWidgetSize) ) );
@@ -369,6 +381,16 @@ QView : QObject {
                                \onWindowDeactivateEvent );
   }
 
+  focusGainedAction_ { arg handler;
+    focusGainedAction = handler;
+    this.registerEventHandler( 8 /* QEvent::FocusIn */, \focusInEvent );
+  }
+
+  focusLostAction_ { arg handler;
+    focusLostAction = handler;
+    this.registerEventHandler( 9 /* QEvent::FocusOut */, \focusOutEvent );
+  }
+
   onClose_ { arg func;
     this.manageFunctionConnection( onClose, func, 'destroyed()', false );
     onClose = func;
@@ -482,6 +504,9 @@ QView : QObject {
   onWindowDeactivateEvent {
     endFrontAction.value(this);
   }
+
+  focusInEvent { focusGainedAction.value(this) }
+  focusOutEvent { focusLostAction.value(this) }
 
   keyDownEvent { arg char, modifiers, unicode, keycode;
     modifiers = QKeyModifiers.toCocoa(modifiers);

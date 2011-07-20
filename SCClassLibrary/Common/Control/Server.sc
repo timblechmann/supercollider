@@ -321,9 +321,9 @@ Server {
 		if (condition.isNil) { condition = Condition.new };
 		cmdName = args[0].asString;
 		if (cmdName[0] != $/) { cmdName = cmdName.insert(0, $/) };
-		resp = OSCProxy({|msg|
+		resp = OSCFunc({|msg|
 			if (msg[1].asString == cmdName) {
-				resp.clear;
+				resp.free;
 				condition.test = true;
 				condition.signal;
 			};
@@ -419,7 +419,7 @@ Server {
 	wait { arg responseName;
 		var routine;
 		routine = thisThread;
-		OSCProxy({
+		OSCFunc({
 			routine.resume(true);
 		}, responseName, addr).oneShot;
 	}
@@ -488,7 +488,7 @@ Server {
 	addStatusWatcher {
 		if(statusWatcher.isNil) {
 			statusWatcher =
-				OSCProxy({ arg msg;
+				OSCFunc({ arg msg;
 					var cmd, one;
 					if(notify){
 						if(notified.not){
@@ -559,7 +559,7 @@ Server {
 			aliveThread = nil;
 		});
 		if( statusWatcher.notNil, {
-			statusWatcher.clear;
+			statusWatcher.free;
 			statusWatcher = nil;
 		});
 	}
@@ -669,7 +669,7 @@ Server {
 		statusWatcher !? {
 			statusWatcher.disable;
 			if(notified) {
-				serverReallyQuitWatcher = OSCProxy({ |msg|
+				serverReallyQuitWatcher = OSCFunc({ |msg|
 					if(msg[1] == '/quit') {
 						statusWatcher.enable;
 						serverReallyQuit = true;
@@ -893,7 +893,7 @@ Server {
 	queryAllNodes { arg queryControls = false;
 		var resp, done = false;
 		if(isLocal, {this.sendMsg("/g_dumpTree", 0, queryControls.binaryValue);}, {
-			resp = OSCProxy({ arg msg;
+			resp = OSCFunc({ arg msg;
 				var i = 2, tabs = 0, printControls = false, dumpFunc;
 				if(msg[1] != 0, {printControls = true});
 				("NODE TREE Group" + msg[2]).postln;
@@ -939,7 +939,7 @@ Server {
 			this.sendMsg("/g_queryTree", 0, queryControls.binaryValue);
 			SystemClock.sched(3, {
 				done.not.if({
-					resp.clear;
+					resp.free;
 					"Remote server failed to respond to queryAllNodes!".warn;
 				});
 			});

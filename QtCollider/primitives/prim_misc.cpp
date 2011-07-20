@@ -34,6 +34,7 @@
 #include <QDesktopWidget>
 #include <QFontDatabase>
 #include <QStyleFactory>
+#include <QWebSettings>
 
 using namespace QtCollider;
 
@@ -50,6 +51,20 @@ QC_LANG_PRIMITIVE( QWindow_ScreenBounds, 1, PyrSlot *r, PyrSlot *rectSlot, VMGlo
   QRect screenGeometry = QApplication::desktop()->screenGeometry();
 
   int err = Slot::setRect( rectSlot, screenGeometry );
+  if( err ) return err;
+
+  slotCopy( r, rectSlot );
+
+  return errNone;
+}
+
+QC_LANG_PRIMITIVE( QWindow_AvailableGeometry, 1, PyrSlot *r, PyrSlot *rectSlot, VMGlobals *g )
+{
+  if( !QcApplication::compareThread() ) return QtCollider::wrongThreadError();
+
+  QRect rect = QApplication::desktop()->availableGeometry();
+
+  int err = Slot::setRect( rectSlot, rect );
   if( err ) return err;
 
   slotCopy( r, rectSlot );
@@ -147,5 +162,14 @@ QC_LANG_PRIMITIVE( Qt_AvailableStyles, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
   }
 
   Slot::setVariantList( r, list );
+  return errNone;
+}
+
+QC_LANG_PRIMITIVE( QWebView_ClearMemoryCaches, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
+{
+  if( !QcApplication::compareThread() ) return QtCollider::wrongThreadError();
+
+  QWebSettings::clearMemoryCaches();
+
   return errNone;
 }

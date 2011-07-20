@@ -25,6 +25,8 @@
 #include "QcScrollArea.h"
 
 #include <QShortcut>
+#include <QApplication>
+#include <QDesktopWidget>
 
 class QcWindowFactory : public QcAbstractFactory
 {
@@ -35,23 +37,33 @@ public:
 
     if( arguments.count() < 5 ) return 0;
 
+    // scrollable?
+
     bool scroll = arguments[4].value<bool>();
 
     QWidget *window;
     if( scroll ) {
       QcScrollArea *scroll = new QcScrollArea();
       window = scroll;
-      // NOTE the 'painting' signal will be connected to a widget proxy
-      // by QcScrollWidget factory
     }
     else {
       window = new QcCustomPainted();
     }
 
+    // window title
+
     QString name = arguments[0].toString();
     window->setWindowTitle( name );
 
+    // size, resizability
+
     QRect geom = arguments[1].value<QRect>();
+
+    if( geom.isEmpty() ) {
+      geom = QApplication::desktop()->availableGeometry();
+      geom.setSize( window->sizeHint() );
+    }
+
     bool resizable = arguments[2].value<bool>();
     if( resizable ) {
       window->setGeometry( geom );
@@ -60,14 +72,20 @@ public:
       window->setFixedSize( geom.size() );
     }
 
+    // frameless?
+
     bool border = arguments[3].value<bool>();
     if( !border )
       window->setWindowFlags( window->windowFlags() | Qt::FramelessWindowHint );
+
+    // Ctrl+W shortcut: close the window
 
     QShortcut *closeShortcut =
       new QShortcut( QKeySequence( Qt::CTRL | Qt::Key_W ), window );
     QObject::connect( closeShortcut, SIGNAL(activated()),
                       window, SLOT(close()) );
+
+    // make the proxy and connect the painting signal to it
 
     QWidgetProxy *proxy = new QWidgetProxy( window, po );
 
@@ -75,6 +93,8 @@ public:
       QObject::connect( window, SIGNAL(painting(QPainter*)),
                         proxy, SLOT(customPaint(QPainter*)) );
     }
+    // NOTE: if scrollable, the 'painting' signal will be connected
+    // to the proxy by QcScrollWidget factory
 
     return proxy;
   }

@@ -101,12 +101,16 @@ QWindow
     ^this.prScreenBounds( Rect.new );
   }
 
+  *availableBounds {
+    ^this.prAvailableBounds( Rect() );
+  }
+
   *closeAll {
     allWindows.copy.do { |win| win.close };
   }
 
   *new { arg name,
-         bounds = Rect( 128, 64, 400, 400 ),
+         bounds,
          resizable = true,
          border = true,
          server,
@@ -114,8 +118,12 @@ QWindow
 
     //NOTE server is only for compatibility with SwingOSC
 
-    var b = QWindow.flipY( bounds.asRect );
-    ^super.new.initQWindow( name, b, resizable, border, scroll );
+    if( bounds.isNil ) {
+      bounds = Rect(0,0,400,400).center_( QWindow.availableBounds.center );
+    }{
+      bounds = QWindow.flipY( bounds.asRect );
+    };
+    ^super.new.initQWindow( name, bounds, resizable, border, scroll );
   }
 
   //------------------------ QWindow specific  -----------------------//
@@ -143,10 +151,7 @@ QWindow
   bounds_ { arg aRect;
     var r = QWindow.flipY( aRect.asRect );
     view.setProperty( \geometry, r );
-    if( resizable.not ) {
-      view.setProperty( \minimumSize, r.asSize );
-      view.setProperty( \maximumSize, r.asSize );
-    }
+    if( resizable.not ) { view.fixedSize = r.size }
   }
 
   bounds {
@@ -183,6 +188,8 @@ QWindow
 
   //------------------- simply redirected to QView ---------------------//
 
+  sizeHint { ^view.sizeHint }
+  minSizeHint { ^view.minSizeHint }
   alpha_ { arg value; view.alpha_(value); }
   addFlowLayout { arg margin, gap; ^view.addFlowLayout( margin, gap ); }
   close { view.close; }
@@ -217,6 +224,11 @@ QWindow
 
   *prScreenBounds { arg return;
     _QWindow_ScreenBounds
+    ^this.primitiveFailed
+  }
+
+  *prAvailableBounds { arg return;
+    _QWindow_AvailableGeometry
     ^this.primitiveFailed
   }
 

@@ -19,7 +19,7 @@ AbstractNodeWatcher {
 				var method;
 				method = cmd.copyToEnd(1).asSymbol;
 				responders = responders.add(
-					OSCProxy({ arg msg; this.respond(method, msg) }, cmd, addrItem).disable
+					OSCFunc({ arg msg; this.respond(method, msg) }, cmd, addrItem).disable
 				)
 			});
 		});
@@ -41,9 +41,9 @@ AbstractNodeWatcher {
 	}
 	stop {
 		if(isWatching, {
-			responders.do({ arg item; item.clear });
+			responders.do({ arg item; item.free });
 			isWatching = false;
-			this.clear;
+			this.free;
 		})
 	}
 

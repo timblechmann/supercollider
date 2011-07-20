@@ -129,7 +129,7 @@ private:
         size_t children = g.child_count();
 
         sequential_child_list sequential_children;
-        sequential_children.reserve(g.child_synths_);
+        sequential_children.reserve(g.child_synth_count);
 
         for (r_iterator it = g.child_nodes.rbegin(); it != g.child_nodes.rend(); ++it)
         {

@@ -44,7 +44,7 @@ server_node * find_node(int32_t target_id)
     server_node * node = instance->find_node(target_id);
 
     if (node == NULL)
-        log("node not found\n");
+        log_printf("node not found: %d\n", target_id);
 
     return node;
 }
@@ -460,21 +460,26 @@ void sc_scheduled_bundles::insert_bundle(time_tag const & timeout, const char * 
 void sc_scheduled_bundles::execute_bundles(time_tag const & last, time_tag const & now)
 {
     World * world = &sc_factory->world;
+
     while(!bundle_q.empty()) {
         bundle_node & front = *bundle_q.top();
-        time_tag const & current = front.timeout_;
+        time_tag const & next_timestamp = front.timeout_;
 
-        if (now < current)
+        if (now < next_timestamp)
             break;
 
-        time_tag time_since_last = current - last;
-        float samples_since_last = time_since_last.to_samples(world->mSampleRate);
+        if (last < next_timestamp) {
+            // between last and now
+            time_tag time_since_last = last - next_timestamp;
+            float samples_since_last = time_since_last.to_samples(world->mSampleRate);
 
-        float sample_offset;
-        float subsample_offset = std::modf(samples_since_last, &sample_offset);
+            float sample_offset;
+            float subsample_offset = std::modf(samples_since_last, &sample_offset);
 
-        world->mSampleOffset = (int)sample_offset;
-        world->mSubsampleOffset = subsample_offset;
+            world->mSampleOffset = (int)sample_offset;
+            world->mSubsampleOffset = subsample_offset;
+        } else
+            world->mSampleOffset = world->mSubsampleOffset = 0;
 
         front.run();
         bundle_q.erase_and_dispose(bundle_q.top(), &dispose_bundle);
@@ -739,6 +744,7 @@ void quit_perform(nova_endpoint const & endpoint)
 template <bool realtime>
 void handle_quit(nova_endpoint const & endpoint)
 {
+    instance->quit_received = true;
     cmd_dispatcher<realtime>::fire_system_callback(boost::bind(quit_perform, endpoint));
 }
 
@@ -760,6 +766,9 @@ void handle_notify(received_message const & message, nova_endpoint const & endpo
 
 void status_perform(nova_endpoint const & endpoint)
 {
+    if (unlikely(instance->quit_received)) // we don't reply once we are about to quit
+        return;
+
     char buffer[1024];
     typedef osc::int32 i32;
     osc::OutboundPacketStream p(buffer, 1024);
@@ -839,6 +848,8 @@ sc_synth * add_synth(const char * name, int node_id, int action, int target_id)
 
     node_position_constraint pos = make_pair(target, node_position(action));
     abstract_synth * synth = instance->add_synth(name, node_id, pos);
+    if (!synth)
+        log_printf("Cannot create synth (synthdef: %s, node id: %d\n", name, node_id);
 
     last_generated = node_id;
     return static_cast<sc_synth*>(synth);
@@ -979,60 +990,28 @@ void handle_s_new(received_message const & msg)
 }
 
 
-void insert_group(int node_id, int action, int target_id)
-{
-    if (node_id == -1)
-        node_id = instance->generate_node_id();
-    else if (!check_node_id(node_id))
-        return;
-
-    server_node * target = find_node(target_id);
-
-    if (!target)
-        return;
-
-    node_position_constraint pos = make_pair(target, node_position(action));
-
-    instance->add_group(node_id, pos);
-    last_generated = node_id;
-}
-
 void handle_g_new(received_message const & msg)
 {
     osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
 
-    while(!args.Eos())
-    {
-        osc::int32 id, action, target;
-        args >> id >> action >> target;
+    while(!args.Eos()) {
+        osc::int32 node_id, action, target_id;
+        args >> node_id >> action >> target_id;
 
-        insert_group(id, action, target);
-    }
-}
+        if (node_id == -1)
+            node_id = instance->generate_node_id();
+        else if (!check_node_id(node_id))
+            continue;
 
-void handle_g_head(received_message const & msg)
-{
-    osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
+        server_node * target = find_node(target_id);
 
-    while(!args.Eos())
-    {
-        osc::int32 id, target;
-        args >> id >> target;
+        if (!target)
+            continue;
 
-        insert_group(id, head, target);
-    }
-}
+        node_position_constraint pos = make_pair(target, node_position(action));
 
-void handle_g_tail(received_message const & msg)
-{
-    osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
-
-    while(!args.Eos())
-    {
-        osc::int32 id, target;
-        args >> id >> target;
-
-        insert_group(id, tail, target);
+        instance->add_group(node_id, pos);
+        last_generated = node_id;
     }
 }
 
@@ -1392,7 +1371,8 @@ HANDLE_N_DECORATOR(mapa, map_control<true>)
 HANDLE_N_DECORATOR(mapn, mapn_control<false>)
 HANDLE_N_DECORATOR(mapan, mapn_control<true>)
 
-void handle_n_before(received_message const & msg)
+template <nova::node_position Relation>
+void handle_n_before_or_after(received_message const & msg)
 {
     osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
 
@@ -1401,37 +1381,37 @@ void handle_n_before(received_message const & msg)
         args >> node_a >> node_b;
 
         server_node * a = find_node(node_a);
+        if (!a) continue;
+
         server_node * b = find_node(node_b);
+        if (!b) continue;
 
-        abstract_group * a_parent = a->get_parent();
-        abstract_group * b_parent = b->get_parent();
-
-        /** \todo this can be optimized if a_parent == b_parent */
-        a_parent->remove_child(a);
-        b_parent->add_child(a, make_pair(b_parent, before));
+        abstract_group::move_before_or_after<Relation>(a, b);
     }
 }
 
-void handle_n_after(received_message const & msg)
+
+
+template <nova::node_position Position>
+void handle_g_head_or_tail(received_message const & msg)
 {
     osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
 
-    while(!args.Eos())
-    {
-        osc::int32 node_a, node_b;
-        args >> node_a >> node_b;
+    while(!args.Eos()) {
+        osc::int32 node_id, target_id;
+        args >> target_id >> node_id;
 
-        server_node * a = find_node(node_a);
-        server_node * b = find_node(node_b);
+        server_node * node = find_node(node_id);
+        if (!node) continue;
 
-        abstract_group * a_parent = a->get_parent();
-        abstract_group * b_parent = b->get_parent();
+        abstract_group * target_group = find_group(target_id);
+        if (!target_group) continue;
 
-        /** \todo this can be optimized if a_parent == b_parent */
-        a_parent->remove_child(a);
-        b_parent->add_child(a, make_pair(b_parent, after));
+        abstract_group::move_to_head_or_tail<Position>(node, target_group);
     }
 }
+
+
 
 void handle_n_query(received_message const & msg, nova_endpoint const & endpoint)
 {
@@ -1505,8 +1485,7 @@ void handle_n_run(received_message const & msg)
 {
     osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
 
-    while(!args.Eos())
-    {
+    while(!args.Eos()) {
         osc::int32 node_id, run_flag;
         args >> node_id >> run_flag;
 
@@ -1536,8 +1515,7 @@ void handle_n_trace(received_message const & msg)
 {
     osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
 
-    while(!args.Eos())
-    {
+    while(!args.Eos()) {
         osc::int32 node_id;
         args >> node_id;
 
@@ -1554,8 +1532,7 @@ void handle_s_noid(received_message const & msg)
 {
     osc::ReceivedMessageArgumentStream args = msg.ArgumentStream();
 
-    while(!args.Eos())
-    {
+    while(!args.Eos()) {
         osc::int32 node_id;
         args >> node_id;
         instance->synth_reassign_id(node_id);
@@ -2934,11 +2911,11 @@ void sc_osc_handler::handle_message_int_address(received_message const & message
         break;
 
     case cmd_g_head:
-        handle_g_head(message);
+        handle_g_head_or_tail<head>(message);
         break;
 
     case cmd_g_tail:
-        handle_g_tail(message);
+        handle_g_head_or_tail<tail>(message);
         break;
 
     case cmd_g_freeAll:
@@ -3002,11 +2979,11 @@ void sc_osc_handler::handle_message_int_address(received_message const & message
         break;
 
     case cmd_n_before:
-        handle_n_before(message);
+        handle_n_before_or_after<before>(message);
         break;
 
     case cmd_n_after:
-        handle_n_after(message);
+        handle_n_before_or_after<after>(message);
         break;
 
     case cmd_n_trace:
@@ -3141,11 +3118,11 @@ void dispatch_group_commands(const char * address, received_message const & mess
         return;
     }
     if (strcmp(address+3, "head") == 0) {
-        handle_g_head(message);
+        handle_g_head_or_tail<head>(message);
         return;
     }
     if (strcmp(address+3, "tail") == 0) {
-        handle_g_tail(message);
+        handle_g_head_or_tail<tail>(message);
         return;
     }
     if (strcmp(address+3, "freeAll") == 0) {
@@ -3220,12 +3197,12 @@ void dispatch_node_commands(const char * address, received_message const & messa
     }
 
     if (strcmp(address+3, "before") == 0) {
-        handle_n_before(message);
+        handle_n_before_or_after<before>(message);
         return;
     }
 
     if (strcmp(address+3, "after") == 0) {
-        handle_n_after(message);
+        handle_n_before_or_after<after>(message);
         return;
     }
 
