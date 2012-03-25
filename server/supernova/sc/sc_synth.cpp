@@ -272,9 +272,11 @@ private:
     int position;
 };
 
-void sc_synth::run_traced(void)
+void sc_synth::run_traced( sc_synth * synth, Unit ** calc_units)
 {
-    trace = 0;
+    synth->calc_func = synth->jit_calc_func;
+
+    size_t calc_unit_count = synth->calc_unit_count;
 
 #ifndef thread_local
     spin_lock::scoped_lock lock (log_guard);
@@ -282,7 +284,7 @@ void sc_synth::run_traced(void)
 
     scratchpad_printer printer(trace_scratchpad.data());
 
-    printer.printf("\nTRACE %d  %s    #units: %d\n", id(), this->definition_name(), calc_unit_count);
+    printer.printf("\nTRACE %d  %s    #units: %d\n", synth->id(), synth->definition_name(), calc_unit_count);
 
     for (size_t calc_unit_index = 0; calc_unit_index != calc_unit_count; ++calc_unit_index) {
         Unit * unit = calc_units[calc_unit_index];
@@ -323,6 +325,48 @@ void sc_synth::run_traced(void)
     spin_lock::scoped_lock lock (log_guard);
 #endif
     log(printer.data());
+}
+
+void sc_synth::run_fallback ( sc_synth * synth, Unit** calc_units )
+{
+    size_t count = synth->calc_unit_count;
+    Unit ** units = calc_units;
+
+    size_t preroll = count & 7;
+
+    for (size_t i = 0; i != preroll; ++i)
+    {
+        Unit * unit = units[i];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+    }
+
+    size_t unroll = count >> 3;
+    if (unroll == 0)
+        return;
+
+    units += preroll;
+
+    for (size_t i = 0; i != unroll; ++i)
+    {
+        Unit * unit = units[0];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        unit = units[1];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        unit = units[2];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        unit = units[3];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        unit = units[4];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        unit = units[5];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        unit = units[6];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        unit = units[7];
+        (unit->mCalcFunc)(unit, unit->mBufLength);
+        units += 8;
+    }
+
 }
 
 } /* namespace nova */

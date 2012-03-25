@@ -1,3 +1,6 @@
+find_package(LLVM)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
+
 if (FFT_GREEN)
     add_definitions("-DSC_FFT_GREEN")
 elseif (APPLE)
@@ -166,6 +169,9 @@ else()
 endif()
 
 target_link_libraries(supernova libsupernova)
+
+target_link_libraries(libsupernova ${LLVM_JIT_LIBS})
+set_property(TARGET libsupernova APPEND PROPERTY LINK_FLAGS ${LLVM_LFLAGS})
 
 if(WIN32)
     target_link_libraries(libsupernova wsock32 ws2_32 winmm)

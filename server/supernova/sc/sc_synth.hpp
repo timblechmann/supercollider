@@ -48,6 +48,18 @@ public:
 
     ~sc_synth(void);
 
+    virtual void pause()
+    {
+        abstract_synth::pause();
+        calc_func = run_paused;
+    }
+
+    virtual void resume()
+    {
+        abstract_synth::resume();
+        calc_func = jit_calc_func;
+    }
+
     /** run ugen constructors and initialize first sample
      *
      *  to be executed after preparing the synth and setting the controls
@@ -56,48 +68,7 @@ public:
 
     inline void perform(void)
     {
-        if (likely(trace == 0))
-        {
-            size_t count = calc_unit_count;
-            Unit ** units = calc_units;
-
-            size_t preroll = count & 7;
-
-            for (size_t i = 0; i != preroll; ++i)
-            {
-                Unit * unit = units[i];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-            }
-
-            size_t unroll = count >> 3;
-            if (unroll == 0)
-                return;
-
-            units += preroll;
-
-            for (size_t i = 0; i != unroll; ++i)
-            {
-                Unit * unit = units[0];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                unit = units[1];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                unit = units[2];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                unit = units[3];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                unit = units[4];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                unit = units[5];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                unit = units[6];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                unit = units[7];
-                (unit->mCalcFunc)(unit, unit->mBufLength);
-                units += 8;
-            }
-        }
-        else
-            run_traced();
+        (calc_func)(this, calc_units);
     }
 
     void run(void);
@@ -168,13 +139,16 @@ public:
 
     void enable_tracing(void)
     {
-        trace = 1;
+        calc_func = &run_traced;
     }
 
     void apply_unit_cmd(const char * unit_cmd, unsigned int unit_index, struct sc_msg_iter *args);
 
 private:
-    void run_traced(void);
+    static void run_fallback(sc_synth*, Unit ** calc_units);
+
+    static void run_traced(sc_synth*, Unit ** calc_units);
+    static void run_paused(sc_synth*, Unit ** calc_units) {}
 
     sample get_constant(size_t index)
     {
@@ -191,6 +165,8 @@ private:
     RGen rgen;
 
     Unit ** units;
+    sc_synthdef::synthdef_calc_func calc_func;
+    sc_synthdef::synthdef_calc_func jit_calc_func;
 };
 
 } /* namespace nova */

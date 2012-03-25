@@ -44,8 +44,6 @@ public:
 
     void operator()(thread_count_type index)
     {
-        if (unlikely(!node->is_running()))
-            return;
         node->perform();
     }
 

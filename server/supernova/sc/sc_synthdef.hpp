@@ -33,6 +33,10 @@
 #include "SC_Wire.h"
 
 namespace nova {
+namespace jit
+{
+class UnitJIT;
+}
 
 class sc_synthdef
 {
@@ -137,12 +141,20 @@ public:
         return memory_requirement_;
     }
 
+    typedef void (*synthdef_calc_func)(class sc_synth *, struct Unit**);
+    synthdef_calc_func calc_function() const
+    {
+        return calc_func;
+    }
+
 private:
+    friend class jit::UnitJIT;
     void read_synthdef(const char *& data, const char * end, int version);
 
     /** assign buffers, collect memory requirement & cache ugen prototype */
     void prepare(void);
 
+    void JITSynthDef(void);
     symbol name_;
     float_vector constants;
     float_vector parameters;
@@ -152,6 +164,8 @@ private:
     std::uint16_t buffer_count;
     calc_units_t calc_unit_indices; /**< indices of the units, that need to be calculated */
     std::size_t memory_requirement_;
+
+    synthdef_calc_func calc_func;
 };
 
 std::vector<sc_synthdef> read_synthdefs(const char * buffer, const char * buffer_end);

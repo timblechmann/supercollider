@@ -46,7 +46,7 @@ struct Unit
 	int16 mDone;
 	struct Wire **mInput, **mOutput;
 	struct Rate *mRate;
-	SC_Unit_Extensions* mExtensions; //future proofing and backwards compatibility; used to be SC_Dimension struct pointer
+	struct SC_Unit_Extensions* mExtensions; //future proofing and backwards compatibility; used to be SC_Dimension struct pointer
 	float **mInBuf, **mOutBuf;
 
 	UnitCalcFunc mCalcFunc;

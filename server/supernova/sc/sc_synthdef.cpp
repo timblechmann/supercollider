@@ -30,6 +30,8 @@
 #include "utilities/sized_array.hpp"
 #include "utilities/exists.hpp"
 
+#include "jit_synthdef.hpp"
+
 namespace nova {
 
 typedef std::int16_t int16;
@@ -56,8 +58,6 @@ std::string read_pstring(const char *& buffer, const char *buffer_end)
 
     char str[256+1];
     char name_size = *buffer++;
-    verify_synthdef_buffer(buffer + name_size, buffer_end);
-
     memcpy(str, buffer, name_size);
     str[int(name_size)] = 0;
 
@@ -137,6 +137,9 @@ std::vector<sc_synthdef> read_synthdefs(const char * buffer, const char * buffer
         } catch (std::exception const & e) {
             std::cerr << "Exception when reading synthdef: " << e.what() << std::endl;
         }
+        catch (...) {
+            std::cerr << "Exception when reading synthdef" << std::endl;
+        }
     }
     return ret;
 }
@@ -188,7 +191,8 @@ sc_synthdef::unit_spec_t::unit_spec_t(const char *& buffer, const char * buffer_
     }
 }
 
-sc_synthdef::sc_synthdef(const char*& buffer, const char* buffer_end, int version)
+sc_synthdef::sc_synthdef(const char*& buffer, const char* buffer_end, int version):
+    calc_func(NULL)
 {
     read_synthdef(buffer, buffer_end, version);
 }
@@ -236,6 +240,7 @@ void sc_synthdef::read_synthdef(const char *& buffer, const char* buffer_end, in
     }
 
     prepare();
+    JITSynthDef();
 }
 
 namespace {
@@ -418,5 +423,10 @@ std::string sc_synthdef::dump(void) const
     return stream.str();
 }
 
+void sc_synthdef::JITSynthDef ( void )
+{
+    static UnitJIT jit;
+    calc_func = jit.jit_synthdef(*this);
+}
 
 } /* namespace nova */
