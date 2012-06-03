@@ -1,3 +1,6 @@
+find_package(LLVM)
+link_directories(${LLVM_LIBRARY_DIR})
+
 set(simple_tests
     buffer_manager_test.cpp
     callback_interpreter_system.cpp

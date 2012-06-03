@@ -3,6 +3,7 @@
 #
 #  LLVM_INCLUDE_DIR - where to find ev.h, etc.
 #  LLVM_LIBRARIES   - List of libraries when using libev.
+#  LLVM_LIBRARY_DIR - library path
 #  LLVM_FOUND       - True if libev found.
 
 find_program(LLVM_CONFIG_EXECUTABLE NAMES llvm-config DOC "llvm-config executable")
@@ -10,6 +11,12 @@ find_program(LLVM_CONFIG_EXECUTABLE NAMES llvm-config DOC "llvm-config executabl
 execute_process(
 	COMMAND ${LLVM_CONFIG_EXECUTABLE} --cppflags
 	OUTPUT_VARIABLE LLVM_CFLAGS
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+execute_process(
+	COMMAND ${LLVM_CONFIG_EXECUTABLE} --libdir
+	OUTPUT_VARIABLE LLVM_LIBRARY_DIR
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 

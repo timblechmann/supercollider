@@ -1,5 +1,6 @@
 find_package(LLVM)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
+link_directories(${LLVM_LIBRARY_DIR})
 
 if (FFT_GREEN)
     add_definitions("-DSC_FFT_GREEN")
