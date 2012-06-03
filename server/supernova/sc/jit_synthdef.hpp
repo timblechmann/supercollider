@@ -248,6 +248,7 @@ private:
         Function * TheFunction = Function::Create(FT, Function::ExternalLinkage, function_name, module);
 
         TheFunction->setHasUWTable(false);
+        TheFunction->setDoesNotThrow(false);
 
         BasicBlock::Create(context, "entry", TheFunction);
 
