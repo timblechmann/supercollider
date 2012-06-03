@@ -111,7 +111,7 @@ private:
         StructTy_struct_Unit = StructType::create(context, "struct.Unit");
         std::vector<Type*> StructTy_struct_Unit_fields;
 
-        StructType *StructTy_struct_World = StructTy_struct_World = StructType::create(context, "struct.World");
+        StructType *StructTy_struct_World = StructType::create(context, "struct.World");
         PointerType* PointerTy_2 = PointerType::get(StructTy_struct_World, 0);
         StructTy_struct_Unit_fields.push_back(PointerTy_2);
 
@@ -174,8 +174,6 @@ private:
 public:
     sc_synthdef::synthdef_calc_func jit_synthdef(sc_synthdef const & synthdef)
     {
-
-
         Function * f = generate_synth_function(module->getContext(), synthdef);
 
         fpm->run(*f);
@@ -246,7 +244,7 @@ private:
 
         TheFunction->setHasUWTable();
 
-        BasicBlock * bb = BasicBlock::Create(context, "entry", TheFunction);
+        BasicBlock::Create(context, "entry", TheFunction);
 
         return TheFunction;
     }
