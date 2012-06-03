@@ -196,6 +196,7 @@ public:
         ptr_units->setName("units");
 
         size_t index_in_calcunits = 0;
+        CallInst * previousCallInst = NULL;
         for (size_t i = 0; i != synthdef.unit_count(); ++i) {
             sc_synthdef::unit_spec_t const & spec = synthdef.graph[i];
 
@@ -222,7 +223,11 @@ public:
 
             LoadInst * loadUnit = new LoadInst(getUnit, "unit", &bb);
             loadUnit->setAlignment(8);
-            create_unit_call(context, &bb, loadUnit, samples_per_tick);
+            CallInst * thisCallInst = create_unit_call(context, &bb, loadUnit, samples_per_tick);
+
+            if (previousCallInst)
+                previousCallInst->moveBefore(thisCallInst);
+            previousCallInst = thisCallInst;
 
             index_in_calcunits += 1;
         }
