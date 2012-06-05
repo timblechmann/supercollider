@@ -28,8 +28,13 @@ struct Wire
 {
 	struct Unit *mFromUnit;
 	int32 mCalcRate;
+#ifndef SUPERNOVA
 	float32 *mBuffer;
 	float32 mScalarValue;
+#else
+	float32 **mBuffer;
+	float32 mScalarValue;
+#endif
 };
 typedef struct Wire Wire;
 

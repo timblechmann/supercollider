@@ -27,8 +27,7 @@
 #include "../server/synth.hpp"
 #include "../server/memory_pool.hpp"
 
-#include "SC_InterfaceTable.h"
-#include "SC_World.h"
+#include "sc.hpp"
 
 #include <boost/scoped_array.hpp>
 

@@ -138,6 +138,11 @@ public:
         add_sync_callback(new reset_queue_cb(this, qptr));
     }
 
+    int audio_thread_count(void) const
+    {
+        return threads.thread_count();
+    }
+
 private:
     callback_system<audio_sync_callback, false> cbs;
     dsp_threads threads;

@@ -25,7 +25,7 @@
 namespace nova {
 
 sc_synth::sc_synth(int node_id, sc_synth_definition_ptr const & prototype):
-    abstract_synth(node_id, prototype), trace(0), unit_buffers(0)
+    abstract_synth(node_id, prototype), trace(0)
 {
     World const & world = sc_factory->world;
     mNode.mWorld = &sc_factory->world;
@@ -38,6 +38,9 @@ sc_synth::sc_synth(int node_id, sc_synth_definition_ptr const & prototype):
     mLocalAudioBusUnit = 0;
     mLocalControlBusUnit = 0;
 
+    mCurrentThread = 0;
+    mTotalThreads = instance->audio_thread_count();
+
     localBufNum = 0;
     localMaxBufNum = 0;
 
@@ -49,8 +52,8 @@ sc_synth::sc_synth(int node_id, sc_synth_definition_ptr const & prototype):
     const size_t constants_count = synthdef.constants.size();
 
     /* we allocate one memory chunk */
-    const size_t wire_buffer_alignment = 64 * 8; // align to cache line boundaries
-    const size_t alloc_size = prototype->memory_requirement();
+    const size_t wire_buffer_alignment = 64; // align to cache line boundaries
+    const size_t alloc_size = prototype->memory_requirement() + 64000; // FIXME: memory requirement for wire buffers!
 
     const size_t sample_alloc_size = world.mBufLength * synthdef.buffer_count
         + wire_buffer_alignment /* for alignment */;
@@ -59,7 +62,7 @@ sc_synth::sc_synth(int node_id, sc_synth_definition_ptr const & prototype):
     if (raw_chunk == NULL)
         throw std::bad_alloc();
 
-    linear_allocator allocator(raw_chunk);
+    linear_allocator allocator(raw_chunk, alloc_size + sample_alloc_size*sizeof(sample));
 
     /* prepare controls */
     mNumControls = parameter_count;
@@ -88,24 +91,18 @@ sc_synth::sc_synth(int node_id, sc_synth_definition_ptr const & prototype):
     calc_unit_count = prototype->calc_unit_count();
     units        = allocator.alloc<Unit*>(unit_count);
     calc_units   = allocator.alloc<Unit*>(calc_unit_count);
-    unit_buffers = allocator.alloc<sample>(sample_alloc_size);
-
-    const int alignment_mask = wire_buffer_alignment - 1;
-    unit_buffers = (sample*) ((intptr_t(unit_buffers) + alignment_mask) & ~alignment_mask);     /* next aligned pointer */
 
     /* allocate unit generators */
     sc_factory->allocate_ugens(synthdef.graph.size());
     for (size_t i = 0; i != synthdef.graph.size(); ++i) {
         sc_synthdef::unit_spec_t const & spec = synthdef.graph[i];
-        units[i] = spec.prototype->construct(spec, this, &sc_factory->world, allocator);
+        units[i] = spec.prototype->construct(spec, this, &sc_factory->world, allocator, mTotalThreads);
     }
 
     for (size_t i = 0; i != synthdef.calc_unit_indices.size(); ++i) {
         int32_t index = synthdef.calc_unit_indices[i];
         calc_units[i] = units[index];
     }
-
-    assert((char*)mControls + alloc_size <= allocator.alloc<char>()); // ensure the memory boundaries
 }
 
 namespace
@@ -220,11 +217,6 @@ void sc_synth::apply_unit_cmd(const char * unit_cmd, unsigned int unit_index, st
     sc_ugen_def * def = reinterpret_cast<sc_ugen_def*>(unit->mUnitDef);
 
     def->run_unit_command(unit_cmd, unit, args);
-}
-
-void sc_synth::run(void)
-{
-    perform();
 }
 
 extern spin_lock log_guard;

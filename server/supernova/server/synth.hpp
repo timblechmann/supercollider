@@ -86,7 +86,7 @@ protected:
     {}
 
 public:
-    virtual void run(void) = 0;
+    virtual void run(int thread_index) = 0;
 
     virtual float get(slot_index_t slot_id) const = 0;
 

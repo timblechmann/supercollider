@@ -51,6 +51,8 @@ public:
     {
         if (unlikely(!node->is_running()))
             return;
+
+        node->mCurrentThread = index;
         node->perform();
     }
 

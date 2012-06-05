@@ -27,8 +27,7 @@
 #include "sc_synth.hpp"
 #include "sc_plugin_interface.hpp"
 
-#include "SC_InterfaceTable.h"
-#include "SC_Unit.h"
+#include "sc.hpp"
 
 #include "utilities/named_hash_entry.hpp"
 
@@ -48,6 +47,30 @@ struct sc_unitcmd_def:
     {
         (func)(unit, args);
     }
+};
+
+class wire_buffer_manager
+{
+public:
+    wire_buffer_manager(int number_of_wires, int number_of_threads, int audio_block_size):
+        thread_count(number_of_threads)
+    {
+        memory = malloc_aligned<float>(number_of_wires * number_of_threads * audio_block_size);
+    }
+
+    ~wire_buffer_manager()
+    {
+        free_aligned(memory);
+    }
+
+    float * get_buffer(int wire_index, int thread_index, int audio_block_size) const
+    {
+        return memory + wire_index * thread_count * audio_block_size + thread_index * audio_block_size;
+    }
+
+private:
+    const int thread_count;
+    float * memory;
 };
 
 class sc_ugen_def:
@@ -77,7 +100,8 @@ public:
         unitcmd_set(unitcmd_set_type::bucket_traits(unitcmd_set_buckets, unitcmd_set_bucket_count))
     {}
 
-    Unit * construct(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, World * world, linear_allocator & allocator);
+    Unit * construct(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, World * world,
+                     linear_allocator & allocator, int thread_count);
 
     void initialize(Unit * unit)
     {
@@ -102,6 +126,14 @@ public:
 
     bool add_command(const char * cmd_name, UnitCmdFunc func);
     void run_unit_command(const char * cmd_name, Unit * unit, struct sc_msg_iter *args);
+
+private:
+    void initialize_members(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, Unit * unit, World * world,
+                            linear_allocator & allocator);
+    void prepare_inputs(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, Unit * unit, linear_allocator & allocator,
+                        int thread_count);
+    void allocate_buffers(sc_synthdef::unit_spec_t const & unit_spec, World * world, Unit * unit,
+                          linear_allocator & allocator, int thread_count);
 };
 
 struct sc_bufgen_def:
@@ -201,8 +233,9 @@ class sc_ugen_factory:
     public sc_plugin_container
 {
 public:
-    sc_ugen_factory():
-        ugen_count_(0)
+    sc_ugen_factory(int number_of_wires, int number_of_threads, int audio_block_size):
+        ugen_count_(0),
+        wire_manager(number_of_wires, number_of_threads, audio_block_size)
     {}
 
     ~sc_ugen_factory(void)
@@ -231,11 +264,17 @@ public:
     void load_plugin_folder(boost::filesystem::path const & path);
     void load_plugin(boost::filesystem::path const & path);
 
+    wire_buffer_manager & get_wire_manager ()
+    {
+        return wire_manager;
+    }
+
 private:
     void close_handles(void);
 
     uint32_t ugen_count_;
     std::vector<void*> open_handles;
+    wire_buffer_manager wire_manager;
 };
 
 extern sc_ugen_factory * sc_factory;

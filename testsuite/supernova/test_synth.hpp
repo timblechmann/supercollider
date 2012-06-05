@@ -10,7 +10,7 @@ public:
         abstract_synth(node_id, prototype)
     {}
 
-    void run(void)
+    void run(int thread_index)
     {}
 
     virtual float get(slot_index_t slot_id) const

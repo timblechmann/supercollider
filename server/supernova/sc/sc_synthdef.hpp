@@ -29,8 +29,7 @@
 #include "utilities/malloc_aligned.hpp"
 #include "utilities/named_hash_entry.hpp"
 
-#include "SC_Types.h"
-#include "SC_Wire.h"
+#include "sc.hpp"
 
 namespace nova {
 

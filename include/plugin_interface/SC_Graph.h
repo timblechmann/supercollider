@@ -56,6 +56,10 @@ struct Graph
 	SndBuf *mLocalSndBufs;
 	int localBufNum;
 	int localMaxBufNum;
+#ifdef SUPERNOVA
+	int mCurrentThread;
+	int mTotalThreads;
+#endif
 };
 typedef struct Graph Graph;
 

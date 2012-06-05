@@ -20,19 +20,14 @@
 #ifndef SC_SYNTH_HPP
 #define SC_SYNTH_HPP
 
-#include "SC_Unit.h"
-#include "SC_Graph.h"
-#include "SC_Rate.h"
-#include "SC_RGen.h"
-#include "SC_Wire.h"
+#include "sc.hpp"
 
 #include "sc_synth_definition.hpp"
 
 #include "../server/synth.hpp"
 #include "../server/memory_pool.hpp"
 
-namespace nova
-{
+namespace nova {
 
 class sc_synth:
     public abstract_synth,
@@ -100,7 +95,11 @@ public:
             run_traced();
     }
 
-    void run(void);
+    void run(int thread_index)
+    {
+        Graph::mCurrentThread = thread_index;
+        perform();
+    }
 
     void set(slot_index_t slot_index, sample val);
     float get(slot_index_t slot_index) const;
@@ -185,7 +184,6 @@ private:
 
     int_fast8_t trace;
     Unit ** calc_units;
-    sample * unit_buffers;
     int32_t calc_unit_count, unit_count;
 
     RGen rgen;

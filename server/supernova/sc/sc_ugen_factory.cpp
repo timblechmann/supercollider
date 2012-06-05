@@ -26,32 +26,40 @@
 #include <boost/filesystem.hpp>
 
 #include "sc_ugen_factory.hpp"
-
-#include "SC_World.h"
-#include "SC_Wire.h"
+#include "vec.hpp"
 
 namespace nova {
 
 sc_ugen_factory * sc_factory;
 
-Unit * sc_ugen_def::construct(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, World * world, linear_allocator & allocator)
+Unit * sc_ugen_def::construct(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, World * world, linear_allocator & allocator,
+                              int thread_count)
 {
-    const int buffer_length = world->mBufLength;
-
-    const size_t output_count = unit_spec.output_specs.size();
-
     /* size for wires and buffers */
-    Unit * unit   = (Unit*)allocator.alloc<uint8_t>(alloc_size);
+    Unit * unit = (Unit*)allocator.alloc<char>(alloc_size);
     memset(unit, 0, alloc_size);
-    unit->mInBuf  = allocator.alloc<float*>(unit_spec.input_specs.size());
-    unit->mOutBuf = allocator.alloc<float*>(unit_spec.output_specs.size());
-    unit->mInput  = allocator.alloc<Wire*>(unit_spec.input_specs.size());
-    unit->mOutput = allocator.alloc<Wire*>(unit_spec.output_specs.size());
 
-    unit->mNumInputs  = unit_spec.input_specs.size();
-    unit->mNumOutputs = unit_spec.output_specs.size();
+    initialize_members(unit_spec, s, unit, world, allocator);
+    allocate_buffers(unit_spec, world, unit, allocator, thread_count);
+    prepare_inputs(unit_spec, s, unit, allocator, thread_count);
 
-    /* initialize members */
+    return unit;
+}
+
+void sc_ugen_def::initialize_members(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, Unit * unit, World * world,
+                                     linear_allocator & allocator)
+{
+    const int number_of_inputs  = unit_spec.input_specs.size();
+    const int number_of_outputs = unit_spec.output_specs.size();
+
+    unit->mInBuf  = allocator.alloc<float*>(number_of_inputs  * s->mTotalThreads);
+    unit->mOutBuf = allocator.alloc<float*>(number_of_outputs * s->mTotalThreads);
+    unit->mInput  = allocator.alloc<Wire*>(number_of_inputs);
+    unit->mOutput = allocator.alloc<Wire*>(number_of_outputs);
+
+    unit->mNumInputs  = number_of_inputs;
+    unit->mNumOutputs = number_of_outputs;
+
     unit->mCalcRate = unit_spec.rate;
     unit->mSpecialIndex = unit_spec.special_index;
     unit->mDone = false;
@@ -66,54 +74,88 @@ Unit * sc_ugen_def::construct(sc_synthdef::unit_spec_t const & unit_spec, sc_syn
         unit->mRate = &world->mBufRate;
 
     unit->mBufLength = unit->mRate->mBufLength;
+}
 
-    float * buffer_base = s->unit_buffers;
+void sc_ugen_def::prepare_inputs(sc_synthdef::unit_spec_t const & unit_spec, sc_synth * s, Unit * unit,
+                                 linear_allocator & allocator, int thread_count)
+{
+    for (size_t input = 0; input != unit_spec.input_specs.size(); ++input) {
+        int source = unit_spec.input_specs[input].source;
+        int index = unit_spec.input_specs[input].index;
 
-    /* allocate buffers */
-    for (size_t i = 0; i != output_count; ++i) {
+        Wire * currentWire;
+        if (source == -1)
+            currentWire = &unit->mParent->mWire[index];
+        else {
+            Unit * prev = s->units[source];
+            currentWire = prev->mOutput[index];
+        }
+
+        if (currentWire->mCalcRate == 2) {
+            for (int thread = 0; thread != thread_count; ++thread) {
+                size_t thread_input_index = input * thread_count + thread;
+
+                unit->mInBuf[thread_input_index] = currentWire->mBuffer[thread];
+                assert(nova::vec<float>::is_aligned(unit->mInBuf[thread_input_index]));
+                printf ("%s: input %d %d -> %p\n", this->name(), input, thread, currentWire->mBuffer[thread]);
+            }
+        } else {
+            for (int thread = 0; thread != thread_count; ++thread) {
+                size_t thread_input_index = input * thread_count + thread;
+                unit->mInBuf[thread_input_index] = &currentWire->mScalarValue;
+            }
+        }
+
+        unit->mInput[input] = currentWire;
+    }
+}
+
+void sc_ugen_def::allocate_buffers(sc_synthdef::unit_spec_t const & unit_spec, World * world,
+                                   Unit * unit, linear_allocator & allocator, int thread_count)
+{
+    wire_buffer_manager & wire_manager = sc_factory->get_wire_manager();
+
+    const size_t output_count = unit_spec.output_specs.size();
+    const int buffer_length = world->mBufLength;
+
+    for (size_t output = 0; output != output_count; ++output) {
         Wire * w = allocator.alloc<Wire>();
 
         w->mFromUnit = unit;
         w->mCalcRate = unit->mCalcRate;
 
-        w->mBuffer = 0;
-        w->mScalarValue = 0;
+        w->mBuffer = (float**)0xdeadbeef;
+        w->mScalarValue = -1;
 
         if (unit->mCalcRate == 2) {
             /* allocate a new buffer */
-            assert(unit_spec.buffer_mapping[i] >= 0);
-            std::size_t buffer_id = unit_spec.buffer_mapping[i];
-            unit->mOutBuf[i] = buffer_base + buffer_length * buffer_id;
-            w->mBuffer = unit->mOutBuf[i];
+            assert(unit_spec.buffer_mapping[output] >= 0);
+            size_t buffer_id = unit_spec.buffer_mapping[output];
+
+            w->mBuffer = allocator.alloc<float*>(thread_count);
+            for (int thread = 0; thread != thread_count; ++thread) {
+                size_t thread_output_index = output * thread_count + thread;
+
+                float * buffer = wire_manager.get_buffer(buffer_id, thread, buffer_length);
+                assert(nova::vec<float>::is_aligned(buffer));
+
+                printf ("%s: output %d %d -> %p\n", this->name(), output, thread, buffer);
+
+                unit->mOutBuf[thread_output_index] = buffer;
+                w->mBuffer[thread] = buffer;
+            }
+        } else {
+            w->mScalarValue = 0;
+
+            for (int thread = 0; thread != thread_count; ++thread) {
+                size_t thread_output_index = output * thread_count + thread;
+                unit->mOutBuf[thread_output_index] = &w->mScalarValue;
+            }
         }
-        else
-            unit->mOutBuf[i] = &w->mScalarValue;
-
-        unit->mOutput[i] = w;
+        unit->mOutput[output] = w;
     }
-
-    /* prepare inputs */
-    for (size_t i = 0; i != unit_spec.input_specs.size(); ++i)
-    {
-        int source = unit_spec.input_specs[i].source;
-        int index = unit_spec.input_specs[i].index;
-
-        if (source == -1)
-            unit->mInput[i] = &unit->mParent->mWire[index];
-        else
-        {
-            Unit * prev = s->units[source];
-            unit->mInput[i] = prev->mOutput[index];
-        }
-
-        if (unit->mInput[i]->mCalcRate == 2)
-            unit->mInBuf[i] = unit->mInput[i]->mBuffer;
-        else
-            unit->mInBuf[i] = &unit->mInput[i]->mScalarValue;
-    }
-
-    return unit;
 }
+
 
 bool sc_ugen_def::add_command(const char* cmd_name, UnitCmdFunc func)
 {

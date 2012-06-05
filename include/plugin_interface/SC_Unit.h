@@ -24,6 +24,8 @@
 
 #include "SC_Types.h"
 #include "SC_SndBuf.h"
+#include "SC_Wire.h"
+#include "SC_Graph.h"
 
 typedef void (*UnitCtorFunc)(struct Unit* inUnit);
 typedef void (*UnitDtorFunc)(struct Unit* inUnit);
@@ -67,8 +69,27 @@ enum {
 #endif
 
 // These return float* pointers to input and output buffers.
+#ifndef SUPERNOVA
+
 #define IN(index)  (unit->mInBuf[index])
 #define OUT(index) (unit->mOutBuf[index])
+
+#else
+
+static inline float * unit_input_buffer(const Unit * unit, int index)
+{
+    return unit->mInBuf [index * unit->mParent->mTotalThreads + unit->mParent->mCurrentThread];
+}
+
+static inline float * & unit_output_buffer(const Unit * unit, int index)
+{
+    return unit->mOutBuf [index * unit->mParent->mTotalThreads + unit->mParent->mCurrentThread];
+}
+
+#define IN(index)  unit_input_buffer(unit, index)
+#define OUT(index) unit_output_buffer(unit, index)
+
+#endif
 
 // These return a float value. Used for control rate inputs and outputs.
 #define IN0(index)  (IN(index)[0])
