@@ -2691,11 +2691,10 @@ void EnvGen_next_k(EnvGen *unit, int inNumSamples)
 				return;
 			}
 
-			float** envPtr  = unit->mInBuf + stageOffset;
-			double endLevel = *envPtr[0] * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
-			double dur      = *envPtr[1] * ZIN0(kEnvGen_timeScale);
-			unit->m_shape   = (int32)*envPtr[2];
-			double curve    = *envPtr[3];
+			double endLevel = ZIN0(stageOffset + 0) * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
+			double dur      = ZIN0(stageOffset + 1) * ZIN0(kEnvGen_timeScale);
+			unit->m_shape   = (int32)ZIN0(stageOffset + 2);
+			double curve    = ZIN0(stageOffset + 3);
 			unit->m_endLevel = endLevel;
 
 			counter  = (int32)(dur * SAMPLERATE);
@@ -2900,12 +2899,10 @@ void EnvGen_next_ak(EnvGen *unit, int inNumSamples)
 					return;
 				}
 
-				float** envPtr  = unit->mInBuf + stageOffset;
-				double endLevel = *envPtr[0] * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
-				double dur      = *envPtr[1] * ZIN0(kEnvGen_timeScale);
-				unit->m_shape   = (int32)*envPtr[2];
-				double curve    = *envPtr[3];
-				unit->m_endLevel = endLevel;
+				double endLevel = ZIN0(stageOffset + 0) * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
+				double dur      = ZIN0(stageOffset + 1) * ZIN0(kEnvGen_timeScale);
+				unit->m_shape   = (int32)ZIN0(stageOffset + 2);
+				double curve    = ZIN0(stageOffset + 3);
 
 				counter  = (int32)(dur * SAMPLERATE);
 				counter  = sc_max(1, counter);
@@ -3161,11 +3158,10 @@ FLATTEN void EnvGen_next_ak_nova(EnvGen *unit, int inNumSamples)
 					return;
 				}
 
-				float** envPtr	= unit->mInBuf + stageOffset;
-				double endLevel = *envPtr[0] * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
-				double dur		= *envPtr[1] * ZIN0(kEnvGen_timeScale);
-				unit->m_shape	= (int32)*envPtr[2];
-				double curve	= *envPtr[3];
+				double endLevel = ZIN0(stageOffset + 0) * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
+				double dur      = ZIN0(stageOffset + 1) * ZIN0(kEnvGen_timeScale);
+				unit->m_shape   = (int32)ZIN0(stageOffset + 2);
+				double curve    = ZIN0(stageOffset + 3);
 				unit->m_endLevel = endLevel;
 
 				counter = (int32)(dur * SAMPLERATE);
@@ -3408,12 +3404,10 @@ void EnvGen_next_aa(EnvGen *unit, int inNumSamples)
 					return;
 				}
 
-				float** envPtr  = unit->mInBuf + stageOffset;
-				double endLevel = *envPtr[0] * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
-				double dur      = *envPtr[1] * ZIN0(kEnvGen_timeScale);
-				unit->m_shape   = (int32)*envPtr[2];
-				double curve    = *envPtr[3];
-				unit->m_endLevel = endLevel;
+				double endLevel = ZIN0(stageOffset + 0) * ZIN0(kEnvGen_levelScale) + ZIN0(kEnvGen_levelBias); // scale levels
+				double dur      = ZIN0(stageOffset + 1) * ZIN0(kEnvGen_timeScale);
+				unit->m_shape   = (int32)ZIN0(stageOffset + 2);
+				double curve    = ZIN0(stageOffset + 3);
 
 				counter  = (int32)(dur * SAMPLERATE);
 				counter  = sc_max(1, counter);

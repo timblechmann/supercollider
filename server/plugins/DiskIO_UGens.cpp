@@ -174,14 +174,16 @@ void* disk_io_thread_func(void* arg)
 		ClearUnitOutputs(unit, inNumSamples); \
 		return; \
 	} \
-	float *const * const out = &OUT(offset);
+	float **out = (float**)alloca(bufChannels * sizeof(float*)); \
+	for (uint32 i=0; i<bufChannels; ++i) out[i] = OUT(i+offset);
 
 #define SETUP_IN(offset) \
 	if (unit->mNumInputs - (uint32)offset != bufChannels) { \
 		ClearUnitOutputs(unit, inNumSamples); \
 		return; \
 	} \
-	const float *const * const in = &IN(offset);
+	float **in = (float**)alloca(bufChannels * sizeof(float*)); \
+	for (uint32 i=0; i<bufChannels; ++i) in[i] = IN(i+offset);
 
 void DiskIn_Ctor(DiskIn* unit)
 {

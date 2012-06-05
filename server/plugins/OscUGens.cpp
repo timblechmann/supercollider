@@ -550,12 +550,10 @@ void Select_next_a(Select *unit, int inNumSamples)
 
 	float *out = ZOUT(0);
 	float *in0 = ZIN(0);
-	float **in = unit->mInBuf;
-
 	for (int i=0; i<inNumSamples; ++i) {
 		int32 index = (int32)ZXP(in0) + 1;
 		index = sc_clip(index, 1, maxindex);
-		ZXP(out) = in[index][i];
+		ZXP(out) = IN(index)[i];
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////
