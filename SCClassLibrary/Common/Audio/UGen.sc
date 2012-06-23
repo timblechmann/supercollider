@@ -633,3 +633,10 @@ OutputProxy : UGen {
 		^this.source.dumpName ++ "[" ++ outputIndex ++ "]"
 	}
 }
+
+
++Object {
+	*hasIntrusiveMuladd {
+		^false
+	}
+}
