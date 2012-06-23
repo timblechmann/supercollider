@@ -203,6 +203,7 @@ MidEQ : Filter {
 }
 
 LPZ1 : Filter {
+	classvar <hasIntrusiveMuladd = true;
 
 	*ar { arg in = 0.0, mul = 1.0, add = 0.0;
 		^this.multiNewMulAdd('audio', in, mul, add)
