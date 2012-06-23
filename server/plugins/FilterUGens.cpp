@@ -21,6 +21,7 @@
 
 #include "SC_PlugIn.h"
 
+#include "muladd_helpers.hpp"
 #include <limits>
 
 // NaNs are not equal to any floating point number
@@ -143,12 +144,12 @@ struct TwoZero : public Unit
 	double m_x1, m_x2, m_b1, m_b2;
 };
 
-struct LPZ1 : public Unit
+struct LPZ1 : public muladd_ugen
 {
 	double m_x1;
 };
 
-struct HPZ1 : public Unit
+struct HPZ1 : public muladd_ugen
 {
 	double m_x1;
 };
@@ -391,12 +392,6 @@ extern "C"
 
 	void APF_next(APF *unit, int inNumSamples);
 	void APF_Ctor(APF* unit);
-
-	void LPZ1_next(LPZ1 *unit, int inNumSamples);
-	void LPZ1_Ctor(LPZ1* unit);
-
-	void HPZ1_next(HPZ1 *unit, int inNumSamples);
-	void HPZ1_Ctor(HPZ1* unit);
 
 	void Slope_next(Slope *unit, int inNumSamples);
 	void Slope_Ctor(Slope* unit);
@@ -1821,19 +1816,9 @@ void APF_next(APF* unit, int inNumSamples)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LPZ1_Ctor(LPZ1* unit)
+template <typename muladd_helper>
+static inline void LPZ1_next(LPZ1* unit, int inNumSamples, muladd_helper & ma)
 {
-	//printf("LPZ1_Reset\n");
-	SETCALC(LPZ1_next);
-	unit->m_x1 = ZIN0(0);
-	LPZ1_next(unit, 1);
-}
-
-
-void LPZ1_next(LPZ1* unit, int inNumSamples)
-{
-	//printf("LPZ1_next_a\n");
-
 	float *out = ZOUT(0);
 	float *in = ZIN(0);
 
@@ -1842,13 +1827,13 @@ void LPZ1_next(LPZ1* unit, int inNumSamples)
 
 	LOOP(inNumSamples >> 2,
 		x0 = ZXP(in);
-		float out0 = 0.5 * (x0 + x1);
+		float out0 = ma(0.5 * (x0 + x1));
 		x1 = ZXP(in);
-		float out1 = 0.5 * (x1 + x0);
+		float out1 = ma(0.5 * (x1 + x0));
 		x0 = ZXP(in);
-		float out2 = 0.5 * (x0 + x1);
+		float out2 = ma(0.5 * (x0 + x1));
 		x1 = ZXP(in);
-		float out3 = 0.5 * (x1 + x0);
+		float out3 = ma(0.5 * (x1 + x0));
 
 		ZXP(out) = out0;
 		ZXP(out) = out1;
@@ -1857,26 +1842,28 @@ void LPZ1_next(LPZ1* unit, int inNumSamples)
 	);
 	LOOP(inNumSamples & 3,
 		x0 = ZXP(in);
-		ZXP(out) = 0.5 * (x0 + x1);
+		ZXP(out) = ma(0.5 * (x0 + x1));
 		x1 = x0;
 	);
 
 	unit->m_x1 = x1;
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////
+DEFINE_UGEN_FUNCTION_WRAPPER(LPZ1, LPZ1_next, 1)
 
-
-void HPZ1_Ctor(HPZ1* unit)
+static void LPZ1_Ctor(LPZ1* unit)
 {
-	//printf("HPZ1_Reset\n");
-	SETCALC(HPZ1_next);
+	SETCALC(LPZ1_next_select(unit));
 	unit->m_x1 = ZIN0(0);
-	HPZ1_next(unit, 1);
+	unit->mCalcFunc(unit, 1);
 }
 
 
-void HPZ1_next(HPZ1* unit, int inNumSamples)
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+template <typename muladd_helper>
+static inline void HPZ1_next(HPZ1* unit, int inNumSamples, muladd_helper & ma)
 {
 	//printf("HPZ1_next\n");
 
@@ -1888,13 +1875,13 @@ void HPZ1_next(HPZ1* unit, int inNumSamples)
 
 	LOOP(inNumSamples >> 2,
 		x0 = ZXP(in);
-		float out0 = 0.5 * (x0 - x1);
+		float out0 = ma(0.5 * (x0 - x1));
 		x1 = ZXP(in);
-		float out1 = 0.5 * (x1 - x0);
+		float out1 = ma(0.5 * (x1 - x0));
 		x0 = ZXP(in);
-		float out2 = 0.5 * (x0 - x1);
+		float out2 = ma(0.5 * (x0 - x1));
 		x1 = ZXP(in);
-		float out3 = 0.5 * (x1 - x0);
+		float out3 = ma(0.5 * (x1 - x0));
 
 		ZXP(out) = out0;
 		ZXP(out) = out1;
@@ -1904,11 +1891,20 @@ void HPZ1_next(HPZ1* unit, int inNumSamples)
 	LOOP(inNumSamples & 3,
 		x0 = ZXP(in);
 		//printf("%d %d %g %g\n", this, inNumSamples, x0, x1);
-		ZXP(out) = 0.5f * (x0 - x1);
+		ZXP(out) = 0.5 * (x0 - x1);
 		x1 = x0;
 	);
 
 	unit->m_x1 = x1;
+}
+
+DEFINE_UGEN_FUNCTION_WRAPPER(HPZ1, HPZ1_next, 1)
+
+static void HPZ1_Ctor(HPZ1* unit)
+{
+	SETCALC(HPZ1_next_select(unit));
+	unit->m_x1 = ZIN0(0);
+	unit->mCalcFunc(unit, 1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
