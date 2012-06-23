@@ -205,10 +205,10 @@ MidEQ : Filter {
 LPZ1 : Filter {
 
 	*ar { arg in = 0.0, mul = 1.0, add = 0.0;
-		^this.multiNew('audio', in).madd(mul, add)
+		^this.multiNewMulAdd('audio', in, mul, add)
 	}
 	*kr { arg in = 0.0, mul = 1.0, add = 0.0;
-		^this.multiNew('control', in).madd(mul, add)
+		^this.multiNewMulAdd('control', in, mul, add)
 	}
 }
 
