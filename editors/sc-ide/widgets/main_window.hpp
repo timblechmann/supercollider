@@ -86,6 +86,8 @@ public:
         // Help
         Help,
         HelpForSelection,
+        ShowAbout,
+        ShowAboutQT,
 
         ActionCount
     };
@@ -125,7 +127,6 @@ public Q_SLOTS:
 signals:
     void evaluateCode( const QString &, bool silent = true );
 
-
 private Q_SLOTS:
     void loadSession( Session *session );
     void saveSession( Session *session );
@@ -146,6 +147,8 @@ private Q_SLOTS:
     void lookupDefinition();
     void lookupDocumentation();
 
+    void showAbout();
+    void showAboutQT();
 
 protected:
     virtual void closeEvent(QCloseEvent *event);

@@ -327,6 +327,14 @@ void MainWindow::createActions()
     act->setStatusTip(tr("Find help for selected text"));
     connect(act, SIGNAL(triggered()), this, SLOT(helpForCursor()));
 
+    mActions[ShowAbout] = act = new QAction(
+    QIcon::fromTheme("show-about"), tr("&About SuperCollider"), this);
+    connect(act, SIGNAL(triggered()), this, SLOT(showAbout()));
+
+    mActions[ShowAboutQT] = act = new QAction(
+    QIcon::fromTheme("show-about-qt"), tr("About &Qt"), this);
+    connect(act, SIGNAL(triggered()), this, SLOT(showAboutQT()));
+
     s->endGroup(); // IDE/shortcuts;
 
     // Add actions to settings
@@ -440,6 +448,9 @@ void MainWindow::createMenus()
     menu = new QMenu(tr("&Help"), this);
     menu->addAction( mActions[Help] );
     menu->addAction( mActions[HelpForSelection] );
+    menu->addSeparator();
+    menu->addAction( mActions[ShowAbout] );
+    menu->addAction( mActions[ShowAboutQT] );
 
     menuBar()->addMenu(menu);
 }
@@ -998,6 +1009,25 @@ void MainWindow::openHelp()
 {
     QString code = QString("Help.gui");
     Main::instance()->scProcess()->evaluateCode(code, true);
+}
+
+void MainWindow::showAbout()
+{
+    QString aboutString =
+            "<h3>SuperCollider %1</h3>"
+            "&copy; James McCartney and others.<br>"
+            "<h3>SuperCollider IDE</h3>"
+            "&copy; Jakob Leben, Tim Blechmann and others.<br>"
+            "Development partially funded by Kiberpipa."
+            ;
+    aboutString = aboutString.arg("3.6~dev");
+
+    QMessageBox::about(this, "About SuperCollider IDE", aboutString);
+}
+
+void MainWindow::showAboutQT()
+{
+    QMessageBox::aboutQt(this);
 }
 
 //////////////////////////// StatusLabel /////////////////////////////////
