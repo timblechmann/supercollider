@@ -241,11 +241,13 @@ void MainWindow::createActions()
     mActions[NewSession] = act = new QAction(
         QIcon::fromTheme("document-new"), tr("&New Session"), this);
     act->setStatusTip(tr("Open a new session"));
+    act->setShortcut(tr("Ctrl+Shift+N", "New Session"));
     connect(act, SIGNAL(triggered()), this, SLOT(newSession()));
 
     mActions[SaveSessionAs] = act = new QAction(
         QIcon::fromTheme("document-save-as"), tr("Save Session &As..."), this);
     act->setStatusTip(tr("Save the current session with a different name"));
+    act->setShortcut(tr("Ctrl+Shift+S", "Save Session As"));
     connect(act, SIGNAL(triggered()), this, SLOT(saveCurrentSessionAs()));
 
     mActions[ManageSessions] = act = new QAction(
