@@ -65,6 +65,7 @@ server_arguments::server_arguments(int argc, char * argv[])
                                                                  "if -U is specified, the standard paths are NOT searched for plugins.")
         ("restricted-path,P", value<std::vector<std::string> >(&restrict_paths), "if specified, prevents file-accessing OSC commands from accessing files outside <restricted-path>")
         ("threads,T", value<uint16_t>(&threads)->default_value(std::thread::hardware_concurrency()), "number of audio threads")
+        ("upsampling-factor", value<int>(&upsampling_factor)->default_value(1), "upsampling factor (runs audio synthesis with a different sampling rate than the audio backend)")
         ;
 
     options_description audio_options("audio options");
@@ -83,34 +84,29 @@ server_arguments::server_arguments(int argc, char * argv[])
     /* parse options */
     boost::program_options::variables_map vm;
 
-    try
-    {
+    try {
         store(command_line_parser(argc, argv).options(cmdline_options).run(), vm);
     }
-    catch(error const & e)
-    {
+    catch(error const & e) {
         cout << "Error when parsing command line arguments:" << endl
              << e.what() << endl << endl;
         std::exit(EXIT_FAILURE);
-    };
+    }
 
     notify(vm);
 
     memory_locking = vm.count("memory-locking");
 
-    if (vm.count("help"))
-    {
+    if (vm.count("help")) {
         cout << cmdline_options<< endl;
         std::exit(EXIT_SUCCESS);
     }
 
     non_rt = vm.count("nrt");
 
-    if (non_rt)
-    {
+    if (non_rt) {
         std::vector<std::string> const & nrt_options = vm["nrt"].as<std::vector<std::string> >();
-        if (nrt_options.size() != 6)
-        {
+        if (nrt_options.size() != 6) {
             cout << "Error when parsing command line:" << endl;
             std::exit(EXIT_FAILURE);
         }

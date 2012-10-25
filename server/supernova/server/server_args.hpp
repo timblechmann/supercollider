@@ -79,6 +79,7 @@ public:
     bool non_rt;
     std::string command_file, input_file, output_file, header_format, sample_format;
 
+    int upsampling_factor;
 private:
     static std::unique_ptr<server_arguments> instance_;
 };
