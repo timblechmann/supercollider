@@ -30,6 +30,7 @@
 
 #include "audio_backend_common.hpp"
 #include "cpu_time_info.hpp"
+#include "upsampled_audio_backend.hpp"
 
 namespace nova {
 
@@ -46,7 +47,6 @@ template <typename engine_functor,
          >
 class jack_backend:
     public detail::audio_backend_base<sample_type, jack_default_audio_sample_t, blocking, false>,
-    public detail::audio_settings_basic,
     protected engine_functor
 {
     typedef detail::audio_backend_base<sample_type, jack_default_audio_sample_t, blocking, false> super;
@@ -104,7 +104,7 @@ public:
                 jack_port_register(client, portname.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
             input_ports.push_back(port);
         }
-        input_channels = input_port_count;
+        super::input_channels = input_port_count;
         super::input_samples.resize(input_port_count);
 
         output_ports.clear();
@@ -115,10 +115,10 @@ public:
                 jack_port_register(client, portname.c_str(), JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
             output_ports.push_back(port);
         }
-        output_channels = output_port_count;
+        super::output_channels = output_port_count;
         super::output_samples.resize(output_port_count);
 
-        samplerate_ = jack_get_sample_rate(client);
+        super::samplerate_ = jack_get_sample_rate(client);
         jack_frames = jack_get_buffer_size(client);
 
         if (jack_frames % blocksize_)
@@ -271,19 +271,19 @@ private:
         }
 
         /* get port regions */
-        jack_default_audio_sample_t ** inputs   = (jack_default_audio_sample_t **)alloca(input_channels * sizeof(jack_default_audio_sample_t*));
-        jack_default_audio_sample_t ** outputs  = (jack_default_audio_sample_t **)alloca(output_channels * sizeof(jack_default_audio_sample_t*));
-        for (uint16_t i = 0; i != input_channels; ++i)
+        jack_default_audio_sample_t ** inputs   = (jack_default_audio_sample_t **)alloca(super::input_channels * sizeof(jack_default_audio_sample_t*));
+        jack_default_audio_sample_t ** outputs  = (jack_default_audio_sample_t **)alloca(super::output_channels * sizeof(jack_default_audio_sample_t*));
+        for (uint16_t i = 0; i != super::input_channels; ++i)
             inputs[i] = (jack_default_audio_sample_t*) jack_port_get_buffer(input_ports[i], frames);
 
-        for (uint16_t i = 0; i != output_channels; ++i)
+        for (uint16_t i = 0; i != super::output_channels; ++i)
             outputs[i] = (jack_default_audio_sample_t*) jack_port_get_buffer(output_ports[i], frames);
 
         jack_nframes_t processed = 0;
         while (processed != frames) {
-            super::fetch_inputs((const float**)inputs, blocksize_, input_channels);
+            super::fetch_inputs((const float**)inputs, blocksize_, super::input_channels);
             engine_functor::run_tick();
-            super::deliver_outputs(outputs, blocksize_, output_channels);
+            super::deliver_outputs(outputs, blocksize_, super::output_channels);
             processed += blocksize_;
         }
 

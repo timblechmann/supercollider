@@ -46,7 +46,6 @@ template <typename engine_functor,
          >
 class sndfile_backend:
     public detail::audio_backend_base<sample_type, float, blocking, false>,
-    public detail::audio_settings_basic,
     private engine_functor
 {
     typedef detail::audio_backend_base<sample_type, float, blocking, false> super;
@@ -66,8 +65,8 @@ public:
     void open_client(std::string const & input_file_name, std::string const & output_file_name,
                      float samplerate, int format, uint32_t output_channel_count, size_t block_size)
     {
-        output_channels = output_channel_count;
-        samplerate_ = samplerate = std::floor(samplerate);
+        super::output_channels = output_channel_count;
+        super::samplerate_ = samplerate = std::floor(samplerate);
         block_size_ = block_size;
 
         if (!input_file_name.empty()) {
@@ -78,11 +77,11 @@ public:
             if (input_file.samplerate() != samplerate)
                 throw std::runtime_error("input file: samplerate mismatch");
 
-            input_channels = input_file.channels();
-            super::input_samples.resize(input_channels);
+            super::input_channels = input_file.channels();
+            super::input_samples.resize(super::input_channels);
         }
         else
-            input_channels = 0;
+            super::input_channels = 0;
         read_position = 0;
 
         output_file = SndfileHandle(output_file_name.c_str(), SFM_WRITE, format, output_channel_count, samplerate);
@@ -93,8 +92,7 @@ public:
 
         super::output_samples.resize(output_channel_count);
 
-        temp_buffer.reset(calloc_aligned<float>(std::max(input_channels, output_channels) * 64));
-
+        temp_buffer.reset(calloc_aligned<float>(std::max(super::input_channels, super::output_channels) * 64));
     }
 
     void close_client(void)
@@ -146,9 +144,8 @@ private:
     /* read input fifo from the rt context */
     void read_input_buffers(size_t frames_per_tick)
     {
-        if (reader_running.load(boost::memory_order_acquire))
-        {
-            const size_t total_samples = input_channels * frames_per_tick;
+        if (reader_running.load(boost::memory_order_acquire)) {
+            const size_t total_samples = super::input_channels * frames_per_tick;
             size_t remaining = total_samples;
 
             read_semaphore.wait();
@@ -159,23 +156,22 @@ private:
                              !reader_running.load(boost::memory_order_acquire)))
                 {
                     /* at the end, we are not able to read a full sample block, clear the final parts */
-                    const size_t last_frame = (total_samples - remaining) / input_channels;
-                    const size_t remaining_per_channel = remaining / input_channels;
-                    assert(remaining % input_channels == 0);
-                    assert(remaining_per_channel % input_channels == 0);
+                    const size_t last_frame = (total_samples - remaining) / super::input_channels;
+                    const size_t remaining_per_channel = remaining / super::input_channels;
+                    assert(remaining % super::input_channels == 0);
+                    assert(remaining_per_channel % super::input_channels == 0);
 
-                    for (uint16_t channel = 0; channel != input_channels; ++channel)
+                    for (uint16_t channel = 0; channel != super::input_channels; ++channel)
                         zerovec(super::input_samples[channel].get() + last_frame, remaining_per_channel);
 
                     break;
                 }
             } while (remaining);
 
-            const size_t frames = (total_samples - remaining) / input_channels;
-            for (size_t frame = 0; frame != frames; ++frame)
-            {
-                for (uint16_t channel = 0; channel != input_channels; ++channel)
-                    super::input_samples[channel].get()[frame] = temp_buffer.get()[frame * input_channels + channel];
+            const size_t frames = (total_samples - remaining) / super::input_channels;
+            for (size_t frame = 0; frame != frames; ++frame) {
+                for (uint16_t channel = 0; channel != super::input_channels; ++channel)
+                    super::input_samples[channel].get()[frame] = temp_buffer.get()[frame * super::input_channels + channel];
             }
         }
         else
@@ -187,14 +183,13 @@ private:
         assert(input_file);
 
         const size_t frames_per_tick = get_audio_blocksize();
-        sized_array<sample_type, aligned_allocator<sample_type> > data_to_read(input_channels * frames_per_tick, 0.f);
+        sized_array<sample_type, aligned_allocator<sample_type> > data_to_read(super::input_channels * frames_per_tick, 0.f);
 
         for (;;) {
             if (unlikely(reader_running.load(boost::memory_order_acquire) == false))
                 return;
 
-            if (read_position < (size_t)input_file.frames())
-            {
+            if (read_position < (size_t)input_file.frames()) {
                 size_t frames = input_file.frames() - read_position;
                 if (frames > frames_per_tick)
                     frames = frames_per_tick;
@@ -202,7 +197,7 @@ private:
                 input_file.readf(data_to_read.c_array(), frames);
                 read_position += frames;
 
-                const size_t item_to_enqueue = input_channels * frames;
+                const size_t item_to_enqueue = super::input_channels * frames;
                 size_t remaining = item_to_enqueue;
 
                 do {
@@ -219,11 +214,11 @@ private:
     void write_output_buffers(size_t frames_per_tick)
     {
         for (size_t frame = 0; frame != frames_per_tick; ++frame) {
-            for (uint16_t channel = 0; channel != output_channels; ++channel)
-                temp_buffer.get()[frame * output_channels + channel] = super::output_samples[channel].get()[frame];
+            for (uint16_t channel = 0; channel != super::output_channels; ++channel)
+                temp_buffer.get()[frame * super::output_channels + channel] = super::output_samples[channel].get()[frame];
         }
 
-        const size_t total_samples = output_channels * frames_per_tick;
+        const size_t total_samples = super::output_channels * frames_per_tick;
         sample_type * buffer = temp_buffer.get();
 
         size_t count = total_samples;
@@ -238,7 +233,7 @@ private:
     void sndfile_write_thread(void)
     {
         const size_t frames_per_tick = get_audio_blocksize();
-        sized_array<sample_type, aligned_allocator<sample_type> > data_to_write(output_channels * frames_per_tick, 0.f);
+        sized_array<sample_type, aligned_allocator<sample_type> > data_to_write(super::output_channels * frames_per_tick, 0.f);
 
         for (;;) {
             write_semaphore.wait();
@@ -252,7 +247,6 @@ private:
             if (unlikely(writer_running.load(boost::memory_order_acquire) == false))
                 return;
         }
-
     }
 
 public:

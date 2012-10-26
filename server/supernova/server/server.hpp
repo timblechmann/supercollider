@@ -135,6 +135,16 @@ typedef jack_backend<realtime_engine_functor, float, false> audio_backend;
 
 } // detail
 
+template <typename EngineFunctor,
+          typename AudioBackend>
+struct synthesis_engine:
+    EngineFunctor,
+    AudioBackend
+{
+
+};
+
+
 class nova_server:
     public asynchronous_log_thread,
     public node_graph,

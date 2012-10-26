@@ -32,9 +32,38 @@
 namespace nova   {
 namespace detail {
 
+class audio_settings_basic
+{
+protected:
+    float samplerate_;
+    uint16_t input_channels, output_channels;
+
+public:
+    audio_settings_basic(void):
+        samplerate_(0.f), input_channels(0), output_channels(0)
+    {}
+
+    float get_samplerate(void) const
+    {
+        return samplerate_;
+    }
+
+    uint16_t get_input_count(void) const
+    {
+        return input_channels;
+    }
+
+    uint16_t get_output_count(void) const
+    {
+        return output_channels;
+    }
+};
+
+
 template <typename sample_type, typename io_sample_type, bool blocking, bool managed_memory = true>
 class audio_backend_base:
-    boost::mpl::if_c<blocking, spin_lock, dummy_mutex>::type
+    boost::mpl::if_c<blocking, spin_lock, dummy_mutex>::type,
+    public audio_settings_basic
 {
     typedef typename boost::mpl::if_c<blocking, spin_lock, dummy_mutex>::type lock_t;
     typedef std::size_t size_t;
@@ -64,6 +93,11 @@ public:
         std::copy(buffer_begin, buffer_end, output_samples.begin());
     }
     /* @} */
+
+    void prepare(size_t input_channels, size_t output_channels, size_t frames_per_block)
+    {
+        prepare_helper_buffers(input_channels, output_channels, frames_per_block);
+    }
 
 protected:
     void clear_inputs(size_t frames_per_tick)
@@ -137,33 +171,6 @@ protected:
 
     sized_array<aligned_storage_ptr<sample_type, managed_memory>,
                 aligned_allocator<sample_type> > input_samples, output_samples;
-};
-
-class audio_settings_basic
-{
-protected:
-    float samplerate_;
-    uint16_t input_channels, output_channels;
-
-public:
-    audio_settings_basic(void):
-        samplerate_(0.f), input_channels(0), output_channels(0)
-    {}
-
-    float get_samplerate(void) const
-    {
-        return samplerate_;
-    }
-
-    uint16_t get_input_count(void) const
-    {
-        return input_channels;
-    }
-
-    uint16_t get_output_count(void) const
-    {
-        return output_channels;
-    }
 };
 
 } /* namespace detail */

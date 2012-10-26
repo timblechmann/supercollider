@@ -49,6 +49,7 @@ endif()
 include_directories(${CMAKE_SOURCE_DIR}/external_libraries/boost_endian
                     ${CMAKE_SOURCE_DIR}/external_libraries/oscpack
                     ${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src
+                    ${CMAKE_SOURCE_DIR}/external_libraries/zita-resampler-1.2.0/libs
                     )
 
 if(APPLE)
@@ -60,6 +61,12 @@ include_directories(${CMAKE_SOURCE_DIR}/include/plugin_interface
                     ${CMAKE_SOURCE_DIR}/include/common
                     .
                     )
+
+set(zita-resampler_src
+    ${CMAKE_SOURCE_DIR}/external_libraries/zita-resampler-1.2.0/libs/resampler.cc
+    ${CMAKE_SOURCE_DIR}/external_libraries/zita-resampler-1.2.0/libs/resampler-table.cc
+)
+
 
 set(libsupernova_src
     sc/sc_synth_definition.cpp
@@ -79,6 +86,7 @@ set(libsupernova_src
     server/node_graph.cpp
     server/server.cpp
     server/server_args.cpp
+    ${zita-resampler_src}
 )
 
 if(WIN32)
@@ -151,7 +159,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     target_link_libraries(libsupernova rt)
 endif()
 
-target_link_libraries(libsupernova oscpack tlsf ${PTHREADS_LIBRARIES})
+target_link_libraries(libsupernova oscpack tlsf ${PTHREADS_LIBRARIES} ${SAMPLERATE_LIBRARY})
 
 if (Boost_FOUND)
     target_link_libraries(libsupernova   ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY} ${Boost_PROGRAM_OPTIONS_LIBRARY})
