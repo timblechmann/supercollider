@@ -77,9 +77,7 @@ class QcListWidget : public QListWidget, public QcHelper
     void onCurrentItemChanged();
   private:
     void keyPressEvent( QKeyEvent * );
-    bool eventFilter( QObject *, QEvent * );
 
-    int _indexOnPress;
     bool _emitAction;
 };
 
@@ -87,9 +85,12 @@ class QcPopUpMenu : public QComboBox, public QcHelper
 {
   Q_OBJECT
   Q_PROPERTY( VariantList items READ dummyVariantList WRITE setItems );
+  Q_PROPERTY( bool signalReactivation READ signalReactivation WRITE setSignalReactivation )
 
   public:
     QcPopUpMenu();
+    bool signalReactivation() const { return _reactivation; }
+    void setSignalReactivation( bool b ) { _reactivation = b; }
   Q_SIGNALS:
     void action();
   private Q_SLOTS:
@@ -97,6 +98,7 @@ class QcPopUpMenu : public QComboBox, public QcHelper
   private:
     void setItems( const VariantList & );
     int lastChoice;
+    bool _reactivation;
 };
 
 class QcTextField : public QLineEdit
@@ -119,7 +121,11 @@ class QcButton : public QPushButton, public QcHelper
   public:
     QcButton();
   Q_SIGNALS:
-    void action();
+    void action(int);
+  protected:
+#ifdef Q_WS_MAC
+    bool hitButton( const QPoint & ) const;
+#endif
   private Q_SLOTS:
     void doAction();
   private:

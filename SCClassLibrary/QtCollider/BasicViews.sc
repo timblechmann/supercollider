@@ -88,19 +88,6 @@ QAbstractStepValue : QView {
     this.setProperty( \step, aFloat );
   }
 
-  value {
-    ^this.getProperty( \value );
-  }
-
-  value_ { arg argVal;
-    this.setProperty( \value, argVal );
-  }
-
-  valueAction_ { arg val;
-    this.value_(val);
-    action.value(this);
-  }
-
   shift_scale_ { arg aFloat;
     shift_scale = aFloat;
     this.setProperty( \shiftScale, aFloat );
@@ -138,6 +125,10 @@ QVLayoutView : QView {
   *qtClass { ^"QcVLayoutWidget" }
 }
 
+QScrollCanvas : QObject {
+  *qtClass { ^'QcScrollWidget' }
+}
+
 QScrollView : QAbstractScroll {
   var <canvas;
   var <background, <hasBorder=true;
@@ -163,11 +154,11 @@ QScrollView : QAbstractScroll {
   }
 
   innerBounds {
-    ^this.getProperty( \innerBounds, Rect.new );
+    ^this.getProperty( \innerBounds );
   }
 
   visibleOrigin {
-    ^this.getProperty( \visibleOrigin, Point.new );
+    ^this.getProperty( \visibleOrigin );
   }
 
   visibleOrigin_ { arg point;
@@ -182,7 +173,7 @@ QScrollView : QAbstractScroll {
   initQScrollView {
     // NOTE: The canvas widget must not be a QView, so that asking its
     // children for parent will skip it and hit this view instead.
-    this.canvas = QObject("QcScrollWidget");
+    this.canvas = QScrollCanvas();
   }
 }
 
@@ -272,10 +263,6 @@ QButton : QView {
 
   *qtClass { ^"QcButton" }
 
-  *properties {
-    ^[\string, \states];
-  }
-
   value {
     ^this.getProperty( \value );
   }
@@ -294,12 +281,25 @@ QButton : QView {
     super.setProperty( \states, stateArray );
   }
 
+  action_ { arg func;
+    this.manageMethodConnection( action, func, 'action(int)', \prDoAction );
+    action = func;
+  }
+
+  doAction { arg modifiers;
+    action.value(this, modifiers);
+  }
+
   defaultGetDrag { ^this.value; }
   defaultCanReceiveDrag { ^true; }
   defaultReceiveDrag {
     if( QView.currentDrag.isNumber )
       { this.valueAction = QView.currentDrag; }
       { this.action = QView.currentDrag; };
+  }
+
+  prDoAction { arg mods;
+    this.doAction(QKeyModifiers.toCocoa(mods));
   }
 }
 
@@ -346,6 +346,10 @@ QCheckBox : QView {
 QPopUpMenu : QItemViewBase {
 
   *qtClass { ^"QcPopUpMenu" }
+
+  allowsReselection { ^this.getProperty( \signalReactivation ) }
+
+  allowsReselection_ { arg flag; ^this.setProperty( \signalReactivation, flag ) }
 
   value {
     var v = this.getProperty( \currentIndex );

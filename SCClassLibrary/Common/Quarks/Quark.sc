@@ -34,7 +34,7 @@ QuarkDependency
 
 Quark
 {
-	var <name, <summary, <version, <author, dependencies, <tags, <>path;
+	var <name, <summary, <version, <author, dependencies, <tags, <>path, <>status;
 	var <isLocal;// meaning that a local copy exists either because checked out or is local only
 	var <parent; // the Quarks, if available
 	var <info;
@@ -42,14 +42,14 @@ Quark
 	*fromFile { | path, parent |
 		var string = { File.use(path, "r", _.readAllString) }.try;
 		if (string.isNil) {
-			Error(path + "is an invalid quark file").throw;
+			Error(path + "is an invalid quark file.").throw;
 		};
 		^this.fromString(string, parent)
 	}
 	*fromString { | string , parent|
 		var blob = { string.interpret }.try;
 		if (blob.isNil or: { blob.isKindOf(IdentityDictionary).not }) {
-			Error("invalid quark").throw;
+			Error("Can not interpret quark definition.").throw;
 		};
 		^this.new(blob, parent)
 	}
@@ -72,6 +72,7 @@ Quark
 		name = this.getName(blob[\name]);
 		path = this.getString(blob[\path]);
 		summary = this.getString(blob[\summary]);
+		status = this.getString(blob[\status]);
  		version = this.getVersion(blob[\version]);
 		dependencies = this.getDependencies(blob[\dependencies]);
 		author = this.getString(blob[\author]);
@@ -83,7 +84,7 @@ Quark
 	getName { | obj |
 		var name = obj.asString;
 		if (name.isEmpty) {
-			error("invalid name")
+			Error("Can not parse a quark: invalid name.").throw;
 		};
 		^name.split(Char.nl).first/*.strip*/
 	}
@@ -93,39 +94,54 @@ Quark
 	getVersion { | obj |
 		if (obj.notNil) {
 			if (obj.respondsTo(\asFloat).not) {
-				Error("invalid version type").throw;
+				Error("Can not parse quark '" ++ this.name ++ "': invalid version type.").throw;
 			};
 			^obj.asFloat
 		};
 		^nil
 	}
 	getDependencies { | obj |
-		var name, version;
+		var deps;
 		if (obj.isNil) {
 			^[]
 		};
 		if (obj.isSequenceableCollection.not) {
-			error("invalid deps");
+			Error("Can not parse quark '" ++ this.name ++ "': invalid dependencies.").throw;
 		};
-		^obj.collectAs({ | spec |
-			if (spec.isString) {
-				QuarkDependency(spec, nil)
-			} {
-				if (spec.isKindOf(ArrayedCollection)) {
-						QuarkDependency(
-							spec[0].asString,
-							this.getVersion(spec[1]),
-							spec[2] !? {spec[2].asString}
-							);
-				} {
-					if (spec.isKindOf(Association)) {
-						QuarkDependency(
-							spec.key.asString,
-							this.getVersion(spec.value));
-					}
-				}
+		deps = Array(obj.size);
+		obj.do { | spec |
+			var dep;
+			case
+			{spec.isString} {
+				dep = QuarkDependency(spec, nil)
 			}
-		}, Array)
+			{spec.isKindOf(ArrayedCollection)} {
+				dep = QuarkDependency(
+					spec[0].asString,
+					this.getVersion(spec[1]),
+					spec[2] !? {spec[2].asString})
+			}
+			{spec.isKindOf(Association)} {
+				dep = QuarkDependency(
+					spec.key.asString,
+					this.getVersion(spec.value))
+			}
+			{Error("Can not parse quark '" ++ this.name ++ "': an invalid dependency.").throw};
+			deps add: dep
+		};
+		^deps;
+	}
+	openHelpFile {
+		var p = info.helpdoc;
+		if(p.isNil) {^nil};
+		case
+			{p.endsWith(".html")} {
+				HelpBrowser.goTo(HelpBrowser.getOldWrapUrl(parent.local.path +/+ path +/+ p))
+			}
+			{p.endsWith(".scd") or: {p.endsWith(".txt")}} {
+				HelpBrowser.goTo(parent.local.path +/+ path +/+ p)
+			}
+			{ HelpBrowser.openHelpFor(p) };
 	}
 	printOn { arg stream;
 		stream << "Quark: " << name;
@@ -135,12 +151,13 @@ Quark
 	longDesc {
 		var string;
 		string = name;
-		if(version.notNil,{ string = string + "[" ++ version ++ "]"; });
+		if(version.notNil) { string = string + "[" ++ version ++ "]" };
 		string = string
 			++ "\n(by " ++ (author ? "anonymous") ++ ")"
-			++ "\n" ++ summary
+			++ "\n\n" ++ summary
+			++ "\n\n" ++ "Status: " ++ (status ? "unknown")
 			++ "\n" ++ "Checked out: " ++ if(isLocal, "yes", "no");
-		dependencies.notEmpty.if{
+		if(dependencies.notEmpty) {
 			string = string ++ "\nDepends on";
 			dependencies.do{|dep|
 				string = string ++ "\n - " ++ dep.name;
@@ -154,10 +171,10 @@ Quark
 	}
 	== { arg that;
 		^this.compareObject(that,
-			[\name, \summary, \version, \author, \dependencies, \tags, \path]);
+			[\name, \summary, \version, \author, \dependencies, \tags, \path, \status]);
 	}
 	hash { arg that;
-		^this.instVarHash([\name, \summary, \version, \author, \dependencies, \tags, \path]);
+		^this.instVarHash([\name, \summary, \version, \author, \dependencies, \tags, \path, \status]);
 	}
 	dependencies { |recursive = false, knownList|
 		var deps, quark, selfasdep;
@@ -181,7 +198,9 @@ Quark
 
 QuarkView {
 	var	<quark, <isInstalled, <toBeInstalled = false, <toBeDeinstalled = false, installButton,
-		nameView, authorView, infoButton, srcButton, browseHelpButton;
+		nameView, authorView, infoButton, srcButton, browseHelpButton,
+		<treeItem;
+
 	*new { |parent, extent, quark, isInstalled|
 		^super.new.init(parent, extent, quark, isInstalled)
 	}
@@ -189,53 +208,69 @@ QuarkView {
 		var installBounds, descrBounds, authorBounds, infoBounds, sourceBounds,
 			pad = 5,checkoutBounds, remainder;
 
-		//installBounds = Rect(0,0, extent.y, extent.y);
-		infoBounds = Rect(0,0, 25, extent.y);
-		sourceBounds = Rect(0, 0, 20, extent.y);
-		checkoutBounds = Rect(0,0,50,extent.y);
-		remainder = extent.x - (infoBounds.width*2)  - sourceBounds.width -
-			checkoutBounds.width - (4*pad);
-		descrBounds = Rect(0, 0, (remainder * 0.60).asInteger, extent.y);
-		authorBounds = Rect(0, 0, (remainder * 0.40).asInteger, extent.y);
 		quark = aQuark;
 		isInstalled = argIsInstalled;
 
-		installButton = GUI.button.new(parent, Rect(15,15,17,17));
-		this.updateButtonStates;
+		if( parent.class.name === \QTreeView ) {
+			installButton = Button().fixedSize_(Size(20,20));
+			treeItem = parent.addItem([
+				nil, quark.name,
+				quark.summary.replace("\n"," ").replace($\t.asString,"")
+			]).setView( 0, installButton );
+		}{
+			//installBounds = Rect(0,0, extent.y, extent.y);
+			infoBounds = Rect(0,0, 25, extent.y);
+			sourceBounds = Rect(0, 0, 20, extent.y);
+			checkoutBounds = Rect(0,0,50,extent.y);
+			remainder = extent.x - (infoBounds.width*2)  - sourceBounds.width -
+				checkoutBounds.width - (4*pad);
+			descrBounds = Rect(0, 0, (remainder * 0.60).asInteger, extent.y);
+			authorBounds = Rect(0, 0, (remainder * 0.40).asInteger, extent.y);
 
-		// the name with author
-		nameView = GUI.staticText.new(parent, descrBounds).string_(quark.name);
-		authorView = GUI.staticText.new(parent, authorBounds).string_(quark.author);
-		infoButton = GUI.button.new(parent, infoBounds)
-			.font_( GUI.font.new( GUI.font.defaultSansFace, 10 ))
-			.states_([["info"]]).action_{this.fullDescription};
+			installButton = GUI.button.new(parent, Rect(15,15,17,17));
 
-		browseHelpButton = GUI.button.new(parent, infoBounds)
-			.font_( GUI.font.new( GUI.font.defaultSansFace, 10 ))
-			.states_([["help"]])
-			.action_({ Help(quark.parent.local.path +/+ quark.path).gui });
+			// the name with author
+			nameView = GUI.staticText.new(parent, descrBounds).string_(quark.name);
+			authorView = GUI.staticText.new(parent, authorBounds).string_(quark.author);
+			infoButton = GUI.button.new(parent, infoBounds)
+				.font_( Font.sansSerif( 10 ))
+				.states_([["info"]]).action_{this.fullDescription};
 
-		if(quark.isLocal and: {thisProcess.platform.name == \osx}) {
-			srcButton = GUI.button.new(parent, sourceBounds)
-				.font_( GUI.font.new( GUI.font.defaultSansFace, 10 ))
-				.states_([["src"]]).action_{
-					("open " ++ ("%/%".format(Quarks.local.path, quark.path).escapeChar($ ))).unixCmd;
-				};
+			browseHelpButton = GUI.button.new(parent, infoBounds)
+				.font_( Font.sansSerif( 10 ))
+				.states_([["help"]])
+				.action_({ Help(quark.parent.local.path +/+ quark.path).gui });
+
+			if(quark.isLocal and: {thisProcess.platform.name == \osx}) {
+				srcButton = GUI.button.new(parent, sourceBounds)
+					.font_( Font.sansSerif( 10 ))
+					.states_([["src"]]).action_{
+						("open " ++ ("%/%".format(Quarks.local.path, quark.path).escapeChar($ ))).unixCmd;
+					};
+			};
+
+			/*if(quark.isLocal.not,{
+				GUI.button.new(parent, checkoutBounds)
+					.font_( Font.sansSerif( 10 ))
+					.states_([["checkout"]]).action_{
+						Quarks.checkout(quark.name);
+					};
+			});*/
 		};
-		/*if(quark.isLocal.not,{
-			GUI.button.new(parent, checkoutBounds)
-				.font_( GUI.font.new( GUI.font.defaultSansFace, 10 ))
-				.states_([["checkout"]]).action_{
-					Quarks.checkout(quark.name);
-				};
-		});*/
+
+		this.updateButtonStates;
 	}
 	updateButtonStates {
+		var palette = GUI.current.tryPerform(\palette);
+		var c = palette !? {palette.buttonColor};
+
 		isInstalled.if({
 			// Quark is currently installed
 			installButton.states = [
-				["+", nil, Color.green(1, 0.5)],		// installed
-				["x", nil, Color.red(1, 0.5)],		    // selected to deinstall
+				// installed
+				["+", nil, if(c.notNil){Color.green.blend(c,0.5)}{Color.green(1, 0.5)}],
+				// selected to deinstall
+				["x", nil, if(c.notNil){Color.red.blend(c,0.5)}{Color.red(1, 0.5)}]
 			];
 			installButton.action = { arg butt;
 				toBeDeinstalled = butt.value>0;
@@ -244,8 +279,10 @@ QuarkView {
 		},{
 			// Quark is currently not installed
 			installButton.states = [
-				["-", nil, ],		// never installed
-				["*", nil, Color.blue(1, 0.5)],				// selected to install
+				// never installed
+				["-", nil, ],
+				// selected to install
+				["*", nil, if(c.notNil){Color.blue.blend(c,0.5)}{Color.blue(1, 0.5)}]
 			];
 			installButton.action = { arg butt;
 				toBeInstalled = butt.value>0;
@@ -271,7 +308,7 @@ QuarkView {
 		};
 		window = GUI.window.new(quark.name, Rect(100, 100, 400, 200)).front;
 		GUI.textView.new( window, Rect(4, 4, 392, 170 + (helpdoc.isNil.binaryValue * 22)))
-			.font_( GUI.font.new( GUI.font.defaultSansFace, 12 ) )
+			.font_( Font.sansSerif( 12 ) )
 			.resize_( 5 )
 			.autohidesScrollers_( true )
 			.hasVerticalScroller_( true )

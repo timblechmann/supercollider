@@ -19,7 +19,9 @@ AbstractNodeWatcher {
 				var method;
 				method = cmd.copyToEnd(1).asSymbol;
 				responders = responders.add(
-					OSCFunc({ arg msg; this.respond(method, msg) }, cmd, addrItem).disable
+					OSCFunc({ arg msg; this.respond(method, msg) }, cmd, addrItem)
+						.permanent_(true)
+						.disable
 				)
 			});
 		});
@@ -128,7 +130,11 @@ NodeWatcher : BasicNodeWatcher {
 	}
 
 	clear {
-		nodes.do({ arg node;
+		// we must copy 'nodes'
+		// b/c a /n_end dependant might add or remove nodes
+		// from the collection
+		// NEVER iterate over a collection that might change
+		nodes.copy.do({ arg node;
 			node.isPlaying = false;
 			node.isRunning = false;
 			node.changed(\n_end);

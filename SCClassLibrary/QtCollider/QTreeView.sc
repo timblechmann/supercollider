@@ -1,4 +1,6 @@
 QTreeView : QView {
+  var <itemPressedAction;
+  var <onItemChanged;
 
   *qtClass { ^"QcTreeWidget" }
 
@@ -28,6 +30,33 @@ QTreeView : QView {
 
   itemAt { arg index;
     ^this.invokeMethod( \item, [QTreeViewItem(), index] ).prValidItem(this);
+  }
+
+  canSort { ^this.getProperty( \sortingEnabled ) }
+  canSort_ { arg bool; this.setProperty( \sortingEnabled, bool ) }
+
+  sort { arg column, descending = false;
+    this.invokeMethod( \sort, [column, descending] )
+  }
+
+  itemPressedAction_ { arg action;
+    if(itemPressedAction.notNil) {
+      this.disconnectFunction( "itemPressedAction()", itemPressedAction );
+    };
+    if(action.notNil) {
+      this.connectFunction( "itemPressedAction()", action );
+    };
+    itemPressedAction = action;
+  }
+
+  onItemChanged_ { arg hook;
+    if(onItemChanged.notNil) {
+      this.disconnectFunction( "currentItemChanged()", onItemChanged );
+    };
+    if(hook.notNil) {
+      this.connectFunction( "currentItemChanged()", hook );
+    };
+    onItemChanged = hook;
   }
 
 /*

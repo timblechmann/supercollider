@@ -68,9 +68,10 @@ if (${CMAKE_COMPILER_IS_GNUCXX})
 
 	add_definitions("-Wreturn-type")
 
-	if (${_gcc_version} VERSION_GREATER 4.0.99)
-		add_definitions("-ffast-math")
-	endif()
+#	disabled for now: -ffast-math breaks avx intrinsics and -fsigned-zeros/-fno-associative-math are not available in some versions
+#	if (${_gcc_version} VERSION_GREATER 4.0.99)
+#		add_definitions("-ffast-math -fsigned-zeros -fno-associative-math")
+#	endif()
 
 	option(DSO_VISIBILITY "DSO visibility support for gcc" OFF)
 
@@ -80,10 +81,6 @@ if (${CMAKE_COMPILER_IS_GNUCXX})
 
 	if(APPLE)
 		exec_program(${CMAKE_CXX_COMPILER} ARGS --version OUTPUT_VARIABLE _gcc_version_info)
-
-		if ("${_gcc_version_info}" MATCHES "darwin10-llvm-g..-4.2")
-			message(FATAL_ERROR "llvm-gcc-4.2 was reported to be broken. please use another compiler.")
-		endif()
 		if ("${_gcc_version_info}" MATCHES "Apple")
 			add_definitions("-fpascal-strings")
 		endif()
@@ -100,6 +97,12 @@ if (${CMAKE_CXX_COMPILER} MATCHES icpc)
 endif()
 
 if (${CMAKE_CXX_COMPILER} MATCHES clang)
+	option(DSO_VISIBILITY "DSO visibility support for clang" OFF)
+
+	if (DSO_VISIBILITY)
+		add_definitions(-fvisibility=hidden)
+	endif()
+
 	set(CMAKE_COMPILER_IS_CLANG 1)
 endif()
 
@@ -159,7 +162,6 @@ option(FINAL_BUILD "Build as single source file." OFF)
 option(CURL "Build with curl for remote file download." ON)
 
 option(FFT_GREEN "Use internal 'Green' FFT lib rather than FFTW. (Not recommended.)" OFF)
-mark_as_advanced(FFT_GREEN)
 
 option(SSE "Compile with support for SSE instructions.")
 option(SSE41 "Compile with support for SSE4.1 instructions.")
@@ -167,6 +169,7 @@ option(SSE42 "Compile with support for SSE4.2 instructions.")
 
 
 option(INSTALL_HELP "Install help docs and examples along with the software" ON)
+option(INSTALL_OLD_HELP "Install old and deprecated help files" ON)
 option(SC_DOC_RENDER "Pre-render SCDoc documentation. (For putting online, etc)" OFF)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
@@ -180,7 +183,8 @@ option(SC_MEMORY_DEBUGGING "Build sclang&scsynth for memory debugging (disable m
 option(GC_SANITYCHECK "Enable sanity checks in the sclang garbage collector.")
 
 option(NO_LIBSNDFILE "Disable soundfile functionality. (Not recommended.)" OFF)
-mark_as_advanced(NO_LIBSNDFILE)
+
+option(NO_AVAHI "Disable Avahi support. (Not recommended.)" OFF)
 
 if(NOT WIN32)
 	option(SCLANG_SERVER "Build with internal server." ON)
@@ -191,6 +195,9 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 endif()
 
 option(SC_QT "Build SuperCollider with Qt GUI" ON)
+if (SC_QT)
+  message( STATUS "Compiling with Qt GUI" )
+endif (SC_QT)
 
 if(WIN32)
 	option(SC_PSYCOLLIDER "Build PsyCollider" ON)
@@ -262,11 +269,6 @@ add_subdirectory(bindings)
 add_subdirectory(platform)
 add_subdirectory(editors)
 
-if (SC_QT)
-  message( STATUS "Compiling with Qt GUI" )
-  add_subdirectory(QtCollider)
-endif (SC_QT)
-
 if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     install(DIRECTORY include/common include/plugin_interface include/server include/lang
         DESTINATION ${CMAKE_INSTALL_PREFIX}/include/SuperCollider
@@ -281,7 +283,7 @@ if(APPLE)
 	set(auxresourcesdir ${scappauxresourcesdir})
 
 	# Some aux files which go in the app's folder
-	install(FILES README ChangeLog
+	install(FILES README.txt ChangeLog
 		DESTINATION ${auxresourcesdir}
 	)
 	install(FILES COPYING AUTHORS
@@ -343,6 +345,8 @@ else()
 	install(DIRECTORY SCClassLibrary
 		DESTINATION ${auxresourcesdir}
 		REGEX ${SCCLASSLIB_EXCLUDE_REGEX} EXCLUDE
+		PATTERN "*~" EXCLUDE
+		PATTERN "*#" EXCLUDE
 	)
 endif()
 
@@ -350,9 +354,18 @@ endif()
 install(DIRECTORY sounds
 	DESTINATION ${auxresourcesdir}
 )
-if(INSTALL_HELP)
-	install(DIRECTORY Help examples HelpSource
+
+if(INSTALL_OLD_HELP)
+	install(DIRECTORY Help
 		DESTINATION ${auxresourcesdir}
+	)
+endif()
+
+if(INSTALL_HELP)
+	install(DIRECTORY examples HelpSource
+		DESTINATION ${auxresourcesdir}
+		PATTERN "*~" EXCLUDE
+		PATTERN "*#" EXCLUDE
 	)
 endif()
 

@@ -39,7 +39,7 @@ QcNumberBox::QcNumberBox()
   normalTextColor( palette().color(QPalette::Text) ),
   _validator( new QDoubleValidator( this ) ),
   step( 0.1f ),
-  scrollStep( 0.1f ),
+  scrollStep( 1.0f ),
   dragDist( 10.f ),
   _value( 0. ),
   _valueType( Number ),
@@ -92,7 +92,7 @@ void QcNumberBox::setEditedTextColor( const QColor& c ) {
 void QcNumberBox::setValue( double val )
 {
   if( val > _validator->top() ) val = _validator->top();
-  else if ( val < _validator->bottom() ) val = _validator->bottom();
+  if ( val < _validator->bottom() ) val = _validator->bottom();
 
   val = roundedVal( val );
 
@@ -123,6 +123,20 @@ void QcNumberBox::setTextValue( const QString &str )
 double QcNumberBox::value () const
 {
   return _value;
+}
+
+void QcNumberBox::setMinimum( double min )
+{
+  _validator->setBottom(min);
+  if( _valueType == Number )
+    setValue( _value ); // clip current value
+}
+
+void QcNumberBox::setMaximum( double max )
+{
+  _validator->setTop(max);
+  if( _valueType == Number )
+    setValue( _value ); // clip current value
 }
 
 void QcNumberBox::setDecimals( int d )
@@ -156,14 +170,14 @@ void QcNumberBox::setMaxDecimals( int d )
     setValue( _value ); // round current value
 }
 
-void QcNumberBox::increment( float factor )
+void QcNumberBox::increment( double factor )
 {
   if( !isReadOnly() || _valueType != Number ) return;
   setValue( value() + (step * factor) );
   Q_EMIT( action() );
 }
 
-void QcNumberBox::decrement( float factor )
+void QcNumberBox::decrement( double factor )
 {
   if( !isReadOnly() || _valueType != Number ) return;
   setValue( value() - (step * factor) );

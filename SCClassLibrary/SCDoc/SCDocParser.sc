@@ -112,6 +112,9 @@ SCDocParser {
         };
         var modalRangeTag = {
             singleline = false;
+            if(current.isNil) {
+                tree.add((tag:\prose,display:proseDisplay,text:"",children:nil));
+            };
             this.addTag(tag);
             lastTagLine = lineno;
             modalTag = '::';
@@ -124,7 +127,7 @@ SCDocParser {
         };
 
         // modal tags ignore all other tags until their closing tag occurs.
-        // here we check if we are in a modal tag (code, emphasis, link) and then
+        // here we check if we are in a modal tag (code, emphasis, link, teletype) and then
         // if we got the closing tag.
         if(modalTag.notNil, {
             //only allow modal block tags to be closed with the closing tag as the first word on a line
@@ -136,7 +139,7 @@ SCDocParser {
                 modalTag = nil;
                 afterClosing = true;
             },{
-                if(("[^ ]+[^ \\]::".matchRegexp(word)) and: (lastTagLine==lineno), { //split unhandled tag-like word
+                if(("[^\\\\]::$".matchRegexp(word)) and: (lastTagLine==lineno), { //split unhandled tag-like word
                     this.addText(word.drop(-2));
                     this.handleWord("::",lineno,wordno+1);
                 },{
@@ -183,6 +186,7 @@ SCDocParser {
                 'code::',               modalRangeTag,
                 'formula::',            modalRangeTag,
                 'emphasis::',           modalRangeTag,
+                'teletype::',           modalRangeTag,
                 'strong::',             modalRangeTag,
                 'link::',               modalRangeTag,
                 'anchor::',             modalRangeTag,
@@ -234,13 +238,10 @@ SCDocParser {
                         this.addTag('link::',word++" ",false,\inline);
                         this.endCurrent;
                     },{
-                        if(("[^ ]+[^ \\]::".matchRegexp(word)) and: (lastTagLine==lineno), { //split unhandled tag-like word
+                        if(("[^\\\\]::$".matchRegexp(word)) and: (lastTagLine==lineno), { //split unhandled tag-like word
                             this.addText(word.drop(-2));
                             this.handleWord("::",lineno,wordno+1);
                         },{
-                            if(word.endsWith("::")) {
-                                warn("SCDocParser: Unknown tag:"+word+"in"+currentFile);
-                            };
                             this.addText(word); //plain text, add the word.
                         });
                     });
@@ -278,18 +279,18 @@ SCDocParser {
         var w, split, split2, word;
         this.init;
         lines.do {|line,l|
-            split = line.findRegexp("[a-zA-Z]+::[^ \n\t]+::|[a-zA-Z]*::|[ \n\t]+|[^ \n\t]+"); //split words and tags and ws
+            split = line.findRegexp("\\S+::\\S+::|\\S+::|::|\\s+|\\S+");
             w = 0;
             split.do {|e|
                 word = e[1];
-                split2 = word.findRegexp("([a-zA-Z]+::)([^ \n\t]+)(::)")[1..]; //split stuff like::this::...
+                split2 = word.findRegexp("([a-zA-Z]+::)(\\S+)(::)")[1..]; //split stuff like::this::...
                 if(split2.isEmpty,{
-                    isWS = "^[ \n\t]+$".matchRegexp(word);
+                    isWS = "^\\s+$".matchRegexp(word);
                     this.handleWord(word,l,w);
                     if(isWS.not,{w=w+1});
                 },{
                     split2.do {|e2|
-                        isWS = "^[ \n\t]+$".matchRegexp(e2[1]);
+                        isWS = "^\\s+$".matchRegexp(e2[1]);
                         this.handleWord(e2[1],l,w);
                         w=w+1;
                     };
@@ -350,7 +351,7 @@ SCDocParser {
             loop {
                 line = file.getLine;
                 if(line.isNil) {break.value};
-                match = line.findRegexp("([a-zA-Z]+::)\\s*(\\S*.*\\S+)?").flop[1];
+                match = line.findRegexp("([a-zA-Z]+::)\\s*(\\S.*\\S|\\S)?").flop[1];
                 if(match.notNil) {
                     tag = match[1].toLower.drop(-2).asSymbol;
                     text = match[2];
@@ -372,7 +373,7 @@ SCDocParser {
                             // - m.isExtensionOf(c) (perhaps not very important, we can see this in the class doc)
                                 match = text.findRegexp("\\(.*\\)|[^ ,]+").flop[1].reject{|x|x[0]==$(};
                                 match.do {|name|
-                                    if("[a-z][a-zA-Z0-9_]*|[-<>@|&%*+/!?=]+".matchRegexp(name).not) {
+                                    if("^[a-z][a-zA-Z0-9_]*|[-<>@|&%*+/!?=]+$".matchRegexp(name).not) {
                                         warn("Methodname not valid: '"++name++"' in"+path);
                                     } {
                                         m = name.asSymbol;

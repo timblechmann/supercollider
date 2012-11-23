@@ -1,27 +1,25 @@
-find_package(FFTW3f)
 
-if(SC_QT)
-	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}  -DQC_DEBUG")
-	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -DQC_DEBUG")
+if (FFT_GREEN)
+        add_definitions("-DSC_FFT_GREEN")
+else()
+        find_package(FFTW3f)
 endif()
 
 include_directories(${CMAKE_SOURCE_DIR}/include/common
                     ${CMAKE_SOURCE_DIR}/include/lang
+                    ${CMAKE_SOURCE_DIR}/include/plugin_interface
+                    ${CMAKE_SOURCE_DIR}/include/server
                     ${CMAKE_SOURCE_DIR}/external_libraries/boost_lockfree
                     ${CMAKE_SOURCE_DIR}/external_libraries/boost
                     ${CMAKE_SOURCE_DIR}/external_libraries/threadpool
-                    ${CMAKE_SOURCE_DIR}/include/plugin_interface
+                    ${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.2.6/include
+                    ${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src
                     LangSource/Bison)
 
 if(APPLE)
-	include_directories(${CMAKE_SOURCE_DIR}/external_libraries/icu
-		"LangPrimSource/${HID_UTIL_DIR}")
+	include_directories("LangPrimSource/${HID_UTIL_DIR}")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
 	find_package(ALSA)
-	find_package(ICU)
-	if (NOT ICU_FOUND)
-		message(SEND_ERROR "cannot find ICU")
-	endif()
 endif()
 
 if(APPLE)
@@ -50,7 +48,6 @@ set(sclang_sources
 	LangPrimSource/PyrListPrim.cpp
 	LangPrimSource/PyrPlatformPrim.cpp
 	LangPrimSource/PyrStringPrim.cpp
-	LangPrimSource/PyrUStringPrim.cpp
 	LangPrimSource/PyrSymbolPrim.cpp
 	LangPrimSource/PyrUnixPrim.cpp
 	LangSource/AdvancingAllocPool.cpp
@@ -86,8 +83,15 @@ set(sclang_sources
 	${CMAKE_SOURCE_DIR}/common/SC_StringParser.cpp
 	${CMAKE_SOURCE_DIR}/common/scsynthsend.cpp
 	${CMAKE_SOURCE_DIR}/common/sc_popen.cpp
-	${CMAKE_SOURCE_DIR}/common/strtod.c
 )
+
+file(GLOB boost_system_sources ../external_libraries/boost/libs/system/src/*cpp)
+file(GLOB boost_fs_sources ../external_libraries/boost/libs/filesystem/v3/src/*cpp)
+file(GLOB boost_regex_sources ../external_libraries/boost/libs/regex/src/*cpp)
+list(APPEND sclang_sources ${boost_fs_sources} ${boost_system_sources} ${boost_regex_sources})
+
+file(GLOB yaml_sources ../external_libraries/yaml-cpp-0.2.6/src/*cpp)
+list(APPEND sclang_sources ${yaml_sources})
 
 if(NOT WIN32)
 	list(APPEND sclang_sources LangPrimSource/PyrSerialPrim.cpp)
@@ -105,10 +109,6 @@ endif()
 set(sclang_parser_source LangSource/Bison/lang11d_tab.cpp)
 
 add_definitions(-DYYSTACK_USE_ALLOCA)
-
-if (SC_QT AND DSO_VISIBILITY)
-	remove_definitions(-fvisibility=hidden)
-endif()
 
 if(UNIX)
 	if(APPLE)
@@ -157,6 +157,9 @@ if (SC_WII OR APPLE)
 		if (BLUETOOTH_FOUND AND CWIID_FOUND)
 			add_definitions(-DHAVE_WII)
 			include_directories(${CWIID_INCLUDE_DIRS} ${BLUETOOTH_INCLUDE_DIRS})
+			message(STATUS "Compiling with WiiMote support")
+		else()
+			message(SEND_ERROR "Cannot find libcwiid or libbluetooth")
 		endif()
 	elseif(APPLE)
 		add_definitions(-DHAVE_WII)
@@ -165,18 +168,11 @@ if (SC_WII OR APPLE)
 	endif()
 endif()
 
-if (SC_QT)
-	find_package (Qt4 4.5)
-	include(${QT_USE_FILE})
-
-	add_definitions(-DSC_QT -DQT_NO_KEYWORDS)
-	include_directories(${CMAKE_SOURCE_DIR}/include/QtCollider)
-
-	qt4_wrap_cpp( QC_LANG_CLIENT_MOC_SRCS ../QtCollider/LanguageClient.h )
-
-	list(APPEND sclang_sources ../QtCollider/LanguageClient.cpp ${QC_LANG_CLIENT_MOC_SRCS})
-endif ()
-
+if(SC_QT)
+	set(QT_COLLIDER_LANG_CLIENT ON)
+	include(../QtCollider/CMakeLists.txt)
+	list(APPEND sclang_sources ${QT_COLLIDER_SRCS})
+endif()
 
 if(0 AND FINAL_BUILD) # sclang final-builds are broken
 	CREATE_FINAL_FILE(libsclang_final.cpp ${sclang_sources})
@@ -207,10 +203,6 @@ else()
 endif()
 
 
-if (SC_QT)
-    target_link_libraries(libsclang QtCollider )
-endif()
-
 set_property(TARGET libsclang
 	PROPERTY OUTPUT_NAME sclang)
 
@@ -223,15 +215,6 @@ if(READLINE_FOUND)
 		PROPERTY COMPILE_DEFINITIONS HAVE_READLINE)
 	target_link_libraries(libsclang ${READLINE_LIBRARY})
 endif(READLINE_FOUND)
-
-if (ICU_FOUND)
-	include_directories(${ICU_INCLUDE_DIRS})
-	target_link_libraries(libsclang ${ICU_LIBRARIES} ${ICU_I18N_LIBRARIES})
-else()
-	if (APPLE)
-		target_link_libraries(libsclang icucore)
-	endif()
-endif()
 
 if (APPLE)
 	target_link_libraries(libsclang "-framework Carbon")
@@ -269,7 +252,15 @@ if (GC_SANITYCHECK)
 	add_definitions(-DGC_SANITYCHECK)
 endif()
 
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	target_link_libraries(libsclang rt)
+endif()
+
 target_link_libraries(libsclang ${PTHREADS_LIBRARY} supercollider_boost_thread)
+
+if(SC_QT)
+	target_link_libraries(libsclang ${QT_COLLIDER_LIBS})
+endif()
 
 add_executable(sclang LangSource/cmdLineFuncs.cpp)
 target_link_libraries(sclang libsclang boost_thread)

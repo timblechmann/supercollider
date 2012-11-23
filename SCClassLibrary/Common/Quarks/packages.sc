@@ -30,12 +30,12 @@
 			var folders,packages,paths,files;
 			dir = dir.withTrailingSlash;
 			paths = (dir++"*").pathMatch;
-			folders = paths.reject({ |p| p.last != $/ or: {PathName(p).folderName == "quarks"} });
+			folders = paths.reject({ |p| p.last != $/ or: {p.basename == "quarks"} });
 			files = paths.select({ |p| p.last != $/ });
-			packages = folders.collect({ |p| (PathName(p).folderName).asSymbol -> p });
+			packages = folders.collect({ |p| p.basename.asSymbol -> p });
 			if(files.notEmpty,{
 				// if there are any loose files then create a package called dir
-				packages = packages.add( PathName(dir).folderName.asSymbol -> dir )
+				packages = packages.add( dir.basename.asSymbol -> dir )
 			});
 			packages
 		};
@@ -50,7 +50,7 @@
 			++
 
 			Quarks.installed.collect({ |q|
-				q.name.asSymbol -> (platform.userExtensionDir++"/quarks/" ++ q.path)
+				q.name.asSymbol -> (Platform.userExtensionDir +/+ "quarks" +/+ q.path.withTrailingSlash)
 			}))
 			.sort({ |a,b| a.value.size > b.value.size }) // sort longer paths first
 
@@ -98,7 +98,7 @@
 
 	definesClasses {
 		var myPath,end;
-		myPath = thisProcess.platform.userExtensionDir++"/quarks/" ++ this.path;
+		myPath = Platform.userExtensionDir +/+ "quarks" +/+ this.path;
 		end = myPath.size-1;
 		^Class.allClasses.reject(_.isMetaClass).select({ |class|
 			class.filenameSymbol.asString.copyRange(0,end) == myPath
@@ -108,9 +108,9 @@
 		// all methods whose path is in this quark folder
 		// where the class is not in this quark
 		var myPath,end;
-		myPath = thisProcess.platform.userExtensionDir++"/quarks/" ++ this.path;
+		myPath = Platform.userExtensionDir +/+ "quarks" +/+  this.path;
 		end = myPath.size-1;
-		^Class.allClasses.collect({ |c| c.methods }).reject(IsNil).flat
+		^Class.allClasses.collect({ |c| c.methods }).reject(_.isNil).flat
 			.select({ |method|
 				method.filenameSymbol.asString.copyRange(0,end) == myPath
 				and: {

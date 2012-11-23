@@ -1,3 +1,4 @@
+
 PageLayout  {
 	/* creates and manages the open/close lifecycle of a window with a top level FlowView.
 		it also manages onClose handlers for use by ObjectGui's MVC model,
@@ -54,7 +55,13 @@ PageLayout  {
 		autoRemoves = [];
 	}
 	asView { ^this.view.asView }
-	asFlowView { ^this.view }
+	asFlowView { arg bounds;
+		^if(bounds.notNil,{
+			FlowView(this,bounds)
+		},{
+			this.view
+		})
+	}
 	bounds { ^this.view.bounds }
 	add { arg view;
 		this.view.add(view);
@@ -90,11 +97,9 @@ PageLayout  {
 			isClosed = true;
 			autoRemoves.do({ arg updater; updater.remove(false) });
 			autoRemoves = nil;
-			window.do({ arg w;
-				w.close;
-			});
+			window.close;
+			NotificationCenter.notify(window,\didClose);
 			window=view=nil;
-			NotificationCenter.notify(this,\didClose);
 		});
 	}
 	onClose_ { arg f; window.onClose = f; }
@@ -156,5 +161,5 @@ PageLayout  {
 	endFullScreen {
 		window.endFullScreen
 	}
-
 }
+

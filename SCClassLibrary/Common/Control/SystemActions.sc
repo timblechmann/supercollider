@@ -106,15 +106,20 @@ ShutDown : AbstractSystemAction {
 
 	classvar <>objects;
 
-	*initClass {
-		UI.registerForShutdown({ this.run });
-	}
-
 	*run {
 		objects.copy.do({ arg item; item.doOnShutDown;  });
 	//	"ShutDown done.".postln;
 	}
 
+}
+
+// things to do on a system reset
+OnError : AbstractSystemAction {
+	classvar <>objects;
+
+	*run {
+		objects.copy.do({ arg item; item.doOnError;  });
+	}
 }
 
 
@@ -125,11 +130,13 @@ AbstractServerAction : AbstractSystemAction {
 	}
 
 	*performFunction { arg server, function;
-		this.objects.at(server).copy.do(function);
-		if(server === Server.default) {
-			this.objects.at(\default).copy.do(function)
-		};
-		this.objects.at(\all).copy.do(function);
+		if (this.objects.notNil) {
+			this.objects.at(server).copy.do(function);
+			if(server === Server.default) {
+				this.objects.at(\default).copy.do(function)
+			};
+			this.objects.at(\all).copy.do(function);
+		}
 	}
 
 	*run { arg server;
@@ -144,30 +151,25 @@ AbstractServerAction : AbstractSystemAction {
 
 	*add { arg object, server;
 		var list;
-		if(server.isNil) { server = \default };
+		if (server.isNil)  { server = \default };
+		if (this.objects.isNil) { this.init };
 		list = this.objects.at(server);
-		if(list.isNil) { list = List.new; this.objects.put(server, list) };
+		if (list.isNil) { list = List.new; this.objects.put(server, list) };
 		if (list.includes(object).not) { list.add(object) };
-
 	}
 
 	*addToAll { arg object;
-
 		Server.set.do({ arg s; this.add(object, s) });
-
 	}
 
 	*remove { arg object, server;
-
 		if(server.isNil) { server = \default };
 		this.objects.at(server).remove(object);
-
 	}
 
 	*removeServer { arg server;
 		this.objects.removeAt(server)
 	}
-
 }
 
 // things to do after server has booted
@@ -177,14 +179,9 @@ ServerBoot : AbstractServerAction {
 
 	classvar <>objects;
 
-	*initClass {
-		this.objects = IdentityDictionary.new;
-	}
-
 	*functionSelector {
 		^\doOnServerBoot
 	}
-
 }
 
 // things to do after server has quit
@@ -194,14 +191,9 @@ ServerQuit : AbstractServerAction {
 
 	classvar <>objects;
 
-	*initClass {
-		this.objects = IdentityDictionary.new;
-	}
-
 	*functionSelector {
 		^\doOnServerQuit
 	}
-
 }
 
 
@@ -210,16 +202,9 @@ ServerQuit : AbstractServerAction {
 
 ServerTree : AbstractServerAction {
 
-
 	classvar <>objects;
-
-
-	*initClass {
-		this.objects = IdentityDictionary.new;
-	}
 
 	*functionSelector {
 		^\doOnServerTree
 	}
-
 }

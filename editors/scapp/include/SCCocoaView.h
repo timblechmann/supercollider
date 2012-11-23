@@ -93,7 +93,7 @@
 	BOOL drawPeak, isVertical, criticalAboveWarning;
 	float peakSubtract, peakLevel, peakY, peakHeight;
 	double value, peakValue;
-	float warning, critical;
+	double warning, critical;
 }
 
 - (void)setDrawPeak:(BOOL)flag;
@@ -205,7 +205,6 @@ public:
 	virtual int setProperty(PyrSymbol *symbol, PyrSlot *slot);
 	virtual int getProperty(PyrSymbol *symbol, PyrSlot *slot);
 	virtual void setVisibleFromParent();
-	virtual void makeFocus(bool focus);
 	//virtual void keyDown(int character, int modifiers, unsigned short keycode);
 	void tabPrevFocus();
 	void tabNextFocus();
@@ -218,6 +217,7 @@ public:
 	
 protected:
 	SCNSWebView *mWebView;
+	SCNSFlippedView *flipView;
 };
 
 //class SCTextField : public SCStaticText

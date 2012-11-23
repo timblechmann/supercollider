@@ -13,7 +13,7 @@ Event : Environment {
 	*silent { |dur(1.0), inEvent|
 		if(inEvent.isNil) { inEvent = Event.new }
 			{ inEvent = inEvent.copy };
-		inEvent.put(\type, \rest).put(\dur, dur).put(\parent, defaultParentEvent)
+		inEvent.put(\isRest, true).put(\dur, dur).put(\parent, defaultParentEvent)
 			.put(\delta, dur * (inEvent[\stretch] ? 1));
 		^inEvent
 	}
@@ -44,6 +44,19 @@ Event : Environment {
 //		^this.delta
 	}
 
+	// this[\isRest] may be nil
+	isRest {
+		^this[\isRest] == true
+		or: { this[\type] == \rest
+			or: {
+				this.use {
+					parent ?? { parent = defaultParentEvent };
+					~detunedFreq.value.isRest
+				}
+			}
+		}
+	}
+
 	// node watcher interface
 
 	isPlaying_ { arg val;
@@ -56,7 +69,7 @@ Event : Environment {
 
 	// this method is called by EventStreamPlayer so it can schedule Routines as well
 	playAndDelta { | cleanup, mute |
-		if (mute) { this.put(\freq, \rest) };
+		if (mute) { this.put(\type, \rest) };
 		cleanup.update(this);
 		this.play;
 		^this.delta;
@@ -407,7 +420,8 @@ Event : Environment {
 					if (tempo.notNil) {
 						thisThread.clock.tempo = tempo;
 					};
-					~eventTypes[~type].value(server);
+					// ~isRest may be nil - force Boolean behavior
+					if(~isRest != true) { ~eventTypes[~type].value(server) };
 				},
 
 				// synth / node interface
@@ -458,7 +472,7 @@ Event : Environment {
 						// var schedBundleArray;
 
 						freqs = ~detunedFreq.value;
-						if (freqs.isKindOf(Symbol).not) {
+						if (freqs.isRest.not) {
 
 							// msgFunc gets the synth's control values from the Event
 							msgFunc = ~getMsgFunc.valueEnvir;
@@ -555,7 +569,7 @@ Event : Environment {
 
 						freqs = ~detunedFreq.value;
 
-						if (freqs.isKindOf(Symbol).not) {
+						if (freqs.isRest.not) {
 
 							// msgFunc gets the synth's control values from the Event
 							instr = ( ~synthLib ?? { SynthDescLib.global } ).at(~instrument);
@@ -597,7 +611,7 @@ Event : Environment {
 
 						freqs = ~detunedFreq.value;
 
-						if (freqs.isKindOf(Symbol).not) {
+						if (freqs.isRest.not) {
 							~freq = freqs;
 							~amp = ~amp.value;
 							msgFunc = ~getMsgFunc.valueEnvir;
@@ -628,7 +642,7 @@ Event : Environment {
 						var freqs, lag, dur, strum, bndl, msgFunc;
 						freqs = ~freq = ~detunedFreq.value;
 
-						if (freqs.isKindOf(Symbol).not) {
+						if (freqs.isRest.not) {
 							~server = server;
 							freqs = ~freq;
 							~amp = ~amp.value;
@@ -716,7 +730,7 @@ Event : Environment {
 
 						freqs = ~freq = ~detunedFreq.value;
 
-						if (freqs.isKindOf(Symbol).not) {
+						if (freqs.isRest.not) {
 							~amp = ~amp.value;
 							~midinote = (freqs.cpsmidi).round(1).asInteger;
 							strum = ~strum;
@@ -790,7 +804,7 @@ Event : Environment {
 
 						freqs = ~freq = ~detunedFreq.value;
 
-						if (freqs.isKindOf(Symbol).not) {
+						if (freqs.isRest.not) {
 							~amp = ~amp.value;
 							~sustain = ~sustain.value;
 

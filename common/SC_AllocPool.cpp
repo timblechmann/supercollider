@@ -23,6 +23,7 @@
 #include "SC_AllocPool.h"
 #include "SC_BoundsMacros.h"
 #include <assert.h>
+#include <string>
 
 /*
    Requests are `small' if both the corresponding and the next bin are small
@@ -200,9 +201,9 @@ AllocAreaPtr AllocPool::NewArea(size_t inAreaSize)
 {
 	void *ptr = (AllocAreaPtr)(mAllocArea)(inAreaSize + kAreaOverhead);
 
-	if (ptr == NULL) {
-		throw std::runtime_error("Could not allocate new area");
-	}
+	if (ptr == NULL)
+		throw std::runtime_error(std::string("Could not allocate new area"));
+
 	// AllocAreaPtr area = (AllocAreaPtr)((unsigned long)ptr & ~kAlignMask);
 	AllocAreaPtr area = (AllocAreaPtr)(((unsigned long)ptr + kAlignMask) & ~kAlignMask);
 	assert((area >= ptr) && ((void*)((unsigned long)area & ~kAlignMask) == area));
@@ -387,7 +388,7 @@ void* AllocPool::Alloc(size_t inReqSize)
 	// exit paths:
 	found_nothing:
 		//ipostbuf("alloc failed. size: %d\n", inReqSize);
-		throw std::runtime_error("alloc failed, increase server's memory allocation (e.g. via ServerOptions)");
+		throw std::runtime_error(std::string("alloc failed, increase server's memory allocation (e.g. via ServerOptions)"));
 
 	whole_new_area:
 		//ipostbuf("whole_new_area\n");
@@ -496,7 +497,7 @@ void* AllocPool::Realloc(void* inPtr, size_t inReqSize)
 		check_pool();
 		if (outPtr == 0) {
 			//ipostbuf("realloc failed. size: %d\n", inReqSize);
-			throw std::runtime_error("realloc failed, increase server's memory allocation (e.g. via ServerOptions)");
+			throw std::runtime_error(std::string("realloc failed, increase server's memory allocation (e.g. via ServerOptions)"));
 		}
 
 		/* Otherwise copy, free, and exit */

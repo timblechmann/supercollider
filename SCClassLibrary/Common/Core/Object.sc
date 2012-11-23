@@ -39,6 +39,7 @@ Object  {
 	//accessing
 	size { ^0 }
 	indexedSize { ^0 }
+	flatSize { ^1	}
 
 	do { arg function; function.value(this, 0) }
 	generate { arg function, state; this.do(function); ^state }
@@ -225,10 +226,12 @@ Object  {
 	finishEvent {}
 	atLimit { ^false }
 
+	isRest { ^false }
+
 	// testing
 	? { arg obj; ^this }
 	?? { arg obj; ^this }
-	!? { arg obj; ^obj.value }
+	!? { arg obj; ^obj.value(this) }
 
 	isNil { ^false }
 	notNil { ^true }
@@ -256,7 +259,7 @@ Object  {
 	// errors
 	halt {
 		thisProcess.nowExecutingPath = nil;
-		UI.reset;
+		OnError.run;
 		this.prHalt
 	}
 	prHalt { _Halt }

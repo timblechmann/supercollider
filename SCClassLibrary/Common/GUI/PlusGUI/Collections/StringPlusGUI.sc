@@ -4,16 +4,26 @@
 	}
 
 	openTextFile{ arg selectionStart=0, selectionLength=0;
-		var doc;
-		doc = Document.open(PathName(this).asAbsolutePath , selectionStart, selectionLength);
+		if(Document.implementationClass.notNil) {
+			Document.open(this.absolutePath , selectionStart, selectionLength);
+		} {
+			this.openOS;
+		}
 	}
 	openHTMLFile{ arg selectionStart=0, selectionLength=0;
-		// On Linux this will be overridden to ensure it opens rendered HTML
-		this.openTextFile(selectionStart, selectionLength)
+		if (Platform.openHTMLFileAction.notNil) {
+			Platform.openHTMLFileAction.value(this, selectionStart, selectionLength)
+		} {
+			this.openTextFile(selectionStart, selectionLength)
+		}
 	}
 
 	openDocument {
-		^Document.open(this)
+		if(Document.implementationClass.notNil) {
+			Document.open(this);
+		} {
+			this.openOS;
+		}
 	}
 //	*fromUser { arg prompt="Enter string :", default="";
 //		_GetStringFromUser
@@ -75,6 +85,7 @@
 			// since Swing is not in svn and can't be easily updated
 			// let's put this temporary hack/if-statement here
 			// rather than pollute everybody else's code with hacks/if-statements
+			font = font ?? { Font.default };
 			^Rect(0, 0, this.size * font.size * 0.52146, font.size * 1.25)
 			// width in Helvetica approx = string size * font size * 0.52146
 			// 0.52146 is average of all 32-127 ascii characters widths
@@ -97,6 +108,10 @@
 	}
 
 	openHelpFile {
-		HelpBrowser.openHelpFor(this);
+		if (Platform.openHelpFileAction.notNil) {
+			Platform.openHelpFileAction.value(this)
+		} {
+			HelpBrowser.openHelpFor(this);
+		}
 	}
 }

@@ -35,7 +35,6 @@
 # include <sys/types.h>
 #endif
 
-#include <stdexcept>
 #include "SC_DirUtils.h"
 
 #if defined(__APPLE__) || defined(SC_IPHONE)
@@ -53,17 +52,24 @@ const char * gIdeName = "none";
 
 // Add a component to a path.
 
-void sc_AppendToPath(char *path, const char *component)
+void sc_AppendToPath(char *path, size_t max_size, const char *component)
 {
-#if defined(_WIN32)
-	strncat(path, "\\", PATH_MAX);
-#else
-	strncat(path, "/", PATH_MAX);
-#endif
-	strncat(path, component, PATH_MAX);
+	size_t currentLength = strlen(path);
+	if (currentLength >= max_size-1)
+		return;
+	path[currentLength] = SC_PATH_DELIMITER[0];
+	path[currentLength+1] = 0;
+	++currentLength;
+
+	char * tail = path + currentLength;
+	size_t remain = max_size - currentLength;
+
+	strncat(tail, component, remain);
 }
 
-char *sc_StandardizePath(const char *path, char *newpath2) {
+
+char *sc_StandardizePath(const char *path, char *newpath2)
+{
 	char newpath1[MAXPATHLEN];
 
 	newpath1[0] = '\0';
@@ -72,10 +78,10 @@ char *sc_StandardizePath(const char *path, char *newpath2) {
 	size_t pathLen = strlen(path);
 
 	if ((pathLen >= 2) && (path[0] == '~') && ((path[1] == '/') || (path[1] == '\\'))) {
-      char home[PATH_MAX];
-      sc_GetUserHomeDirectory(home, PATH_MAX);
+		char home[PATH_MAX];
+		sc_GetUserHomeDirectory(home, PATH_MAX);
 
-	    if (home != 0) {
+		if (home != 0) {
 			if ((pathLen - 1 + strlen(home)) >= MAXPATHLEN) {
 				return 0;
 			}
@@ -96,7 +102,9 @@ char *sc_StandardizePath(const char *path, char *newpath2) {
 	}
 
 	bool isAlias = false;
-	sc_ResolveIfAlias(newpath1, newpath2, isAlias, PATH_MAX);
+	if(sc_ResolveIfAlias(newpath1, newpath2, isAlias, PATH_MAX)!=0) {
+		strcpy(newpath2, newpath1);
+	}
 
 	return newpath2;
 }
@@ -197,14 +205,6 @@ int sc_ResolveIfAlias(const char *path, char *returnPath, bool &isAlias, int len
 			return 0;
 		}
 	}
-#elif defined(__linux__) || defined(__FreeBSD__)
-	isAlias = sc_IsSymlink(path);
-	if (realpath(path, returnPath))
-	{
-		return 0;
-	}
-
-	return -1;
 #endif
 	strcpy(returnPath, path);
 	return 0;
@@ -238,7 +238,7 @@ void sc_GetResourceDirectory(char* pathBuf, int length)
 	sc_GetUserAppSupportDirectory(pathBuf, length);
 }
 
-#else
+#elif defined(__unix__)
 
 bool sc_IsStandAlone()
 {
@@ -247,18 +247,35 @@ bool sc_IsStandAlone()
 
 void sc_GetResourceDirectory(char* pathBuf, int length)
 {
-	sc_GetResourceDirectoryFromAppDirectory(pathBuf, length);
+#ifdef SC_DATA_DIR
+	strncpy(pathBuf, SC_DATA_DIR, length);
+#else
+	strncpy(pathBuf, "/usr/share/SuperCollider", length);
+#endif
 }
 
+#else
 
-#endif
+bool sc_IsStandAlone()
+{
+	return false;
+}
 
-void sc_GetResourceDirectoryFromAppDirectory(char* pathBuf, int length)
+static void sc_GetResourceDirectoryFromAppDirectory(char* pathBuf, int length)
 {
 	char * result = getcwd(pathBuf, length);
 	if (result != pathBuf)
 		throw std::runtime_error("cannot get current working directory");
 }
+
+
+void sc_GetResourceDirectory(char* pathBuf, int length)
+{
+	return sc_GetResourceDirectoryFromAppDirectory(pathBuf, length);
+}
+
+#endif
+
 
 
 // Support for Extensions
@@ -268,7 +285,7 @@ void sc_GetResourceDirectoryFromAppDirectory(char* pathBuf, int length)
 void sc_GetUserHomeDirectory(char *str, int size)
 {
 #ifndef _WIN32
-	char *home = getenv("HOME");
+	const char *home = getenv("HOME");
 	if(home!=NULL){
 		strncpy(str, home, size);
 	}else{
@@ -305,21 +322,25 @@ void sc_GetSystemAppSupportDirectory(char *str, int size)
 
 void sc_GetUserAppSupportDirectory(char *str, int size)
 {
-	char home[PATH_MAX];
-	sc_GetUserHomeDirectory(home, PATH_MAX);
+	// XDG support according to http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
+	const char * xdg_data_home = getenv("XDG_DATA_HOME");
+	if (xdg_data_home) {
+		strncpy(str, xdg_data_home, size);
+		sc_AppendToPath(str, size, "SuperCollider");
+		return;
+	}
 
-	snprintf(str,
-			 size,
+	sc_GetUserHomeDirectory(str, size);
+
 #if defined(SC_IPHONE)
-			"%s/Documents",
+	sc_AppendToPath(str, size, "Documents");
 #elif defined(__APPLE__)
-			 "%s/Library/Application Support/SuperCollider",
+	sc_AppendToPath(str, size, "Library/Application Support/SuperCollider");
 #elif defined(_WIN32)
-			"%s\\SuperCollider",
+	sc_AppendToPath(str, size, "SuperCollider");
 #else
-			 "%s/share/SuperCollider",
+	sc_AppendToPath(str, size, ".local/share/SuperCollider");
 #endif
-			 home);
 }
 
 
@@ -327,10 +348,8 @@ void sc_GetUserAppSupportDirectory(char *str, int size)
 
 void sc_GetSystemExtensionDirectory(char *str, int size)
 {
-	char path[PATH_MAX];
-	sc_GetSystemAppSupportDirectory(path, sizeof(path));
-	sc_AppendToPath(path, "Extensions");
-	strncpy(str, path, size);
+	sc_GetSystemAppSupportDirectory(str, size);
+	sc_AppendToPath(str, size, "Extensions");
 }
 
 
@@ -338,10 +357,28 @@ void sc_GetSystemExtensionDirectory(char *str, int size)
 
 void sc_GetUserExtensionDirectory(char *str, int size)
 {
-	char path[PATH_MAX];
-	sc_GetUserAppSupportDirectory(path, sizeof(path));
-	sc_AppendToPath(path, "Extensions");
-	strncpy(str, path, size);
+	sc_GetUserAppSupportDirectory(str, size);
+	sc_AppendToPath(str, size, "Extensions");
+}
+
+// Get the directory for the configuration files.
+void sc_GetUserConfigDirectory(char *str, int size)
+{
+	// XDG support according to http://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
+	const char * xdg_config_home = getenv("XDG_CONFIG_HOME");
+	if (xdg_config_home) {
+		strncpy(str, xdg_config_home, size);
+		sc_AppendToPath(str, size, "SuperCollider");
+	}
+
+#if defined(__linux__) || defined(__freebsd__)
+	char * home = str;
+
+	sc_GetUserHomeDirectory(str, size);
+	sc_AppendToPath(str, size, ".config/SuperCollider");
+#else
+	sc_GetUserAppSupportDirectory(str, size);
+#endif
 }
 
 
@@ -416,7 +453,7 @@ bool sc_ReadDir(SC_DirHandle* dir, const char* dirname, char* path, bool& skipEn
 
     char entrypathname[PATH_MAX];
 	strncpy(entrypathname, dirname, PATH_MAX);
-	sc_AppendToPath(entrypathname, dir->mEntry.cFileName);
+	sc_AppendToPath(entrypathname, PATH_MAX, dir->mEntry.cFileName);
 
 	bool isAlias = false;
 	sc_ResolveIfAlias(entrypathname, path, isAlias, PATH_MAX);
@@ -446,7 +483,7 @@ bool sc_ReadDir(SC_DirHandle* dir, const char* dirname, char* path, bool& skipEn
 	// construct path from dir entry
 	char entrypathname[PATH_MAX];
 	strncpy(entrypathname, dirname, PATH_MAX);
-	sc_AppendToPath(entrypathname, dir->mEntry->d_name);
+	sc_AppendToPath(entrypathname, PATH_MAX, dir->mEntry->d_name);
 
 	// resolve path
 	bool isAlias = false;
@@ -530,7 +567,7 @@ const char* sc_GlobNext(SC_GlobHandle* glob)
 	if (glob->mAtEnd)
 		return 0;
 	strncpy(glob->mEntryPath, glob->mFolder, PATH_MAX);
-	sc_AppendToPath(glob->mEntryPath, glob->mEntry.cFileName);
+	sc_AppendToPath(glob->mEntryPath, PATH_MAX, glob->mEntry.cFileName);
 	if (!::FindNextFile(glob->mHandle, &glob->mEntry))
 		glob->mAtEnd = true;
 	return glob->mEntryPath;

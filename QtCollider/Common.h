@@ -33,6 +33,8 @@
 #include <PyrSymbol.h>
 #include <PyrObject.h>
 
+#include <pthread.h>
+
 extern pthread_mutex_t gLangMutex;
 
 struct VariantList {
@@ -40,6 +42,7 @@ struct VariantList {
 };
 
 Q_DECLARE_METATYPE( VariantList );
+Q_DECLARE_METATYPE( PyrObject * );
 
 namespace QtCollider {
 
@@ -68,16 +71,28 @@ namespace QtCollider {
     Asynchronous
   };
 
-  void lockLang();
+  inline void lockLang()
+  {
+    qcDebugMsg(2,"locking lang!");
+    pthread_mutex_lock (&gLangMutex);
+    qcDebugMsg(2,"locked");
+  }
 
-  inline static void unlockLang()
+  inline void unlockLang()
   {
     pthread_mutex_unlock(&gLangMutex);
     qcDebugMsg(2,"unlocked");
   }
 
+  void runLang (
+    PyrObjectHdr *receiver,
+    PyrSymbol *method,
+    const QList<QVariant> & args = QList<QVariant>(),
+    PyrSlot *result = 0 );
+
   int wrongThreadError ();
 
+  extern PyrSymbol *s_interpretCmdLine;
   extern PyrSymbol *s_interpretPrintCmdLine;
   extern PyrSymbol *s_doFunction;
   extern PyrSymbol *s_doDrawFunc;

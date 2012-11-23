@@ -20,15 +20,18 @@
 ************************************************************************/
 
 #include "primitives.h"
-#include "Slot.h"
+#include "../Slot.h"
 #include "../QWidgetProxy.h"
+#include "../Common.h"
 
 #include <PyrKernel.h>
+#include <SCBase.h>
 
 #include <QWidget>
 #include <QThread>
 #include <QApplication>
 #include <QDrag>
+#include <QMimeData>
 
 using namespace QtCollider;
 
@@ -63,7 +66,7 @@ QC_LANG_PRIMITIVE( QWidget_Refresh, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
   return errNone;
 }
 
-QC_LANG_PRIMITIVE( QWidget_MapToGlobal, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
+QC_LANG_PRIMITIVE( QWidget_MapToGlobal, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
   QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy( r ) );
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
@@ -73,10 +76,7 @@ QC_LANG_PRIMITIVE( QWidget_MapToGlobal, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 
   QPoint pt( Slot::toPoint( a ).toPoint() );
   pt = w->mapToGlobal( pt );
-
-  int err = Slot::setPoint( a+1, pt );
-  if( err ) return err;
-  slotCopy( r, a+1 );
+  Slot::setPoint( r, pt );
 
   return errNone;
 }
@@ -111,11 +111,55 @@ QC_LANG_PRIMITIVE( QWidget_SetAlwaysOnTop, 1, PyrSlot *r, PyrSlot *a, VMGlobals 
   return errNone;
 }
 
-QC_LANG_PRIMITIVE( QWidget_StartDrag, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
+namespace QtCollider {
+
+struct MimeData : public QMimeData {
+  virtual ~MimeData() {
+    qcDebugMsg(1,"Drag data object destroyed, clearing QView.currentDrag.");
+
+    QtCollider::lockLang();
+
+    PyrClass *classView = getsym("View")->u.classobj;
+    PyrSymbol *symClearDrag = getsym("prClearCurrentDrag");
+    if( !classView || !symClearDrag ) return;
+
+    QtCollider::runLang( classView, symClearDrag );
+
+    QtCollider::unlockLang();
+  }
+};
+
+}
+
+QC_LANG_PRIMITIVE( QWidget_StartDrag, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
   QWidgetProxy *wProxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
   if( !wProxy->compareThread() ) return QtCollider::wrongThreadError();
 
-  QApplication::postEvent( wProxy, new StartDragEvent( Slot::toString(a) ) );
+  PyrSlot *data = a+1;
+  QString str = Slot::toString(a+2);
+
+  QMimeData *mime = new QtCollider::MimeData;
+
+  mime->setData( "application/supercollider", QByteArray() );
+
+  if( isKindOfSlot( data, class_Color ) )
+    mime->setColorData( QVariant(Slot::toColor(data)) );
+
+  if( !str.isEmpty() )
+    mime->setText( str );
+
+  QApplication::postEvent( wProxy, new StartDragEvent( Slot::toString(a), mime ) );
+
+  return errNone;
+}
+
+QC_LANG_PRIMITIVE( QWidget_SetGlobalEventEnabled, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
+  if( NotInt( a+0 ) ) return errWrongType;
+  int event = Slot::toInt(a+0);
+  bool enabled = IsTrue(a+1);
+  if( !enabled && !IsFalse(a+1) ) return errWrongType;
+
+  QWidgetProxy::setGlobalEventEnabled( (QWidgetProxy::GlobalEvent) event, enabled );
 
   return errNone;
 }

@@ -51,6 +51,9 @@ Collection {
 		this.do { tally = tally + 1 };
 		^tally
 	}
+	flatSize {
+		^this.sum(_.flatSize)
+	}
 
 	isEmpty { ^this.size == 0 }
 	notEmpty { ^this.size > 0 }
@@ -195,10 +198,6 @@ Collection {
 		var sum = 0;
 		this.do { | elem | if (elem == obj) { sum=sum+1 } }
 		^sum;
-	}
-	occurencesOf { | obj |
-		this.deprecated(thisMethod, Collection.findRespondingMethodFor(\occurrencesOf));
-		^this.occurrencesOf(obj);
 	}
 	any { | function |
 		this.do {|elem, i| if (function.value(elem, i)) { ^true } }

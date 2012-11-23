@@ -120,6 +120,17 @@ ScopeOut : UGen {
 	}
 }
 
+ScopeOut2 : UGen {
+	*ar { arg inputArray, scopeNum=0, maxFrames = 4096, scopeFrames;
+		this.multiNewList(['audio', scopeNum, maxFrames, scopeFrames ? maxFrames] ++ inputArray.asArray);
+		^0.0
+	}
+	*kr { arg inputArray, scopeNum=0, maxFrames = 4096, scopeFrames;
+		this.multiNewList(['control', scopeNum, maxFrames, scopeFrames ? maxFrames] ++ inputArray.asArray);
+		^0.0
+	}
+}
+
 Tap : UGen {
 	*ar { arg bufnum = 0, numChannels = 1, delaytime = 0.2;
 		var n;
@@ -128,7 +139,7 @@ Tap : UGen {
 	}
 }
 
-LocalBuf : UGen {
+LocalBuf : WidthFirstUGen {
 
 	*new { arg numFrames = 1, numChannels = 1;
 		^this.multiNew('scalar', numChannels, numFrames)
@@ -175,13 +186,13 @@ MaxLocalBufs : UGen {
 	}
 }
 
-SetBuf : UGen {
+SetBuf : WidthFirstUGen {
 	*new { arg buf, values, offset = 0;
 		^this.multiNewList(['scalar', buf, offset, values.size] ++ values)
 	}
 }
 
-ClearBuf : UGen {
+ClearBuf : WidthFirstUGen {
 	*new { arg buf;
 		^this.multiNew('scalar', buf)
 	}

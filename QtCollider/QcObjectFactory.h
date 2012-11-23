@@ -24,9 +24,11 @@
 
 #include "QObjectProxy.h"
 #include "Common.h"
+#include "Slot.h"
 
 #include <PyrObject.h>
 
+#include <QMetaObject>
 #include <QObject>
 #include <QWidget>
 #include <QHash>
@@ -46,7 +48,8 @@ public:
     qcDebugMsg( 2, QString("Declaring class '%1'").arg(className) );
     QtCollider::factories().insert( className, this );
   }
-  virtual QObjectProxy *newInstance( PyrObject *, QList<QVariant> & arguments ) = 0;
+  virtual const QMetaObject *metaObject() = 0;
+  virtual QObjectProxy *newInstance( PyrObject *, QtCollider::Variant arg[10] ) = 0;
 };
 
 
@@ -55,19 +58,50 @@ template <class QOBJECT> class QcObjectFactory : public QcAbstractFactory
 public:
   QcObjectFactory() : QcAbstractFactory( QOBJECT::staticMetaObject.className() ) {}
 
-  virtual QObjectProxy *newInstance( PyrObject *scObject, QList<QVariant> & arguments ) {
-    QOBJECT *qobject = new QOBJECT();
-    QObject *qo = qobject; // template parameter type-safety
+  const QMetaObject *metaObject() {
+    return &QOBJECT::staticMetaObject;
+  }
 
-    QObjectProxy *proxy = new QObjectProxy ( qobject, scObject );
+  virtual QObjectProxy *newInstance( PyrObject *scObject, QtCollider::Variant arg[10] ) {
+    QOBJECT *qObject;
 
-    initialize( proxy, qobject, arguments );
+    if( arg[0].type() == QMetaType::Void ) {
+      qObject = new QOBJECT;
+    }
+    else {
+      QObject *obj = QOBJECT::staticMetaObject.newInstance(
+        arg[0].asGenericArgument(),
+        arg[1].asGenericArgument(),
+        arg[2].asGenericArgument(),
+        arg[3].asGenericArgument(),
+        arg[4].asGenericArgument(),
+        arg[5].asGenericArgument(),
+        arg[6].asGenericArgument(),
+        arg[7].asGenericArgument(),
+        arg[8].asGenericArgument(),
+        arg[9].asGenericArgument()
+      );
 
-    return proxy;
+      qObject = qobject_cast<QOBJECT*>(obj);
+      if( !qObject ) {
+        qcErrorMsg( QString("No appropriate constructor found for '%1'.")
+          .arg( QOBJECT::staticMetaObject.className() ) );
+        return 0;
+      }
+    }
+
+    return proxy( qObject, scObject );
   }
 
 protected:
-  virtual void initialize( QObjectProxy *, QOBJECT *, QList<QVariant> & arguments ) {};
+
+  virtual QObjectProxy *proxy( QOBJECT *obj, PyrObject *sc_obj ) {
+    QObjectProxy *prox( new QObjectProxy(obj, sc_obj) );
+    initialize( prox, obj );
+    return prox;
+  }
+
+  virtual void initialize( QObjectProxy *proxy, QOBJECT *obj ) {};
 };
 
 

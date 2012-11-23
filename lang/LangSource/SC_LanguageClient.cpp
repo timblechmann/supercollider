@@ -26,6 +26,7 @@
 #include "SC_LanguageClient.h"
 #include "SC_LibraryConfig.h"
 #include <cstring>
+#include <string>
 #include <cerrno>
 
 #ifdef SC_WIN32
@@ -58,6 +59,7 @@ extern PyrString* newPyrStringN(class PyrGC *gc, long length, long flags, long c
 // =====================================================================
 
 SC_LanguageClient* SC_LanguageClient::gInstance = 0;
+SC_Lock SC_LanguageClient::gInstanceMutex;
 
 PyrSymbol* SC_LanguageClient::s_interpretCmdLine = 0;
 PyrSymbol* SC_LanguageClient::s_interpretPrintCmdLine = 0;
@@ -71,25 +73,47 @@ SC_LanguageClient::SC_LanguageClient(const char* name)
 	  mScratch(0),
 	  mRunning(false)
 {
+	lockInstance();
+
 	if (gInstance) {
+		unlockInstance();
 		fprintf(stderr, "SC_LanguageClient already running\n");
 		abort();
 	}
 
 	mName = strdup(name);
 	gInstance = this;
+
+	unlockInstance();
 }
 
 SC_LanguageClient::~SC_LanguageClient()
 {
+	lockInstance();
 	free(mName);
 	gInstance = 0;
+	unlockInstance();
 }
 
 void SC_LanguageClient::initRuntime(const Options& opt)
 {
 	// start virtual machine
 	if (!mRunning) {
+#ifdef __linux__
+		char deprecatedSupportDirectory[PATH_MAX];
+		sc_GetUserHomeDirectory(deprecatedSupportDirectory, PATH_MAX);
+		sc_AppendToPath(deprecatedSupportDirectory, PATH_MAX, "share/SuperCollider");
+
+		if (sc_DirectoryExists(deprecatedSupportDirectory)) {
+			char supportDirectory[PATH_MAX];
+			sc_GetUserAppSupportDirectory(supportDirectory, PATH_MAX);
+			postfl("WARNING: Deprecated support directory detected: %s\n"
+				"Extensions and other contents in this directory will not be available until you move them to the new support directory:\n"
+				"%s\n"
+				"Quarks will need to be reinstalled due to broken symbolic links.\n\n", deprecatedSupportDirectory, supportDirectory);
+		}
+#endif
+
 		mRunning = true;
 		if (opt.mRuntimeDir) {
 			int err = chdir(opt.mRuntimeDir);
@@ -106,42 +130,6 @@ void SC_LanguageClient::initRuntime(const Options& opt)
 void SC_LanguageClient::shutdownRuntime()
 {
 	cleanup_OSC();
-}
-
-bool SC_LanguageClient::readLibraryConfig(const char* filePath, const char* fileName)
-{
-	SC_LibraryConfigFile file(&::post);
-	if (!fileName) fileName = filePath;
-	if (file.open(filePath)) {
-		bool success = SC_LibraryConfig::readLibraryConfig(file, fileName);
-		file.close();
-		return success;
-	}
-	SC_LibraryConfig::freeLibraryConfig();
-	return false;
-}
-
-bool SC_LanguageClient::readDefaultLibraryConfig()
-{
-#ifndef SC_WIN32
-	const char* paths[3] = { ".sclang.cfg", "~/.sclang.cfg", "/etc/sclang.cfg" };
-
-	char opath[PATH_MAX];
-
-	for (int i=0; i < 3; i++) {
-		const char * ipath = paths[i];
-		if (sc_StandardizePath(ipath, opath)) {
-			bool success = readLibraryConfig(opath, ipath);
-			if (success) return true;
-		}
-	}
-
-	return false;
-#else
-// $$$todo rewrite for win32 (home folder ?)
-  //assert(0);
-  return false;
-#endif
 }
 
 void SC_LanguageClient::compileLibrary()
@@ -342,7 +330,9 @@ int vpost(const char *fmt, va_list ap)
 	char buf[512];
 	int n = vsnprintf(buf, sizeof(buf), fmt, ap);
 	if (n > 0) {
-		SC_LanguageClient::instance()->postText(buf, sc_min(n, sizeof(buf) - 1));
+		SC_LanguageClient *client = SC_LanguageClient::lockedInstance();
+		if (client) client->postText(buf, sc_min(n, sizeof(buf) - 1));
+		SC_LanguageClient::unlockInstance();
 	}
 	return 0;
 }
@@ -361,18 +351,24 @@ void postfl(const char *fmt, ...)
     va_start(ap, fmt);
 	int n = vsnprintf(buf, sizeof(buf), fmt, ap);
 	if (n > 0) {
-		SC_LanguageClient::instance()->postFlush(buf, sc_min(n, sizeof(buf) - 1));
+		SC_LanguageClient *client = SC_LanguageClient::lockedInstance();
+		if (client) client->postFlush(buf, sc_min(n, sizeof(buf) - 1));
+		SC_LanguageClient::unlockInstance();
 	}
 }
 
 void postText(const char *str, long len)
 {
-	SC_LanguageClient::instance()->postFlush(str, len);
+	SC_LanguageClient *client = SC_LanguageClient::lockedInstance();
+	if (client) client->postFlush(str, len);
+	SC_LanguageClient::unlockInstance();
 }
 
 void postChar(char c)
 {
-	SC_LanguageClient::instance()->postFlush(&c, sizeof(char));
+	SC_LanguageClient *client = SC_LanguageClient::lockedInstance();
+	if (client) client->postFlush(&c, sizeof(char));
+	SC_LanguageClient::unlockInstance();
 }
 
 void error(const char *fmt, ...)
@@ -382,7 +378,9 @@ void error(const char *fmt, ...)
 	va_start(ap, fmt);
 	int n = vsnprintf(buf, sizeof(buf), fmt, ap);
 	if (n > 0) {
-		SC_LanguageClient::instance()->postError(buf, sc_min(n, sizeof(buf) - 1));
+		SC_LanguageClient *client = SC_LanguageClient::lockedInstance();
+		if (client) client->postError(buf, sc_min(n, sizeof(buf) - 1));
+		SC_LanguageClient::unlockInstance();
 	}
 }
 

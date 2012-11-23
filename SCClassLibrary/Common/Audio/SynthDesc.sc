@@ -1,13 +1,12 @@
 IODesc {
-	var <>rate, <>numberOfChannels, <>startingChannel;
+	var <>rate, <>numberOfChannels, <>startingChannel, <>type;
 
-	*new { arg rate, numberOfChannels, startingChannel="?";
-		^super.newCopyArgs(rate, numberOfChannels, startingChannel)
+	*new { arg rate, numberOfChannels, startingChannel="?", type;
+		^super.newCopyArgs(rate, numberOfChannels, startingChannel, type)
 	}
 
 	printOn { arg stream;
-		stream << rate.asString << " " << startingChannel.source
-				<< " " << numberOfChannels << "\n"
+		stream << rate.asString << " " << type.name << " " << startingChannel << " " << numberOfChannels
 	}
 }
 
@@ -15,7 +14,7 @@ IODesc {
 SynthDesc {
 	classvar <>mdPlugin, <>populateMetadataFunc;
 
-	var <>name, <>controlNames;
+	var <>name, <>controlNames, <>controlDict;
 	var <>controls, <>inputs, <>outputs;
 	var <>metadata;
 
@@ -88,6 +87,7 @@ SynthDesc {
 
 		inputs = [];
 		outputs = [];
+		controlDict = IdentityDictionary.new;
 
 		name = stream.getPascalString;
 
@@ -104,22 +104,27 @@ SynthDesc {
 
 		controls = Array.fill(numControls)
 			{ |i|
-				ControlName("?", i, '?', def.controls[i]);
+				ControlName('?', i, '?', def.controls[i]);
 			};
 
 		numControlNames = stream.getInt16;
 		numControlNames.do
 			{
 				var controlName, controlIndex;
-				controlName = stream.getPascalString;
+				controlName = stream.getPascalString.asSymbol;
 				controlIndex = stream.getInt16;
 				controls[controlIndex].name = controlName;
 				controlNames = controlNames.add(controlName);
+				controlDict[controlName] = controls[controlIndex];
 			};
 
 		numUGens = stream.getInt16;
 		numUGens.do {
 			this.readUGenSpec(stream);
+		};
+
+		controls.inject(nil) {|z,y|
+			if(y.name=='?') { z.defaultValue = z.defaultValue.asArray.add(y.defaultValue); z } { y }
 		};
 
 		def.controlNames = controls.select {|x| x.name.notNil };
@@ -148,7 +153,7 @@ SynthDesc {
 	readUGenSpec { arg stream;
 		var ugenClass, rateIndex, rate, numInputs, numOutputs, specialIndex;
 		var inputSpecs, outputSpecs;
-		var bus;
+		var addIO;
 		var ugenInputs, ugen;
 		var control;
 
@@ -192,29 +197,29 @@ SynthDesc {
 		ugen = ugenClass.newFromDesc(rate, numOutputs, ugenInputs, specialIndex).source;
 		ugen.addToSynth(ugen);
 
+		addIO = {|list, nchan|
+			var b = ugen.inputs[0];
+			if (b.class == OutputProxy and: {b.source.isKindOf(Control)}) {
+				control = controls.detect {|item| item.index == (b.outputIndex+b.source.specialIndex) };
+				if (control.notNil) { b = control.name };
+			};
+			list.add( IODesc(rate, nchan, b, ugenClass))
+		};
+
 		if (ugenClass.isControlUGen) {
+			// Control.newFromDesc does not set the specialIndex, since it doesn't call Control-init.
+			// Therefore we fill it in here:
+			ugen.specialIndex = specialIndex;
 			numOutputs.do { |i|
 				controls[i+specialIndex].rate = rate;
 			}
 		} {
-			if (ugenClass.isInputUGen) {
-				bus = ugen.inputs[0].source;
-				if (bus.class.isControlUGen) {
-					control = controls.detect {|item| item.index == bus.specialIndex };
-					if (control.notNil) { bus = control.name };
-				};
-				inputs = inputs.add( IODesc(rate, numOutputs, bus))
-			} {
-			if (ugenClass.isOutputUGen) {
-				bus = ugen.inputs[0].source;
-				if (bus.class.isControlUGen) {
-					control = controls.detect {|item| item.index == bus.specialIndex };
-					if (control.notNil) { bus = control.name };
-				};
-				outputs = outputs.add( IODesc(rate, numInputs - ugenClass.numFixedArgs, bus))
-			} {
+			case
+			{ugenClass.isInputUGen} {inputs = addIO.value(inputs, ugen.channels.size)}
+			{ugenClass.isOutputUGen} {outputs = addIO.value(outputs, ugen.numAudioChannels)}
+			{
 				canFreeSynth = canFreeSynth or: { ugen.canFreeSynth };
-			}}
+			};
 		};
 	}
 
@@ -255,8 +260,8 @@ Use of this synth in Patterns will not detect argument names automatically becau
 			};
 			controls.do {|controlName, i|
 				var name, name2;
-				name = controlName.name;
-				if (name.asString != "?") {
+				name = controlName.name.asString;
+				if (name != "?") {
 					if (name == "gate") {
 						hasGate = true;
 						if(msgFuncKeepGate) {
@@ -279,8 +284,8 @@ Use of this synth in Patterns will not detect argument names automatically becau
 			comma = false;
 			controls.do {|controlName, i|
 				var name, name2;
-				name = controlName.name;
-				if (name.asString != "?") {
+				name = controlName.name.asString;
+				if (name != "?") {
 					if (msgFuncKeepGate or: { name != "gate" }) {
 						if (name[1] == $_) { name2 = name.drop(2) } { name2 = name };
 						stream << "\t" << name2 << " !? { x" << suffix

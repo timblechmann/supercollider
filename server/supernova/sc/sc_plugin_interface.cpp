@@ -45,9 +45,25 @@
 #undef scfft_destroy
 
 namespace nova {
+
+spin_lock log_guard; // needs to be acquired for logging from the helper threads!
+
 namespace {
 
-static spin_lock log_guard; // needs to be acquired for logging from the helper threads!
+inline Node * as_Node(server_node * node)
+{
+    if (node == NULL)
+        return NULL;
+
+    // hack!!! we only assume that the 32bit integer mID member can be accessed via Node
+    if (node->is_synth()) {
+        sc_synth * s = static_cast<sc_synth*>(node);
+        return &s->mNode;
+    } else {
+        void * nodePointer = &node->node_id;
+        return (Node*)nodePointer;
+    }
+}
 
 void pause_node(Unit * unit)
 {
@@ -268,6 +284,36 @@ void free_parent_group(Unit * unit)
     sc_factory->add_done_node(group);
 }
 
+bool get_scope_buffer(World *inWorld, int index, int channels, int maxFrames, ScopeBufferHnd &hnd)
+{
+    scope_buffer_writer writer = instance->get_scope_buffer_writer( index, channels, maxFrames );
+
+    if( writer.valid() ) {
+        hnd.internalData = writer.buffer;
+        hnd.data = writer.data();
+        hnd.channels = channels;
+        hnd.maxFrames = maxFrames;
+        return true;
+    }
+    else {
+        hnd.internalData = 0;
+        return false;
+    }
+}
+
+void push_scope_buffer(World *inWorld, ScopeBufferHnd &hnd, int frames)
+{
+    scope_buffer_writer writer(reinterpret_cast<scope_buffer*>(hnd.internalData));
+    writer.push(frames);
+    hnd.data = writer.data();
+}
+
+void release_scope_buffer(World *inWorld, ScopeBufferHnd &hnd)
+{
+    scope_buffer_writer writer(reinterpret_cast<scope_buffer*>(hnd.internalData));
+    instance->release_scope_buffer_writer( writer );
+}
+
 } /* namespace */
 } /* namespace nova */
 
@@ -361,6 +407,18 @@ void node_end(struct Node * node)
     nova::server_node * s = nova::instance->find_node(node->mID);
     nova::sc_factory->add_done_node(s);
 }
+
+void node_set_run(struct Node * node, int run)
+{
+    using namespace nova;
+    server_node * s = instance->find_node(node->mID);
+
+    if (run == 0)
+        sc_factory->add_pause_node(s);
+    else
+        sc_factory->add_resume_node(s);
+}
+
 
 int print(const char *fmt, ...)
 {
@@ -478,6 +536,12 @@ void world_unlock(World *world)
     world->mNRTLock->Unlock();
 }
 
+Node * get_node(World *world, int id)
+{
+    nova::server_node * node = nova::instance->find_node(id);
+    return nova::as_Node(node);
+}
+
 void send_node_reply(Node* node, int reply_id, const char* command_name, int argument_count, const float* values)
 {
     if (!nova::sc_factory->world.mRealTime)
@@ -526,10 +590,11 @@ inline void initialize_rate(Rate & rate, double sample_rate, int blocksize)
 }
 
 
-void sc_plugin_interface::initialize(server_arguments const & args)
+void sc_plugin_interface::initialize(server_arguments const & args, float * control_busses)
 {
     done_nodes.reserve(64);
     pause_nodes.reserve(16);
+    resume_nodes.reserve(16);
     freeAll_nodes.reserve(16);
     freeDeep_nodes.reserve(16);
 
@@ -541,6 +606,8 @@ void sc_plugin_interface::initialize(server_arguments const & args)
 
     /* interface functions */
     sc_interface.fNodeEnd = &node_end;
+    sc_interface.fGetNode = &get_node;
+    sc_interface.fNodeRun = &node_set_run;
     sc_interface.fPrint = &print;
     sc_interface.fDoneAction = &done_action;
 
@@ -580,16 +647,20 @@ void sc_plugin_interface::initialize(server_arguments const & args)
     sc_interface.fSCfftDoFFT = &scfft_dofft;
     sc_interface.fSCfftDoIFFT = &scfft_doifft;
 
+    /* scope API */
+    sc_interface.fGetScopeBuffer = &get_scope_buffer;
+    sc_interface.fPushScopeBuffer = &push_scope_buffer;
+    sc_interface.fReleaseScopeBuffer = &release_scope_buffer;
+
     /* osc plugins */
     sc_interface.fDoAsynchronousCommand = &do_asynchronous_command;
 
     /* initialize world */
     /* control busses */
-    world.mControlBus = new float[args.control_busses];
+    world.mControlBus = control_busses;
     world.mNumControlBusChannels = args.control_busses;
     world.mControlBusTouched = new int32[args.control_busses];
-    for (size_t i = 0; i != args.control_busses; ++i)
-        world.mControlBusTouched[i] = -1;
+    std::fill(world.mControlBusTouched, world.mControlBusTouched + args.control_busses, -1);
 
     /* audio busses */
     audio_busses.initialize(args.audio_busses, args.blocksize);
@@ -598,8 +669,8 @@ void sc_plugin_interface::initialize(server_arguments const & args)
     world.mNumAudioBusChannels = args.audio_busses;
     world.mAudioBusTouched = new int32[args.audio_busses];
     world.mAudioBusLocks = audio_busses.locks;
-    for (size_t i = 0; i != args.audio_busses; ++i)
-        world.mAudioBusTouched[i]   = -1;
+    world.mControlBusLock = new spin_lock();
+    std::fill(world.mAudioBusTouched, world.mAudioBusTouched + args.audio_busses, -1);
 
     /* audio buffers */
     world.mNumSndBufs = args.buffers;
@@ -639,6 +710,9 @@ void sc_done_action_handler::update_nodegraph(void)
 {
     std::for_each(done_nodes.begin(), done_nodes.end(), boost::bind(&nova_server::free_node, instance, _1));
     done_nodes.clear();
+
+    std::for_each(resume_nodes.begin(), resume_nodes.end(), boost::bind(&nova_server::node_resume, instance, _1));
+    resume_nodes.clear();
 
     std::for_each(pause_nodes.begin(), pause_nodes.end(), boost::bind(&nova_server::node_pause, instance, _1));
     pause_nodes.clear();
@@ -711,16 +785,24 @@ inline void sndbuf_copy(SndBuf * dest, const SndBuf * src)
     dest->sndfile = src->sndfile;
 }
 
-void read_channel(SndfileHandle & sf, uint32_t channel_count, const uint32_t * channel_data,
-                  uint32 frames, sample * data)
+static inline size_t compute_remaining_samples(size_t frames_per_read, size_t already_read, size_t total_frames)
+{
+    int remain = frames_per_read;
+    if (already_read + frames_per_read > total_frames)
+        remain = total_frames - already_read;
+    return remain;
+}
+
+void read_channel(SndfileHandle & sf, uint32_t channel_count, const uint32_t * channel_data, uint32 total_frames, sample * data)
 {
     const unsigned int frames_per_read = 1024;
     sized_array<sample> read_frame(sf.channels() * frames_per_read);
 
     if (channel_count == 1) {
         // fast-path for single-channel read
-        for (size_t i = 0; i < frames; i += frames_per_read) {
-            size_t read = sf.readf(read_frame.c_array(), frames_per_read);
+        for (size_t i = 0; i < total_frames; i += frames_per_read) {
+            int remaining_samples = compute_remaining_samples(frames_per_read, i, total_frames);
+            size_t read = sf.readf(read_frame.c_array(), remaining_samples);
 
             size_t channel_mapping = channel_data[0];
             for (size_t frame = 0; frame != read; ++frame) {
@@ -729,8 +811,9 @@ void read_channel(SndfileHandle & sf, uint32_t channel_count, const uint32_t * c
             }
         }
     } else {
-        for (size_t i = 0; i < frames; i += frames_per_read) {
-            size_t read = sf.readf(read_frame.c_array(), frames_per_read);
+        for (size_t i = 0; i < total_frames; i += frames_per_read) {
+            int remaining_samples = compute_remaining_samples(frames_per_read, i, total_frames);
+            size_t read = sf.readf(read_frame.c_array(), remaining_samples);
 
             for (size_t frame = 0; frame != read; ++frame) {
                 for (size_t c = 0; c != channel_count; ++c) {

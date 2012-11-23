@@ -14,7 +14,9 @@ OSXPlatform : UnixPlatform
 
 	startupFiles {
 		var filename = "startup.rtf";
-		^[this.systemAppSupportDir +/+ filename, this.userAppSupportDir +/+ filename];
+		var deprecated = [this.systemAppSupportDir +/+ filename, this.userAppSupportDir +/+ filename];
+		Platform.deprecatedStartupFiles(deprecated);
+		^(deprecated ++ super.startupFiles)
 	}
 
 	startup {
@@ -37,8 +39,6 @@ OSXPlatform : UnixPlatform
 	defaultGUIScheme { if (GUI.get(\qt).notNil) {^\qt} {^\cocoa} }
 	defaultHIDScheme { ^\osx_hid }
 
-	recompile { _Recompile }
-
 	setDeferredTaskInterval { |interval| _SetDeferredTaskInterval }
 
 	findHelpFile { | string |
@@ -53,12 +53,12 @@ OSXPlatform : UnixPlatform
 		_Mouse_getCoords
 		^this.primitiveFailed
 	}
-	
+
 	// for now just write syntax colours. Could be other things.
 	writeClientCSS {
 		var theme, file, string;
 		theme = Document.theme;
-		("mkdir"+SCDoc.helpTargetDir.escapeChar($ )).systemCmd;
+		SCDoc.helpTargetDir.mkdir;
 		file = File.open(SCDoc.helpTargetDir ++ "/frontend.css", "w");
 		string = ".str { color: %; } /* strings */
 .kwd { color: %; } /* special values like true, nil.. */
@@ -71,16 +71,16 @@ OSXPlatform : UnixPlatform
 .dec { color: %; } /* declarations like var, const... */
 .atn { color: %; } /* symbols */
 .atv { color: %; } /* environment vars */".format(
-			theme.stringColor.hexString, 
-			theme.specialValsColor.hexString, 
-			theme.commentColor.hexString, 
-			theme.classColor.hexString, 
-			theme.numberColor.hexString, 
-			theme.puncColor.hexString, 
-			theme.textColor.hexString, 
-			theme.specialVarsColor.hexString, 
-			theme.declColor.hexString, 
-			theme.symbolColor.hexString, 
+			theme.stringColor.hexString,
+			theme.specialValsColor.hexString,
+			theme.commentColor.hexString,
+			theme.classColor.hexString,
+			theme.numberColor.hexString,
+			theme.puncColor.hexString,
+			theme.textColor.hexString,
+			theme.specialVarsColor.hexString,
+			theme.declColor.hexString,
+			theme.symbolColor.hexString,
 			theme.environColor.hexString
 		);
 		file.putString(string);

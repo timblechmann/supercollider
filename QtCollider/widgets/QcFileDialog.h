@@ -25,6 +25,7 @@
 #include "../Common.h"
 
 #include <QFileDialog>
+#include <QPointer>
 
 class QcFileDialog : public QObject
 {
@@ -32,11 +33,11 @@ class QcFileDialog : public QObject
 
 public:
 
-  QcFileDialog() {
-    dialog = new QFileDialog();
-    dialog->setDirectory( QDir::home() );
-    setParent( dialog );
-    connect( dialog, SIGNAL(finished(int)), this, SLOT(onFinished(int)) );
+  Q_INVOKABLE QcFileDialog( int fileMode = QFileDialog::ExistingFile,
+                            int acceptMode = QFileDialog::AcceptOpen );
+
+  ~QcFileDialog() {
+    delete dialog;
   }
 
   QFileDialog *theDialog() { return dialog; }
@@ -50,7 +51,7 @@ private Q_SLOTS:
 
   void show() {
     dialog->exec();
-    dialog->deleteLater();
+    delete dialog;
   }
 
   void onFinished( int res ) {
@@ -69,7 +70,7 @@ private Q_SLOTS:
 
 private:
 
-  QFileDialog *dialog;
+  QPointer<QFileDialog> dialog;
 };
 
 #endif // QC_FILE_DIALOG_H

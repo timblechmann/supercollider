@@ -1,18 +1,15 @@
-QTopScrollWidget : QObject {
+QTopScrollWidget : QScrollCanvas {
   var <>win;
-  *new { ^super.new("QcScrollWidget") }
-  doDrawFunc { win.drawHook.value(win); }
+  doDrawFunc { win.drawFunc.value(win); }
 }
 
 QScrollTopView : QScrollView {
   var >window;
 
-  *qtClass {^"QcWindow"}
+  *qtClass {^'QcScrollWindow'}
 
-  // NOTE: Since the scroll arg is true, this should actually
-  // instantiate a QcScrollArea
   *new { arg win, name, bounds, resizable, border;
-    ^super.newCustom([name, bounds, resizable, border, true /*scroll*/])
+    ^super.newCustom([name, bounds, resizable, border])
           .initQScrollTopView(win);
   }
 
@@ -28,13 +25,13 @@ QScrollTopView : QScrollView {
 
   bounds {
     var r;
-    r = this.getProperty( \geometry, Rect.new );
+    r = this.getProperty( \geometry );
     ^r.moveTo(0,0);
   }
 
   bounds_ { arg rect;
     var rNew = rect.asRect;
-    var rOld = this.getProperty( \geometry, Rect.new );
+    var rOld = this.getProperty( \geometry );
     this.setProperty( \geometry, rOld.resizeTo( rNew.width, rNew.height ) );
   }
 
@@ -47,12 +44,10 @@ QTopView : QView {
   var >window;
   var <background;
 
-  *qtClass {^"QcWindow"}
+  *qtClass {^'QcWindow'}
 
-  // NOTE: Since the scroll arg is false, this should actually
-  // instantiate a QcCustomPainted
   *new { arg win, name, bounds, resizable, border;
-    ^super.newCustom([name, bounds, resizable, border, false /*scroll*/])
+    ^super.newCustom([name, bounds, resizable, border])
           .initQTopView(win);
   }
 
@@ -60,13 +55,13 @@ QTopView : QView {
 
   bounds {
     var r;
-    r = this.getProperty( \geometry, Rect.new );
+    r = this.getProperty( \geometry );
     ^r.moveTo(0,0);
   }
 
   bounds_ { arg rect;
     var rNew = rect.asRect;
-    var rOld = this.getProperty( \geometry, Rect.new );
+    var rOld = this.getProperty( \geometry );
     this.setProperty( \geometry, rOld.resizeTo( rNew.width, rNew.height ) );
   }
 
@@ -79,14 +74,14 @@ QTopView : QView {
 
   findWindow { ^window; }
 
-  doDrawFunc { window.drawHook.value(window) }
+  doDrawFunc { window.drawFunc.value(window) }
 }
 
 QWindow
 {
   classvar <allWindows, <>initAction;
 
-  var resizable, <drawHook, <onClose;
+  var resizable, <drawFunc, <onClose;
   var <view;
 
   //TODO
@@ -98,25 +93,27 @@ QWindow
   }
 
   *screenBounds {
-    ^this.prScreenBounds( Rect.new );
+    _QWindow_ScreenBounds
   }
 
   *availableBounds {
-    ^this.prAvailableBounds( Rect() );
+    _QWindow_AvailableGeometry
   }
 
   *closeAll {
     allWindows.copy.do { |win| win.close };
   }
 
-  *new { arg name,
+  /* NOTE:
+    - 'server' is only for compatibility with SwingOSC
+    - all args have to be of correct type for QWidget constructor to match!
+  */
+  *new { arg name="",
          bounds,
          resizable = true,
          border = true,
          server,
          scroll = false;
-
-    //NOTE server is only for compatibility with SwingOSC
 
     if( bounds.isNil ) {
       bounds = Rect(0,0,400,400).center_( QWindow.availableBounds.center );
@@ -155,12 +152,12 @@ QWindow
   }
 
   bounds {
-    ^QWindow.flipY( view.getProperty( \geometry, Rect.new ) );
+    ^QWindow.flipY( view.getProperty( \geometry ) );
   }
 
   setInnerExtent { arg w, h;
     // bypass this.bounds, to avoid QWindow flipping the y coordinate
-    var r = view.getProperty(\geometry, Rect.new );
+    var r = view.getProperty(\geometry );
     view.setProperty(\geometry, r.resizeTo( w, h ); )
   }
 
@@ -168,9 +165,9 @@ QWindow
 
   background_ { arg aColor; view.background = aColor; }
 
-  drawHook_ { arg aFunction;
+  drawFunc_ { arg aFunction;
     view.drawingEnabled = aFunction.notNil;
-    drawHook = aFunction;
+    drawFunc = aFunction;
   }
 
   setTopLeftBounds{ arg rect, menuSpacer=45;
@@ -220,16 +217,6 @@ QWindow
   *flipY { arg aRect;
     var flippedTop = QWindow.screenBounds.height - aRect.top - aRect.height;
     ^Rect( aRect.left, flippedTop, aRect.width, aRect.height );
-  }
-
-  *prScreenBounds { arg return;
-    _QWindow_ScreenBounds
-    ^this.primitiveFailed
-  }
-
-  *prAvailableBounds { arg return;
-    _QWindow_AvailableGeometry
-    ^this.primitiveFailed
   }
 
   *addWindow { arg window;

@@ -122,7 +122,7 @@ Quarks
 		d = (Platform.userExtensionDir +/+ local.name).escapeChar($ );
 		if(d.pathMatch.isEmpty,{
 			("creating: " + d).inform;
-			("mkdir -p" + d).systemCmd;
+			d.mkdir;
 		});
 	}
 	checkedOut {
@@ -200,7 +200,7 @@ Quarks
 		// Ensure the correct folder-hierarchy exists first
 		dirname = (Platform.userExtensionDir +/+  local.name +/+ q.path).dirname;
 		if(File.exists(dirname).not, {
-			("mkdir -p " + dirname.escapeChar($ )).systemCmd;
+			dirname.mkdir
 		});
 
 		// install via symlink to Extensions/<quarks-dir>
@@ -315,7 +315,7 @@ Quarks
 	*repos { ^this.global.repos }
 	*help  {|name| ^this.global.help(name) }
 	*gui {
-		^this.global.gui
+		if( GUI.id === \qt ) { ^this.global.qtGui } { ^this.global.gui }
 	}
 
 	// a gui for Quarks. 2007 by LFSaw.de
@@ -341,8 +341,7 @@ Quarks
 
 		// note, this doesn't actually contact svn
 		// it only reads the DIRECTORY entries you've already checked out
-		quarks = this.repos.quarks.copy
-			.sort({ |a, b| a.name < b.name });
+		quarks = this.repos.quarks.copy;
 
 		scrB = GUI.window.screenBounds;
 		height = min(quarks.size * 25 + 120, scrB.height - 60);
@@ -352,7 +351,7 @@ Quarks
 		window.view.decorator = flowLayout;
 
 		caption = GUI.staticText.new(window, Rect(20,15,400,30));
-		caption.font_( GUI.font.new( GUI.font.defaultSansFace, 24 ));
+		caption.font_( Font.sansSerif( 24 ));
 		caption.string = this.name;
 		window.view.decorator.nextLine;
 
@@ -384,7 +383,7 @@ Quarks
 			GUI.button.new(window, Rect(15,15,150,20))
 			.states_([["open quark directory", nil, Color.gray(0.5, 0.8)]])
 			.action_{ arg butt;
-				"open %".format(this.local.path.escapeChar($ )).unixCmd;
+				openOS(this.local.path.escapeChar($ ))
 			};
 		};
 
@@ -426,7 +425,7 @@ Quarks
 		window.view.decorator.nextLine;
 
 		warning = GUI.staticText.new(window, Rect(20,15,400,30));
-		warning.font_( GUI.font.new( GUI.font.defaultSansFace, 18 ));
+		warning.font_( Font.sansSerif( 18 ));
 
 		window.view.decorator.nextLine;
 		GUI.staticText.new( window, 492 @ 1 ).background_( Color.grey );
@@ -443,4 +442,284 @@ Quarks
 		^window;
 	}
 
+	qtGui {
+		var window, lblCaption,
+			btnUpdate, btnHelp, btnUpdateQuarks, btnOpenDir, btnReset, btnApply,
+			lblStatus, lblExplanation, quarksView,
+			infoView, btnQuarkHelp, btnQuarkOpen, btnQuarkClasses,
+			btnQuarkMethods, txtDescription, btnCloseDetails;
+		var quarks, views, curQuark;
+		var refresh, msgWorking, msgDone;
+		var screen, palette, gizmo;
+
+		refresh = {
+			quarksView.invokeMethod( \clear );
+			quarks = this.repos.quarks.copy;
+			quarksView.canSort = false;
+			views = quarks.collect{|quark|
+				var qView = QuarkView.new(quarksView, 500@20, quark,
+					this.installed.detect{|it| it == quark}.notNil);
+				qView;
+			};
+			quarksView.canSort = true;
+			quarksView.sort( 1 );
+			quarksView.invokeMethod( \resizeColumnToContents, 0 );
+			quarksView.invokeMethod( \resizeColumnToContents, 1 );
+			views
+		};
+
+		msgWorking = { arg msg;
+			lblStatus.background = palette.buttonColor.blend(Color.yellow,0.2);
+			lblStatus.string = msg;
+		};
+
+		msgDone =  { arg msg;
+			lblStatus.background = palette.buttonColor.blend(Color.green,0.2);
+			lblStatus.string = msg;
+		};
+
+		palette = GUI.current.palette;
+		screen = Window.flipY(Window.availableBounds);
+		window = Window( this.name, Rect( 0, 0, 700, screen.height * 0.9 ).center_(screen.center) );
+
+		lblCaption = StaticText().font_( GUI.font.new(size:16,usePointSize:true) ).string_(this.name);
+
+		btnUpdate = Button()
+			.states_([["Update Quark Listing"]])
+			.setProperty( \toolTip, "Download the latest information and update the Quarks listing")
+			.action_({
+				quarksView.enabled = false;
+				msgWorking.value("Downloading the latest information...");
+				AppClock.sched( 0.2, {
+					protect {
+						this.updateDirectory;
+					} {
+						refresh.value;
+						quarksView.enabled = true;
+						msgDone.value("Quarks listing has been updated with the latest information.")
+					}
+				});
+				this
+			});
+
+		btnUpdateQuarks = Button()
+			.states_([["Update Quarks"]])
+			.setProperty( \toolTip, "Update installed Quarks")
+			.action_({
+				quarksView.enabled = false;
+				msgWorking.value("Updating installed Quarks...");
+				AppClock.sched( 0.2, {
+					protect {
+						this.update;
+					} {
+						refresh.value;
+						quarksView.enabled = true;
+						msgDone.value("Quarks have been updated." +
+							" You should recompile the class library for changes to take effect.")
+					}
+				});
+				this
+			});
+
+		btnHelp = Button().states_([["Help"]])
+			.setProperty( \toolTip, "Browse help for all the Quarks - Not yet available!")
+			.enabled_(false);
+
+		btnOpenDir = Button().states_([["Directory"]])
+			.setProperty( \toolTip, "Open the local Quarks directory")
+			.action_({ openOS(this.local.path) });
+
+		btnReset = Button()
+			.states_([["Reset"]])
+			.setProperty( \toolTip, "Clear the marked changes")
+			.action_({ arg butt; views.do(_.reset) });
+
+		btnApply = Button().states_([["Apply",nil,Color.blue.blend(palette.buttonColor,0.6)]])
+			.setProperty( \toolTip, "Apply the marked changes")
+			.action_({ arg butt;
+				quarksView.enabled = false;
+				msgWorking.value("Applying changes, please wait...");
+				AppClock.sched( 0.2, {
+					protect {
+						views.do{|qView|
+							qView.toBeInstalled.if({
+								this.install(qView.quark.name);
+								qView.flush
+							});
+							qView.toBeDeinstalled.if({
+								this.uninstall(qView.quark.name);
+								qView.flush;
+							})
+						};
+					} {
+						msgDone.value("Changes applied." +
+							"You should recompile the class library for changes to take effect."
+						);
+						quarksView.enabled = true;
+					}
+				});
+			});
+
+		lblExplanation = StaticText().string_(
+			"\"+\" installed, \"-\" not installed, \"*\" to install, \"x\" to uninstall"
+		);
+
+		lblStatus = StaticText().font_( GUI.font.new( size:12, usePointSize:true ) );
+
+		quarksView = \QTreeView.asClass.new
+			.setProperty( \rootIsDecorated, false )
+			.columns_([nil,"Name","Summary"])
+			.itemPressedAction_({ |v|
+				infoView.visible = true;
+			})
+			.onItemChanged_({ |v|
+				var curItem, curView, inst;
+				curItem = v.currentItem;
+				curQuark = nil;
+				if( curItem.notNil ) {
+					curView = views.detect { |view| view.treeItem == curItem };
+					if( curView.notNil ) {
+						curQuark = curView.quark;
+						txtDescription.string = curQuark.longDesc;
+						btnQuarkOpen.enabled = curQuark.isLocal;
+						inst = this.installed.detect{|it| it == curQuark}.notNil;
+						btnQuarkClasses.enabled = inst;
+						btnQuarkMethods.enabled = inst;
+					}
+				}{
+					infoView.visible = false
+				}
+			});
+
+		txtDescription = TextView(bounds:10@10)
+			.font_( GUI.font.new( size:10, usePointSize:true ) )
+			.tabWidth_(15)
+			.autohidesScrollers_( true )
+			.hasVerticalScroller_( true )
+			.editable_( false )
+			//.minSize_(Size(0,0));
+			.minHeight_(50);
+
+		btnQuarkHelp = Button()
+			.states_([["Help"]])
+			.setProperty( \toolTip, "Show help for this Quark")
+			.action_({
+				curQuark.openHelpFile
+			});
+
+		btnQuarkOpen = Button()
+			.states_([["Source"]])
+			.setProperty( \toolTip, "Open the source directory of this Quark")
+			.action_({
+				openOS( "%/%".format(Quarks.local.path, curQuark.path) );
+			});
+
+		btnQuarkClasses = Button()
+			.states_([["Classes"]])
+			.setProperty( \toolTip, "Show list of classes defined by this Quark")
+			.enabled_(false)
+			.action_({
+				var cls = curQuark.definesClasses;
+				var tree, item, buts = [
+					Button().states_([["Browse"]]).action_({
+						cls[item.index].browse;
+					}),
+					Button().states_([["Help"]]).action_({
+						cls[item.index].openHelpFile;
+					}),
+					Button().states_([["Source"]]).action_({
+						cls[item.index].openCodeFile;
+					})
+				];
+				buts.do(_.enabled_(false));
+				Window("% Classes".format(curQuark.name)).layout_(
+					\QVLayout.asClass.new(
+						tree = \QTreeView.asClass.new
+							.setProperty( \rootIsDecorated, false )
+							.columns_(["Classes"])
+							.onItemChanged_({|v| item = v.currentItem}),
+						\QHLayout.asClass.new(*buts)
+					)
+				).front;
+				if(cls.size>0) {
+					cls.do {|c| tree.addItem([c.name.asString])};
+					tree.itemPressedAction = { buts.do(_.enabled_(true)) }
+				} {
+					tree.addItem(["No classes"]);
+				};
+				tree.invokeMethod( \resizeColumnToContents, 0 );
+			});
+
+		btnQuarkMethods = Button()
+			.states_([["Ext methods"]])
+			.setProperty( \toolTip, "Show list of extension methods added by this Quark")
+			.enabled_(false)
+			.action_({
+				var mets = curQuark.definesExtensionMethods;
+				var tree, item, buts = [
+					Button().states_([["Browse"]]).action_({
+						mets[item.index].ownerClass.browse;
+					}),
+					Button().states_([["Help"]]).action_({
+						mets[item.index].openHelpFile;
+					}),
+					Button().states_([["Source"]]).action_({
+						mets[item.index].openCodeFile;
+					})
+				];
+				buts.do(_.enabled_(false));
+				Window("% Extension Methods".format(curQuark.name)).layout_(
+					\QVLayout.asClass.new(
+						tree = \QTreeView.asClass.new
+							.setProperty( \rootIsDecorated, false )
+							.columns_(["Class","Method"])
+							.onItemChanged_({|v| item = v.currentItem}),
+						\QHLayout.asClass.new(*buts)
+					)
+				).front;
+				if(mets.size>0) {
+					mets.collect{|m|
+						var x = m.ownerClass.name;
+						tree.addItem(if(x.isMetaClassName) {[x.asString[5..],"*"++m.name]} {[x.asString,"-"++m.name]});
+					};
+					tree.itemPressedAction = { buts.do(_.enabled_(true)) }
+				} {
+					tree.addItem([nil,"No extension methods"]);
+				};
+				tree.invokeMethod( \resizeColumnToContents, 0 );
+				tree.invokeMethod( \resizeColumnToContents, 1 );
+			});
+
+		btnCloseDetails = StaticText()
+			.string_("X")
+			.align_(\center)
+			.setProperty( \toolTip, "Hide Quark information panel")
+			.mouseDownAction_({
+				infoView.visible = false;
+			});
+		gizmo = btnCloseDetails.sizeHint;
+		gizmo.width = gizmo.width + 20;
+		btnCloseDetails.fixedSize = gizmo;
+
+		infoView = View();
+		infoView.layout = \QVLayout.asClass.new(
+			\QHLayout.asClass.new( btnCloseDetails, btnQuarkHelp, btnQuarkOpen, btnQuarkClasses, btnQuarkMethods, nil ).margins_(0),
+			txtDescription
+		).spacing_(0).margins_(0);
+		infoView.visible = false;
+
+		window.layout =
+			\QVLayout.asClass.new(
+				lblCaption,
+				\QHLayout.asClass.new( btnUpdate, btnUpdateQuarks, btnOpenDir, btnHelp, nil ),
+				lblStatus,
+				\QHLayout.asClass.new( btnReset, btnApply, [lblExplanation, s:1] ).margins_(0),
+				[quarksView, s:5],
+				[infoView, s:2]
+			);
+
+		refresh.value;
+		window.front;
+		^window;
+	}
 }

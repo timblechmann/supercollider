@@ -7,7 +7,7 @@ HelpBrowser {
 	var <window;
 	var webView;
 	var animCount = 0;
-	var txtPath;
+	var srchBox;
 	var openNewWin;
 
 	*initClass {
@@ -23,7 +23,10 @@ HelpBrowser {
 	*instance {
 		if( singleton.isNil ) {
 			singleton = this.new;
-			singleton.window.onClose = { singleton = nil; };
+			singleton.window.onClose = {
+				singleton.stopAnim;
+				singleton = nil;
+			};
 		};
 		^singleton;
 	}
@@ -49,6 +52,25 @@ HelpBrowser {
 	*openHelpFor {|text|
 		this.goTo(SCDoc.findHelpFile(text));
 	}
+	*openHelpForMethod {|method|
+		var cls = method.ownerClass;
+		var met = method.name.asString;
+		if(cls.isMetaClass) {
+			cls = cls.name.asString.drop(5);
+			met = "*"++met;
+		} {
+			cls = cls.name.asString;
+			met = "-"++met;
+		};
+		this.goTo(Help.dir+/+"Classes"+/+cls++".html#"++met);
+	}
+	*getOldWrapUrl {|url|
+		var c;
+		^("file://" ++ SCDoc.helpTargetDir +/+ "OldHelpWrapper.html#"++url++"?"++
+		SCDoc.helpTargetDir +/+ if((c=url.basename.split($.).first).asSymbol.asClass.notNil)
+			{"Classes" +/+ c ++ ".html"}
+			{"Guides/WritingHelp.html"})
+	}
 
 	goTo {|url, brokenAction|
 		var newPath, oldPath, plainTextExts = #[".sc",".scd",".txt",".schelp"];
@@ -62,6 +84,7 @@ HelpBrowser {
 			}
 		};
 
+		window.front;
 		this.startAnim;
 
 		brokenAction = brokenAction ? {SCDoc.helpTargetDir++"/BrokenLink.html#"++url};
@@ -71,15 +94,19 @@ HelpBrowser {
 				#newPath, oldPath = [url,webView.url].collect {|x|
 					if(x.notEmpty) {x.findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1][1]}
 				};
+				// detect old helpfiles and open them in OldHelpWrapper
+				if(block{|break| Help.do {|key,path| if(url.endsWith(path)) {break.value(true)}}; false}) {
+					url = HelpBrowser.getOldWrapUrl(url)
+				};
 				webView.url = url;
 				// needed since onLoadFinished is not called if the path did not change:
 				if(newPath == oldPath) {webView.onLoadFinished.value};
+				webView.focus;
 			} {|err|
 				webView.html = err.errorString;
 				err.throw;
 			};
 		}.play(AppClock);
-		window.front;
 	}
 
 	goHome { this.goTo(homeUrl); }
@@ -111,42 +138,38 @@ HelpBrowser {
 
 		h = strh + vPad;
 		x = marg; y = marg;
-		[\Home, \Back, \Forward].do { |sym|
-			var str = sym.asString;
+		[[\Back,"<"], [\Forward,">"], [\Reload, "Reload"]].do { |item|
+			var str = item[1];
 			var w = str.bounds.width + hPad;
-			toolbar[sym] = Button( window, Rect(x,y,w,h) ).states_([[str]]);
+			toolbar[item[0]] = Button( window, Rect(x,y,w,h) ).states_([[str]]);
 			x = x + w + 2;
 		};
 
-		str = "Path:";
+		x = x + 10;
+		str = "Quick lookup:";
 		w = str.bounds.width + 5;
-		x = x + 5;
-		StaticText.new( window, Rect(x, y, w, h) )
-			.string_(str)
-			.resize_(1);
+		StaticText(window, Rect(x,y,w,h)).string_(str);
 		x = x + w;
-
 		w = 200;
-		txtPath = TextField.new( window, Rect(x,y,w,h) ).resize_(1);
-		txtPath.action = {|x|
-			var path, hash, fallback;
+		srchBox = TextField.new( window, Rect(x,y,w,h) ).resize_(1);
+		if(GUI.current.id == \qt) {
+			srchBox.toolTip = "Smart quick help lookup. Prefix with # to just search.";
+		};
+		srchBox.action = {|x|
 			if(x.string.notEmpty) {
-				#path, hash = x.string.findRegexp("([^#]+)(#?.*)")[1..].flop[1];
-				fallback = {SCDoc.helpTargetDir++"/Search.html#"++x.string};
-				if(hash.isEmpty) {
-					this.goTo(SCDoc.helpTargetDir +/+ path ++ ".html", fallback)
-				} {
-					this.goTo(SCDoc.helpTargetDir +/+ path ++ ".html" ++ hash, fallback)
-				}
+				this.goTo(if(x.string.first==$#)
+					{SCDoc.helpTargetDir++"/Search.html#"++x.string.drop(1)}
+					{SCDoc.findHelpFile(x.string)}
+				);
 			}
 		};
 
 		openNewWin = aNewWin;
 		x = x + w + 10;
-		if(GUI.scheme==QtGUI) {
+		if(GUI.current.respondsTo(\checkBox)) {
 			str = "Open links in new window";
 			w = str.bounds.width + 50;
-			QCheckBox.new (window, Rect(x, y, w, h) )
+			CheckBox.new (window, Rect(x, y, w, h) )
 				.resize_(1)
 				.string_(str)
 				.value_(openNewWin)
@@ -183,14 +206,17 @@ HelpBrowser {
 		webView = WebView.new( window, Rect(x,y,w,h) ).resize_(5);
 		webView.html = "Please wait while initializing Help... (This might take several seconds the first time)";
 
+		if(webView.respondsTo(\setFontFamily)) {
+			webView.setFontFamily(\fixed, Platform.case(
+				\osx, { "Monaco" },
+				\linux, { "Andale Mono" },
+				{ "Monospace" }
+			))
+		};
+
 		webView.onLoadFinished = {
 			this.stopAnim;
-			window.name = "SuperCollider Help:"+webView.title;
-			if(webView.url.beginsWith("file://"++SCDoc.helpTargetDir)) {
-				txtPath.string = webView.url.findRegexp("file://"++SCDoc.helpTargetDir++"/([^#]+?)\\.[^\\.]+$")[1][1];
-			} {
-				txtPath.string = webView.url;
-			}
+			window.name = "SuperCollider Help: %".format(webView.title);
 		};
 		webView.onLoadFailed = { this.stopAnim };
 		webView.onLinkActivated = {|wv, url|
@@ -240,30 +266,21 @@ HelpBrowser {
 			}
 		};
 
-		toolbar[\Home].action = { this.goHome };
 		toolbar[\Back].action = { this.goBack };
 		toolbar[\Forward].action = { this.goForward };
+		toolbar[\Reload].action = { this.goTo( webView.url ) };
 		txtFind.action = { |x| webView.findText( x.string ); };
 	}
 
 	openTextFile {|path|
 		var win, winRect, txt, file, fonts;
 		path = path.replace("%20"," ").findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1][1];
-		if(Document.implementationClass.notNil) {
-			^Document.open(path);
-		};
-		if("which xdg-open >/dev/null".systemCmd==0) {
-			^("xdg-open"+path.escapeChar($ )).systemCmd;
-		};
-		winRect = Rect(0,0,600,400);
-		winRect = winRect.moveToPoint(winRect.centerIn(Window.screenBounds));
-		file = File(path,"r");
-		win = Window(bounds: winRect).name_("SuperCollider Help:"+path.basename);
-		txt = TextView(win,Rect(0,0,600,400)).resize_(5).string_(file.readAllString);
-		file.close;
-		fonts = Font.availableFonts;
-		txt.font = Font(["Monaco","Monospace"].detect {|x| fonts.includesEqual(x)} ?? {Font.defaultMonoFace}, 12);
-		win.front;
+		if(File.exists(path)) {
+			path.openDocument;
+		} {
+			webView.url = SCDoc.helpTargetDir++"/BrokenLink.html#"++path;
+			window.front;
+		}
 	}
 
 	startAnim {
@@ -293,7 +310,7 @@ HelpBrowser {
 }
 
 + Help {
-	gui {
+	*gui {
 		HelpBrowser.instance.goHome;
 	}
 }

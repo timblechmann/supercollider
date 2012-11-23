@@ -210,7 +210,6 @@ int prSymbol_SpecialIndex(struct VMGlobals *g, int numArgsPushed)
 	return errNone;
 }
 
-extern "C" double sc_strtod(const char *nptr, char **endptr);
 
 int prSymbol_AsFloat(struct VMGlobals *g, int numArgsPushed);
 int prSymbol_AsFloat(struct VMGlobals *g, int numArgsPushed)
@@ -218,7 +217,7 @@ int prSymbol_AsFloat(struct VMGlobals *g, int numArgsPushed)
 	PyrSlot *a = g->sp;
 
 	char *str = slotRawSymbol(a)->name;
-	SetFloat(a, sc_strtod(str, NULL));
+	SetFloat(a, atof(str));
 
 	return errNone;
 }
@@ -243,6 +242,19 @@ int prSymbol_matchOSCPattern(struct VMGlobals *g, int numArgsPushed)
 	return errNone;
 }
 
+int prSymbol_isMap(struct VMGlobals *g, int numArgsPushed);
+int prSymbol_isMap(struct VMGlobals *g, int numArgsPushed)
+{
+	PyrSlot *a = g->sp;
+
+	char *str = slotRawSymbol(a)->name;
+	if(strlen(str)>1 && (str[0]=='a' || str[0]=='c') && str[1]>='0' && str[1]<='9')
+		SetTrue(a);
+	else
+		SetFalse(a);
+
+	return errNone;
+}
 
 
 
@@ -266,7 +278,7 @@ void initSymbolPrimitives()
 	definePrimitive(base, index++, "_Symbol_SpecialIndex", prSymbol_SpecialIndex, 1, 0);
 	definePrimitive(base, index++, "_Symbol_AsFloat", prSymbol_AsFloat, 1, 0);
 	definePrimitive(base, index++, "_Symbol_matchOSCPattern", prSymbol_matchOSCPattern, 2, 0);
-
+	definePrimitive(base, index++, "_Symbol_IsMap", prSymbol_isMap, 1, 0);
 }
 
 

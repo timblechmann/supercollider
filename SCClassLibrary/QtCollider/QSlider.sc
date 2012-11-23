@@ -9,6 +9,19 @@ QSlider : QAbstractStepValue {
     ^super.new( parent, bounds ).initQSlider( bounds );
   }
 
+  value {
+    ^this.getProperty( \value );
+  }
+
+  value_ { arg argVal;
+    this.setProperty( \value, argVal );
+  }
+
+  valueAction_ { arg val;
+    this.value_(val);
+    action.value(this);
+  }
+
   knobColor {
     ^this.palette.buttonColor;
   }
@@ -53,10 +66,13 @@ QSlider : QAbstractStepValue {
           16r1000014, { this.increment(scale) },
           16r5b, { this.decrement(scale) },
           16r1000015, { this.decrement(scale) },
-          16r1000012, { this.decrement(scale) }
+          16r1000012, { this.decrement(scale) },
+          { ^this; } // if unhandled, let Qt process the event
         );
+        this.doAction;
       }
     );
+    ^true; // accept the event and stop its processing
   }
 
   defaultGetDrag { ^this.value; }

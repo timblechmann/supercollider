@@ -30,7 +30,6 @@ BOOST_AUTO_TEST_CASE( server_test_1 )
 {
     rt_pool.init(1024 * 1024);
     nova_server server(server_arguments::initialize(0, 0));
-    sc_factory->initialize(server_arguments::instance());
 
     server.synth_factory::register_prototype(new test_synth_prototype());
 

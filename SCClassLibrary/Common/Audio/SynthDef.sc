@@ -13,6 +13,7 @@ SynthDef {
 	// topo sort
 	var <>available;
 	var <>variants;
+	var <>widthFirstUGens;
 
 	var <>desc, <>metadata;
 
@@ -26,11 +27,8 @@ SynthDef {
 
 	*initClass {
 		synthDefDir = Platform.userAppSupportDir ++ "/synthdefs/";
-                // Ensure exists:
-		("mkdir"
-			+ Platform.case(\windows, {""}, {"-p"}) // -p option doesn't exist on win
-			+ synthDefDir.quote
-		).systemCmd;
+		// Ensure exists:
+		synthDefDir.mkdir;
 	}
 
 	*new { arg name, ugenGraphFunc, rates, prependArgs, variants, metadata;
@@ -410,20 +408,29 @@ SynthDef {
 	// UGens do these
 	addUGen { arg ugen;
 		ugen.synthIndex = children.size;
+		ugen.widthFirstAntecedents = widthFirstUGens.copy;
 		children = children.add(ugen);
 	}
 	removeUGen { arg ugen;
-		children.remove(ugen);
-		this.indexUGens;
+		// lazy removal: clear entry and later remove all nil enties
+		children[ugen.synthIndex] = nil;
 	}
 	replaceUGen { arg a, b;
-		children.remove(b);
+		if (b.isKindOf(UGen).not) {
+			error("replaceUGen assumes a UGen ");
+		};
+
+		b.widthFirstAntecedents = a.widthFirstAntecedents;
+		b.descendants = a.descendants;
+		b.synthIndex = a.synthIndex;
+
+		children[a.synthIndex] = b;
+
 		children.do { arg item, i;
-			if (item === a and: { b.isKindOf(UGen) }) {
-				children[i] = b;
-			};
-			item.inputs.do { arg input, j;
-				if (input === a) { item.inputs[j] = b };
+			if (item.notNil) {
+				item.inputs.do { arg input, j;
+					if (input === a) { item.inputs[j] = b };
+				};
 			};
 		};
 	}
@@ -440,9 +447,17 @@ SynthDef {
 	// so that cache performance of connection buffers is optimized.
 
 	optimizeGraph {
+		var oldSize;
 		this.initTopoSort;
 		children.copy.do { arg ugen;
 			ugen.optimizeGraph;
+		};
+
+		// fixup removed ugens
+		oldSize = children.size;
+		children.removeEvery(#[nil]);
+		if (oldSize != children.size) {
+			this.indexUGens
 		};
 	}
 	collectConstants {
@@ -472,6 +487,7 @@ SynthDef {
 		children.do { arg ugen;
 			ugen.antecedents = nil;
 			ugen.descendants = nil;
+			ugen.widthFirstAntecedents = nil;
 		};
 	}
 	topologicalSort {
@@ -504,7 +520,6 @@ SynthDef {
 	}
 
 	// make SynthDef available to all servers
-
 	add { arg libname, completionMsg, keepDef = true;
 		var	servers, desc = this.asSynthDesc(libname ? \global, keepDef);
 		if(libname.isNil) {
@@ -513,7 +528,7 @@ SynthDef {
 			servers = SynthDescLib.getLib(libname).servers
 		};
 		servers.do { |each|
-			each.value.sendMsg("/d_recv", this.asBytes, completionMsg.value(each))
+			this.doSend(each.value, completionMsg.value(each))
 		}
 	}
 
@@ -530,7 +545,6 @@ SynthDef {
 
 	// only send to servers
 	send { arg server, completionMsg;
-
 		var servers = (server ?? { Server.allRunningServers }).asArray;
 		servers.do { |each|
 			if(each.serverRunning.not) {
@@ -539,7 +553,22 @@ SynthDef {
 			if(metadata.trueAt(\shouldNotSend)) {
 				this.loadReconstructed(each, completionMsg);
 			} {
-				each.sendMsg("/d_recv", this.asBytes, completionMsg)
+				this.doSend(each, completionMsg);
+			}
+		}
+	}
+
+	doSend { |server, completionMsg|
+		var bytes = this.asBytes;
+		try {
+			server.sendMsg("/d_recv", this.asBytes, completionMsg)
+		} {
+			if (server.isLocal) {
+				"Possible buffer overflow when sending SynthDef %. Retrying via synthdef file".format(name).warn;
+				this.writeDefFile(synthDefDir);
+				server.sendMsg("/d_load", synthDefDir ++ name ++ ".scsyndef", completionMsg)
+			} {
+				"Possible buffer overflow when sending SynthDef %.".format(name).warn;
 			}
 		}
 	}
@@ -570,7 +599,7 @@ SynthDef {
 				file.close;
 				lib.read(path);
 				lib.servers.do { arg server;
-					server.value.sendMsg("/d_recv", bytes, completionMsg)
+					this.doSend(server.value, completionMsg)
 				};
 				desc = lib[this.name.asSymbol];
 				desc.metadata = metadata;
@@ -626,12 +655,6 @@ SynthDef {
 			lib = SynthDescLib.getLib(libname);
 			lib.read(path);
 		};
-	}
-
-
-	memStore { arg libname = \global, completionMsg, keepDef = true;
-		this.deprecated(thisMethod, this.class.findRespondingMethodFor(\add));
-		this.add(libname, completionMsg, keepDef);
 	}
 
 	play { arg target,args,addAction=\addToHead;

@@ -24,8 +24,8 @@ definitionlist::
 ::
 code::
 (
-SynthDef("test", { arg out, freq, xFade; 
-	XOut.ar(out, xFade, SinOsc.ar(freq)) 
+SynthDef("test", { arg out, freq, xFade;
+	XOut.ar(out, xFade, SinOsc.ar(freq))
 }).store
 );
 ::
@@ -141,14 +141,26 @@ instancemethods::
 method:: name
 returns:: the name of the SynthDef
 
-method:: controlNames
-returns:: an array of instances of ControlName, each of which 
+method:: controls
+returns:: an array of instances of link::Classes/ControlName::, each of which
 have the following fields: name, index, rate, defaultValue
 discussion::
 code::
 SynthDescLib.global.at(\default).controlNames.postln;
 ::
-	
+
+method:: controlDict
+An link::Classes/IdentityDictionary:: of the link::Classes/ControlName::'s, indexed by name.
+This can be used for fast lookup of control index by name, for example to set a specific element of a multichannel control.
+
+method:: controlNames
+returns:: an array of Strings with the names of controls
+
+method:: outputs
+returns:: an array of link::Classes/IODesc:: that describes the available outputs.
+method:: inputs
+returns:: an array of link::Classes/IODesc:: that describes the available inputs.
+
 method:: hasGate
 is true if the Synthdef has a gate input
 
@@ -164,7 +176,7 @@ method:: msgFunc
 the function which is used to create an array of arguments for
 playing a synth def in patterns
 discussion::
-code::		
+code::
 SynthDescLib.global.synthDescs.at(\default).msgFunc.postcs;
 ::
 

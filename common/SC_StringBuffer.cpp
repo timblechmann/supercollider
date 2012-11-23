@@ -30,6 +30,8 @@
 # include <stdarg.h>
 #endif
 
+#include <string>
+
 SC_StringBuffer::SC_StringBuffer(size_t initialSize)
 	: mCapacity(0), mPtr(0), mData(0)
 {
@@ -120,9 +122,8 @@ void SC_StringBuffer::growBy(size_t request)
 		mData = newData;
 		mCapacity = newCapacity;
 		mPtr = mData + oldSize;
-	} else {
-		throw std::runtime_error("SC_StringBuffer: memory allocation failure");
-	}
+	} else
+		throw std::runtime_error(std::string("SC_StringBuffer: memory allocation failure"));
 }
 
 // EOF

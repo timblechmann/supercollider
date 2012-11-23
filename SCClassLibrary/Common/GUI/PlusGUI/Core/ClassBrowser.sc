@@ -26,7 +26,7 @@ ClassBrowser {
 	init { arg class;
 		this.class.initGUI;
 		gui = GUI.scheme;
-		hvBold12 = gui.font.new( gui.font.defaultSansFace, 12 ).boldVariant;
+		hvBold12 = Font.sansSerif( 12 ).boldVariant;
 
 		history = [];
 
@@ -38,7 +38,7 @@ ClassBrowser {
 			~window.view.decorator = FlowLayout(~window.view.bounds);
 
 			~currentClassNameView = gui.textField.new(~window, Rect(0,0, 308, 32));
-			~currentClassNameView.font = gui.font.new( gui.font.defaultSansFace, 18 ).boldVariant;
+			~currentClassNameView.font = Font.sansSerif( 18 ).boldVariant;
 			~currentClassNameView.align = \center;
 
 			~currentClassNameView.action = {
@@ -46,7 +46,7 @@ ClassBrowser {
 			};
 
 			~superClassNameView = gui.staticText.new(~window, Rect(0,0, 256, 32));
-			~superClassNameView.font = hvBold12 = gui.font.new( gui.font.defaultSansFace, 12 ).boldVariant;
+			~superClassNameView.font = hvBold12 = Font.sansSerif( 12 ).boldVariant;
 
 			~window.view.decorator.nextLine;
 
@@ -170,7 +170,7 @@ ClassBrowser {
 			~window.view.decorator.nextLine;
 
 			~filenameView = gui.staticText.new(~window, Rect(0,0, 600, 18));
-			~filenameView.font = gui.font.new( gui.font.defaultSansFace, 10 );
+			~filenameView.font = Font.sansSerif( 10 );
 
 			~window.view.decorator.nextLine;
 			gui.staticText.new(~window, Rect(0,0, 180, 24))
@@ -316,7 +316,10 @@ ClassBrowser {
 					^this	// just to force early exit
 				};
 			};
-		if(isClassSearch) {
+		case { string.isEmpty } {
+			result = pool.sort({ |a, b| a.name < b.name });
+		}
+		{ isClassSearch } {
 			result = (if(matchCase) {
 				pool.select({ |class|
 					class.isMetaClass.not and: { class.name.asString.contains(string) }
@@ -326,7 +329,8 @@ ClassBrowser {
 					class.isMetaClass.not and: { class.name.asString.containsi(string) }
 				})
 			}).sort({ |a, b| a.name < b.name });
-		} {
+		}
+		{	// default case - method search
 			result = Array.new;
 			if(matchCase) {
 				pool.do({ |class|

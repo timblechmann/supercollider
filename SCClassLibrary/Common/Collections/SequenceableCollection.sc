@@ -166,17 +166,15 @@ SequenceableCollection : Collection {
 		});
 		^nil
 	}
-	indicesOfEqual { |item|
-		var indices, i=0, offset=0;
-		while {
-			i = this.indexOfEqual(item, offset);
-			i.notNil
-		}{
-			indices = indices.add(i);
-			offset = i + 1;
-		}
-		^indices
-	}
+
+        indicesOfEqual { |item|
+                var indices;
+                this.do { arg val, i;
+                        if (item == val) { indices = indices.add(i) }
+                };
+                ^indices
+        }
+
 
 	find { |sublist, offset=0|
 		var subSize_1 = sublist.size - 1, first = sublist.first, index;
@@ -329,29 +327,30 @@ SequenceableCollection : Collection {
 		^list
 	}
 	clump { arg groupSize;
-		var list, sublist;
-		list = Array.new;
-		sublist = this.species.new;
+		var list = Array.new((this.size / groupSize).roundUp.asInteger);
+		var sublist = this.species.new(groupSize);
 		this.do({ arg item;
-			sublist = sublist.add(item);
+			sublist.add(item);
 			if (sublist.size >= groupSize, {
-				list = list.add(sublist);
-				sublist = this.species.new;
+				list.add(sublist);
+				sublist = this.species.new(groupSize);
 			});
 		});
 		if (sublist.size > 0, { list = list.add(sublist); });
 		^list
 	}
 	clumps { arg groupSizeList;
-		var list, sublist, i=0;
-		list = Array.new;
-		sublist = this.species.new;
+		var i = 0;
+		var list = Array.new(groupSizeList.size); // still better estimate than default
+		var subSize = groupSizeList.at(0);
+		var sublist = this.species.new(subSize);
 		this.do({ arg item;
 			sublist = sublist.add(item);
-			if (sublist.size >= groupSizeList.wrapAt(i), {
+			if (sublist.size >= subSize, {
 				i = i + 1;
 				list = list.add(sublist);
-				sublist = this.species.new;
+				subSize = groupSizeList.wrapAt(i);
+				sublist = this.species.new(subSize);
 			});
 		});
 		if (sublist.size > 0, { list = list.add(sublist); });
@@ -376,13 +375,15 @@ SequenceableCollection : Collection {
 		});
 		^list
 	}
-
+	
 	flat {
-		var list;
-		list = this.species.new;
+		^this.prFlat(this.species.new(this.flatSize))
+	}
+	
+	prFlat { |list|
 		this.do({ arg item, i;
-			if (item.respondsTo('flat'), {
-				list = list.addAll(item.flat);
+			if (item.respondsTo('prFlat'), {
+				list = item.prFlat(list);
 			},{
 				list = list.add(item);
 			});
@@ -390,19 +391,18 @@ SequenceableCollection : Collection {
 		^list
 	}
 
-	flatIf { arg func;
-		var list;
-		list = this.species.new;
+	flatIf { |func|
+		var list = this.species.new(this.size); // as we don't know the size, just guess
 		this.do({ arg item, i;
-			if (item.respondsTo('flat') and: { func.value(item, i) }, {
-				list = list.addAll(item.flat);
+			if (item.respondsTo('flatIf') and: { func.value(item, i) }, {
+				list = list.addAll(item.flatIf(func));
 			},{
 				list = list.add(item);
 			});
 		});
 		^list
 	}
-
+	
 	flop {
 		var list, size, maxsize;
 
@@ -830,6 +830,16 @@ SequenceableCollection : Collection {
 		if(this.size == 1, { ^this.first.rate });
 		^this.collect({ arg item; item.rate }).minItem;
 		// 'scalar' > 'control' > 'audio'
+	}
+
+	// if we don't catch the special case of an empty array,
+	// Object:multiChannelPerform goes into infinite recursion
+	multiChannelPerform { arg selector ... args;
+		if(this.size > 0) {
+			^super.multiChannelPerform(selector, *args);
+		} {
+			^this.class.new
+		}
 	}
 
 	// support some UGen convenience methods.

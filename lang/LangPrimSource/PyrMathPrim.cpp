@@ -34,6 +34,8 @@
 #include "SC_Endian.h"
 #include "SCBase.h"
 
+#include "boost/math/special_functions.hpp"
+
 const int INT_MAX_BY_PyrSlot = INT_MAX / sizeof(PyrSlot);
 
 inline bool IsSignal(PyrSlot* slot) { return (IsObj(slot) && slotRawObject(slot)->classptr == class_signal); }
@@ -978,6 +980,12 @@ int prAsFraction(struct VMGlobals *g, int numArgsPushed)
 	if (x < 0.0) {
 		x = -x;
 		neg = true;
+	}
+
+	if (x == 0.0) {
+		SetInt(slots+0, 0);
+		SetInt(slots+1, 1);
+		return errNone;
 	}
 
 	if (x < 1.0) {

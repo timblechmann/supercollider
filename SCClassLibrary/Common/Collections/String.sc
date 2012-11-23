@@ -248,15 +248,9 @@ String[char] : RawArray {
 
 
 	escapeChar { arg charToEscape; // $"
-		^this.class.streamContents({ arg st;
-			this.do({ arg char;
-				if(char == charToEscape,{
-					st << $\\
-				});
-				st << char;
-			})
-		})
+		_String_EscapeChar
 	}
+
 	quote {
 		^"\"" ++ this ++ "\""
 	}
@@ -322,6 +316,10 @@ String[char] : RawArray {
 		_String_StandardizePath
 		^this.primitiveFailed
 	}
+	realPath {
+		_String_RealPath
+		^this.primitiveFailed
+	}
 	withTrailingSlash {
 		var sep = thisProcess.platform.pathSeparator;
 		if(this.last != sep, {
@@ -366,7 +364,13 @@ String[char] : RawArray {
 		^(path.dirname ++ thisProcess.platform.pathSeparator ++ this).loadPaths
 	}
 	resolveRelative {
-		var path = thisProcess.nowExecutingPath;
+		var path, caller;
+		caller = thisMethod.getBackTrace.caller.functionDef;
+		if(caller == Interpreter.findMethod(\interpretPrintCmdLine), {
+			path = thisProcess.nowExecutingPath;
+		}, {
+			path = caller.filenameSymbol.asString;
+		});
 		if(this[0] == thisProcess.platform.pathSeparator, {^this});
 		if(path.isNil) { Error("can't resolve relative to an unsaved file").throw};
 		^(path.dirname ++ thisProcess.platform.pathSeparator ++ this)
@@ -491,5 +495,9 @@ String[char] : RawArray {
 	}
 	toUpper {
 		^this.collect(_.toUpper)
+	}
+
+	mkdir {
+		File.mkdir(this);
 	}
 }

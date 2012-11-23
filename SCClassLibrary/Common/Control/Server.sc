@@ -1,7 +1,6 @@
 ServerOptions
 {
-
-	var <>numAudioBusChannels=128;
+	var <>numPrivateAudioBusChannels=112;
 	var <>numControlBusChannels=4096;
 	var <>numInputBusChannels=8;
 	var <>numOutputBusChannels=8;
@@ -26,8 +25,6 @@ ServerOptions
 	var <>inDevice = nil;
 	var <>outDevice = nil;
 
-	var <>blockAllocClass;
-
 	var <>verbosity = 0;
 	var <>zeroConf = false; // Whether server publishes port to Bonjour, etc.
 
@@ -37,9 +34,9 @@ ServerOptions
 	var <>remoteControlVolume = false;
 
 	var <>memoryLocking = false;
+	var <>threads = nil; // for supernova
 
-	device
-	{
+	device {
 		^if(inDevice == outDevice)
 		{
 			inDevice
@@ -49,8 +46,7 @@ ServerOptions
 		}
 	}
 
-	device_
-	{
+	device_ {
 		|dev|
 		inDevice = outDevice = dev;
 	}
@@ -74,9 +70,8 @@ ServerOptions
 		o = if (protocol == \tcp, " -t ", " -u ");
 		o = o ++ port;
 
-		if (numAudioBusChannels != 128, {
-			o = o ++ " -a " ++ numAudioBusChannels;
-		});
+	    o = o ++ " -a " ++ (numPrivateAudioBusChannels + numInputBusChannels + numOutputBusChannels) ;
+
 		if (numControlBusChannels != 4096, {
 			o = o ++ " -c " ++ numControlBusChannels;
 		});
@@ -144,6 +139,11 @@ ServerOptions
 		if (memoryLocking, {
 			o = o ++ " -L";
 		});
+		if (threads.notNil, {
+			if (Server.program.asString.endsWith("supernova")) {
+				o = o ++ " -T " ++ threads;
+			}
+		});
 		^o
 	}
 
@@ -151,41 +151,70 @@ ServerOptions
 		^numOutputBusChannels + numInputBusChannels
 	}
 
+	numAudioBusChannels{
+		^numPrivateAudioBusChannels + numInputBusChannels + numOutputBusChannels
+	}
+
 	bootInProcess {
 		_BootInProcessServer
 		^this.primitiveFailed
 	}
 
-	rendezvous_ {|bool|
-		zeroConf = bool;
-		this.deprecated(thisMethod, ServerOptions.findMethod(\zeroConf_))
-	}
-
-	rendezvous {|bool|
-		this.deprecated(thisMethod, ServerOptions.findMethod(\zeroConf));
-		^zeroConf;
-	}
-
-	*prListDevices
-	{
+	*prListDevices {
 		arg in, out;
 		_ListAudioDevices
 		^this.primitiveFailed
 	}
 
-	*devices
-	{
+	*devices {
 		^this.prListDevices(1, 1);
 	}
 
-	*inDevices
-	{
+	*inDevices {
 		^this.prListDevices(1, 0);
 	}
 
-	*outDevices
-	{
+	*outDevices {
 		^this.prListDevices(0, 1);
+	}
+}
+
+ServerShmInterface {
+	// order matters!
+	var ptr, finalizer;
+
+	*new {|port|
+		^super.new.connect(port)
+	}
+
+	connect {
+		_ServerShmInterface_connectSharedMem
+		^this.primitiveFailed
+	}
+
+	disconnect {
+		_ServerShmInterface_disconnectSharedMem
+		^this.primitiveFailed
+	}
+
+	getControlBusValue {
+		_ServerShmInterface_getControlBusValue
+		^this.primitiveFailed
+	}
+
+	getControlBusValues {
+		_ServerShmInterface_getControlBusValues
+		^this.primitiveFailed
+	}
+
+	setControlBusValue {
+		_ServerShmInterface_getControlBusValue
+		^this.primitiveFailed
+	}
+
+	setControlBusValues {
+		_ServerShmInterface_getControlBusValues
+		^this.primitiveFailed
 	}
 }
 
@@ -200,6 +229,7 @@ Server {
 	var <controlBusAllocator;
 	var <audioBusAllocator;
 	var <bufferAllocator;
+	var <scopeBufferAllocator;
 	var <syncThread, <syncTasks;
 
 	var <numUGens=0, <numSynths=0, <numGroups=0, <numSynthDefs=0;
@@ -211,11 +241,13 @@ Server {
 
 	var <window, <>scopeWindow;
 	var <emacsbuf;
-	var recordBuf, <recordNode, <>recHeaderFormat="aiff", <>recSampleFormat="float"; 	var <>recChannels=2;
+	var recordBuf, <recordNode, <>recHeaderFormat="aiff", <>recSampleFormat="float";
+	var <>recChannels=2;
 
 	var <volume;
 
 	var <pid;
+	var serverInterface;
 
 	*default_ { |server|
 		default = server; // sync with s?
@@ -257,6 +289,7 @@ Server {
 		this.newNodeAllocators;
 		this.newBusAllocators;
 		this.newBufferAllocators;
+		this.newScopeBufferAllocators;
 		NotificationCenter.notify(this, \newAllocators);
 	}
 
@@ -272,6 +305,12 @@ Server {
 
 	newBufferAllocators {
 		bufferAllocator = ContiguousBlockAllocator.new(options.numBuffers);
+	}
+
+	newScopeBufferAllocators {
+		if (isLocal) {
+			scopeBufferAllocator = StackNumberAllocator.new(0, 127);
+		}
 	}
 
 	nextNodeID {
@@ -509,32 +548,17 @@ Server {
 			statusWatcher.enable;
 		};
 	}
-	// Buffer objects are cached in an Array for easy
-	// auto buffer info updating
-	addBuf { |buffer|
-		this.deprecated(thisMethod, Buffer.findRespondingMethodFor(\cache));
-		buffer.cache;
-	}
-
-	freeBuf { |i|
-		var	buf;
-		this.deprecated(thisMethod, Buffer.findRespondingMethodFor(\uncache));
-		if((buf = Buffer.cachedBufferAt(this, i)).notNil) { buf.free };
-	}
-
-	// /b_info on the way
-	// keeps a reference count of waiting Buffers so that only one responder is needed
-	waitForBufInfo {
-		this.deprecated(thisMethod, Buffer.findRespondingMethodFor(\cache));
-	}
-
-	resetBufferAutoInfo {
-		this.deprecated(thisMethod, Meta_Buffer.findRespondingMethodFor(\clearServerCaches));
-		Buffer.clearServerCaches(this);
-	}
 
 	cachedBuffersDo { |func| Buffer.cachedBuffersDo(this, func) }
 	cachedBufferAt { |bufnum| ^Buffer.cachedBufferAt(this, bufnum) }
+
+	inputBus {
+		^Bus(\audio, this.options.numOutputBusChannels, this.options.numInputBusChannels, this);
+	}
+
+	outputBus {
+		^Bus(\audio, 0, this.options.numOutputBusChannels, this);
+	}
 
 	startAliveThread { arg delay=0.0;
 		this.addStatusWatcher;
@@ -587,6 +611,15 @@ Server {
 			if (sendQuit.isNil) {
 				sendQuit = not(this.inProcess) and: {this.isLocal};
 			};
+
+			if (this.inProcess) {
+				serverInterface = ServerShmInterface(thisProcess.pid);
+			} {
+				if (isLocal) {
+					serverInterface = ServerShmInterface(addr.port);
+				}
+			};
+
 			this.initTree;
 			(volume.volume != 0.0).if({
 				volume.play;
@@ -607,6 +640,11 @@ Server {
 			//this.serverRunning = true;
 			pid = thisProcess.pid;
 		},{
+			if (serverInterface.notNil) {
+				serverInterface.disconnect;
+				serverInterface = nil;
+			};
+
 			pid = (program ++ options.asOptionsString(addr.port)).unixCmd;
 			//unixCmd(program ++ options.asOptionsString(addr.port)).postln;
 			("booting " ++ addr.port.asString).inform;
@@ -721,7 +759,7 @@ Server {
 		// you can't cause them to quit via OSC (the boot button)
 
 		// this brutally kills them all off
-		"killall -9 scsynth".unixCmd;
+		thisProcess.platform.killAll(this.program.basename);
 		this.quitAll;
 	}
 	freeAll {
@@ -827,7 +865,11 @@ Server {
 			if(recordNode.isNil){
 				recordNode = Synth.tail(RootNode(this), "server-record",
 						[\bufnum, recordBuf.bufnum]);
-			}{
+				CmdPeriod.doOnce {
+					recordNode = nil;
+					if (recordBuf.notNil) { recordBuf.close {|buf| buf.free; }; recordBuf = nil; };
+				}
+			} {
 				recordNode.run(true)
 			};
 			"Recording: %\n".postf(recordBuf.path);
@@ -853,7 +895,7 @@ Server {
 	prepareForRecord { arg path;
 		if (path.isNil) {
 			if(File.exists(thisProcess.platform.recordingsDir).not) {
-				systemCmd("mkdir" + thisProcess.platform.recordingsDir.quote);
+				thisProcess.platform.recordingsDir.mkdir
 			};
 
 			// temporary kludge to fix Date's brokenness on windows
@@ -871,21 +913,16 @@ Server {
 		SynthDef("server-record", { arg bufnum;
 			DiskOut.ar(bufnum, In.ar(0, recChannels))
 		}).send(this);
-		// cmdPeriod support
-		CmdPeriod.add(this);
 	}
 
 	// CmdPeriod support for Server-scope and Server-record and Server-volume
 	cmdPeriod {
-		if(recordNode.notNil) { recordNode = nil; };
-		if(recordBuf.notNil) { recordBuf.close {|buf| buf.free; }; recordBuf = nil; };
 		addr = addr.recover;
 		this.changed(\cmdPeriod);
-		if(scopeWindow.notNil) {
-			fork { 0.5.wait; scopeWindow.run } // wait until synth is freed
-		}{
-			CmdPeriod.remove(this)
-		};
+	}
+
+	doOnServerTree {
+		if(scopeWindow.notNil) { scopeWindow.run }
 	}
 
 	defaultGroup { ^Group.basicNew(this, 1) }
@@ -976,5 +1013,37 @@ Server {
 	reorder { arg nodeList, target, addAction=\addToHead;
 		target = target.asTarget;
 		this.sendMsg(62, Node.actionNumberFor(addAction), target.nodeID, *(nodeList.collect(_.nodeID))); //"/n_order"
+	}
+
+	getControlBusValue {|busIndex|
+		if (serverInterface.isNil) {
+			error("Server-getControlBusValue only supports local servers")
+		} {
+			^serverInterface.getControlBusValue(busIndex)
+		}
+	}
+
+	getControlBusValues {|busIndex, busChannels|
+		if (serverInterface.isNil) {
+			error("Server-getControlBusValues only supports local servers")
+		} {
+			^serverInterface.getControlBusValues(busIndex, busChannels)
+		}
+	}
+
+	setControlBusValue {|busIndex, value|
+		if (serverInterface.isNil) {
+			error("Server-getControlBusValue only supports local servers")
+		} {
+			^serverInterface.setControlBusValue(busIndex, value)
+		}
+	}
+
+	setControlBusValues {|busIndex, valueArray|
+		if (serverInterface.isNil) {
+			error("Server-getControlBusValues only supports local servers")
+		} {
+			^serverInterface.setControlBusValues(busIndex, valueArray)
+		}
 	}
 }

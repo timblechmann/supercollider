@@ -1,12 +1,18 @@
 QtGUI {
 
   *initClass {
+    Class.initClassTree( GUI );
     GUI.add( this );
   }
 
   *id { ^\qt }
 
   *stop { }
+
+  *debugLevel {
+    _QtGUI_DebugLevel
+    ^this.primitiveFailed
+  }
 
   *debugLevel_ { arg level;
     _QtGUI_SetDebugLevel
@@ -24,6 +30,7 @@ QtGUI {
 
   *staticText { ^QStaticText }
   *button { ^QButton; }
+  *checkBox { ^QCheckBox; }
   *textField { ^QTextField }
   *numberBox { ^QNumberBox }
   *slider { ^QSlider }
@@ -33,6 +40,7 @@ QtGUI {
   *tabletSlider2D { ^this.notImplemented( "TabletSlider2D"); }
   *knob { ^QKnob; }
   *listView { ^QListView }
+  *treeView { ^QTreeView }
   *popUpMenu { ^QPopUpMenu }
   *textView { ^QTextView; }
 
@@ -49,9 +57,6 @@ QtGUI {
 
   *userView { ^QUserView }
 
-  *pen { ^QPen; }
-  *font { ^QFont }
-
   *dragSource { ^QDragSource; }
   *dragSink { ^QDragSink; }
   *dragBoth { ^QDragBoth; }
@@ -64,6 +69,11 @@ QtGUI {
   *ezPopUpMenu { ^EZPopUpMenu}
   *ezNumber { ^EZNumber}
   *ezRanger { ^EZRanger }
+
+  *pen { ^QPen }
+
+  *font { ^QFont }
+  *image { ^this.notImplemented( "Image" ) }
 
   *notImplemented { arg class;
     ("QtGUI: " ++ class.asString ++ " is not implemented yet").postln;
@@ -83,14 +93,15 @@ QtGUI {
   }
 
   *stringBounds { arg aString, aFont;
-    var bounds = this.prStringBounds( aString, aFont, Rect.new );
+    var bounds = this.prStringBounds( aString, aFont );
     bounds.left = 0;
     bounds.top = 0;
     ^bounds
   }
 
   *palette {
-    ^this.prPalette( QPalette.new.init );
+    _Qt_GlobalPalette
+    ^this.primitiveFailed;
   }
 
   *palette_ { arg p;
@@ -114,12 +125,7 @@ QtGUI {
 
   // private ///////////////////////////////////////////////////////////
 
-  *prPalette { arg ret;
-    _Qt_GlobalPalette
-    ^this.primitiveFailed;
-  }
-
-  *prStringBounds { arg aString, aFont, aRect;
+  *prStringBounds { arg aString, aFont;
     _Qt_StringBounds
     ^this.primitiveFailed
   }

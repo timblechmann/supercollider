@@ -21,6 +21,8 @@
 #ifndef _SC_SynthInterfaceTable_
 #define _SC_SynthInterfaceTable_
 
+static const int sc_api_version = 1;
+
 #include "SC_Types.h"
 #include "SC_SndBuf.h"
 #include "SC_Unit.h"
@@ -41,6 +43,23 @@ struct World;
 
 typedef bool (*AsyncStageFn)(World *inWorld, void* cmdData);
 typedef void (*AsyncFreeFn)(World *inWorld, void* cmdData);
+
+struct ScopeBufferHnd
+{
+	void *internalData;
+	float *data;
+	uint32 channels;
+	uint32 maxFrames;
+
+	float *channel_data( uint32 channel ) {
+		return data + (channel * maxFrames);
+	}
+
+	operator bool ()
+	{
+		return internalData != 0;
+	}
+};
 
 struct InterfaceTable
 {
@@ -147,6 +166,11 @@ struct InterfaceTable
 
 	// destroy any resources held internally.
 	void (*fSCfftDestroy)(scfft *f, SCFFT_Allocator & alloc);
+
+	// Get scope buffer. Returns the maximum number of possile frames.
+	bool (*fGetScopeBuffer)(World *inWorld, int index, int channels, int maxFrames, ScopeBufferHnd &);
+	void (*fPushScopeBuffer)(World *inWorld, ScopeBufferHnd &, int frames);
+	void (*fReleaseScopeBuffer)(World *inWorld, ScopeBufferHnd &);
 };
 
 typedef struct InterfaceTable InterfaceTable;
@@ -205,7 +229,9 @@ typedef struct InterfaceTable InterfaceTable;
 #ifdef STATIC_PLUGINS
 	#define PluginLoad(name) void name##_Load(InterfaceTable *inTable)
 #else
-	#define PluginLoad(name) C_LINKAGE SC_API_EXPORT void load(InterfaceTable *inTable)
+	#define PluginLoad(name) 														\
+		C_LINKAGE SC_API_EXPORT int api_version(void) { return sc_api_version; }	\
+		C_LINKAGE SC_API_EXPORT void load(InterfaceTable *inTable)
 #endif
 
 #define scfft_create (*ft->fSCfftCreate)

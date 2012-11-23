@@ -32,6 +32,7 @@
 #include "../utilities/callback_interpreter.hpp"
 #include "../utilities/static_pooled_class.hpp"
 #include "../utilities/asynchronous_log.hpp"
+#include "../../common/server_shm.hpp"
 
 #ifdef PORTAUDIO_BACKEND
 #include "audio_backend/audio_frontend.hpp"
@@ -127,6 +128,7 @@ struct scheduler_hook
 class nova_server:
     public asynchronous_log_thread,
     public node_graph,
+    public server_shared_memory_creator,
     public scheduler<scheduler_hook, thread_init_functor>,
 #if defined(JACK_BACKEND)
     public jack_backend<realtime_engine_functor, float, false>,
@@ -245,12 +247,12 @@ public:
 
     void register_prototype(synth_prototype_ptr const & prototype);
 
-    float cpu_load(void) const
+    void cpu_load(float & peak, float & average) const
     {
 #ifdef JACK_BACKEND
-        return get_cpuload();
+        return get_cpuload(peak, average);
 #else
-        return 0.f;
+        peak = average = 0.f;
 #endif
     }
 
@@ -272,10 +274,8 @@ public:
         sc_osc_handler::increment_logical_time(time_per_tick);
     }
 
-private:
-
 public:
-    void operator()(void)
+    HOT void operator()(void)
     {
         if (unlikely(dsp_queue_dirty))
             rebuild_dsp_queue();
@@ -294,7 +294,6 @@ public:
 private:
     bool dsp_queue_dirty;
 
-private:
     callback_interpreter<system_callback, false> system_interpreter; // rt to system thread
     threaded_callback_interpreter<system_callback, io_thread_init_functor> io_interpreter; // for network IO
 };

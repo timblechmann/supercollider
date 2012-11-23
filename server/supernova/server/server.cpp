@@ -30,11 +30,6 @@
 #include "sc/sc_synth_prototype.hpp"
 #include "sc/sc_ugen_factory.hpp"
 
-#ifdef JACK_BACKEND
-#include "jack/jack.h"
-#endif
-
-
 #ifdef __APPLE__
 #include <AvailabilityMacros.h>
 #include <CoreAudio/HostTime.h>
@@ -48,14 +43,17 @@ class nova_server * instance = 0;
 
 nova_server::nova_server(server_arguments const & args):
     scheduler<nova::scheduler_hook, thread_init_functor>(args.threads, !args.non_rt),
+    server_shared_memory_creator(args.port(), args.control_busses),
     buffer_manager(1024), sc_osc_handler(args), dsp_queue_dirty(false)
 {
     assert(instance == 0);
     io_interpreter.start_thread();
-    sc_factory = new sc_ugen_factory;
     instance = this;
+    sc_factory = new sc_ugen_factory;
+    sc_factory->initialize(args, server_shared_memory_creator::shm->get_control_busses());
 
-    /** todo: backend may force sample rate */
+
+    /** first guess: needs to be updated, once the backend is started */
     time_per_tick = time_tag::from_samples(args.blocksize, args.samplerate);
 
     start_receive_thread();
@@ -78,6 +76,14 @@ void nova_server::prepare_backend(void)
         outputs.push_back(sc_factory->world.mAudioBus + blocksize * channel);
 
     audio_backend::output_mapping(outputs.begin(), outputs.end());
+
+#ifdef __SSE__
+    /* denormal handling */
+    _MM_SET_FLUSH_ZERO_MODE(_MM_FLUSH_ZERO_ON);
+    _mm_setcsr(_mm_getcsr() | 0x40);
+#endif
+
+    time_per_tick = time_tag::from_samples(blocksize, get_samplerate());
 }
 
 nova_server::~nova_server(void)

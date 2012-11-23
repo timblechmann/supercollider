@@ -26,13 +26,18 @@ LinExp : UGen {
 	}
 }
 
-LinLin : UGen {
-	checkInputs { ^this.checkSameRateAsFirstInput }
+LinLin {
 	*ar { arg in=0.0, srclo = 0.0, srchi = 1.0, dstlo = 1.0, dsthi = 2.0;
-		^this.multiNew('audio', in, srclo, srchi, dstlo, dsthi)
+		var scale  = (dsthi - dstlo) / (srchi - srclo);
+		var offset = dstlo - (scale * srclo);
+
+		^MulAdd(in, scale, offset)
 	}
 	*kr { arg in=0.0, srclo = 0.0, srchi = 1.0, dstlo = 1.0, dsthi = 2.0;
-		^this.multiNew('control',  in, srclo, srchi, dstlo, dsthi)
+		var scale  = (dsthi - dstlo) / (srchi - srclo);
+		var offset = dstlo - (scale * srclo);
+
+		^(in * scale + offset)
 	}
 }
 
@@ -101,12 +106,13 @@ DC : MultiOutUGen {
 	}
 }
 
-Silent : MultiOutUGen {
+Silent {
 	*ar { arg numChannels = 1;
-		^this.multiNew('audio', numChannels)
-	}
-	init { arg numChannels;
-		inputs = [];
-		^this.initOutputs(numChannels, rate)
+		var sig = DC.ar(0);
+		if (numChannels == 1) {
+			^sig
+		} {
+			^(sig ! numChannels)
+		}
 	}
 }

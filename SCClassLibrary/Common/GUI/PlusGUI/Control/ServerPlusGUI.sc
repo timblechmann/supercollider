@@ -4,7 +4,11 @@
 	// while maintaining the availability of the GUI server window
 
 	makeWindow { arg w;
-		this.makeGui( w );
+		if (Platform.makeServerWindowAction.notNil) {
+			^Platform.makeServerWindowAction.value(this, w)
+		} {
+			^this.makeGui( w );
+		}
 	}
 
 	calculateViewBounds {
@@ -24,7 +28,7 @@
 		if (window.notNil) { ^window.front };
 
 		gui = GUI.current;
-		font = GUI.font.new(Font.defaultSansFace, 10);
+		font = Font.sansSerif(10);
 
 		if (gui.id == \qt) {
 			buttonColor = gui.palette.buttonColor;
@@ -71,7 +75,7 @@
 		active = gui.staticText.new(w, Rect(0,0, 78, 18));
 		active.string = this.name.asString;
 		active.align = \center;
-		active.font = gui.font.new( gui.font.defaultSansFace, 12 ).boldVariant;
+		active.font = Font.sansSerif( 12 ).boldVariant;
 		if(serverRunning,running,stopped);
 
 		makeDefault = gui.button.new(w, Rect(0,0, 54, 18));
@@ -105,17 +109,22 @@
 				{char === $n } { this.queryAllNodes(false) }
 				{char === $N } { this.queryAllNodes(true) }
 				{char === $l } { this.tryPerform(\meter) }
-				{char === $p} { if(serverRunning) { this.plotTree } }
-				{char === $ } { if(serverRunning.not) { this.boot } }
-				{char === $s and: { gui.stethoscope.isValidServer( this ) } } {
-					GUI.use( gui, { this.scope })}
+				{char === $p}  { if(serverRunning) { this.plotTree } }
+				{char === $ }  { if(serverRunning.not) { this.boot } }
+				{char === $s } { if( (this.isLocal and: (GUI.id == \qt)) or: ( this.inProcess ))
+					                 {this.scope(options.numOutputBusChannels)}
+					                 {warn("Scope not supported")}
+				               }
+				{char === $f } { if( (this.isLocal and: (GUI.id == \qt)) or: ( this.inProcess ))
+					                 {this.freqscope}
+					                 {warn("FreqScope not supported")}
+				               }
 				{char == $d } {
 					if(this.isLocal or: { this.inProcess }) {
 						if(dumping, stopDump, startDump)
 					} {
 						"cannot dump a remote server's messages".inform
 					}
-
 				}
 				{char === $m } { if(this.volume.isMuted) { this.unmute } { this.mute } }
 				{char === $0 and: {volumeNum.hasFocus.not}} {
@@ -339,15 +348,75 @@
 		this.startAliveThread;
 	}
 
-	plotTree {
-
+	plotTree {|interval=0.5|
 		var resp, done = false;
+		var collectChildren, levels, countSize;
+		var window, view, bounds;
+		var updater, updateFunc;
+		var tabSize = 25;
+
+		window = Window.new(name.asString + "Node Tree",
+			Rect(128, 64, 400, 400),
+			scroll:true
+		).front;
+		window.view.hasHorizontalScroller_(false).background_(Color.grey(0.9));
+
+		view = UserView.new(window, Rect(0,0,400,400));
+
+		view.drawFunc = {
+			var xtabs = 0, ytabs = 0, drawFunc;
+
+			drawFunc = {|group|
+				var thisSize, rect, endYTabs;
+				xtabs = xtabs + 1;
+				ytabs = ytabs + 1;
+				Pen.font = Font.sansSerif(10);
+				group.do({|node|
+					if(node.value.isArray, {
+						thisSize = countSize.value(node);
+						endYTabs = ytabs + thisSize + 0.2;
+						rect = Rect(xtabs * tabSize + 0.5,
+							ytabs * tabSize + 0.5,
+							window.view.bounds.width - (xtabs * tabSize * 2),
+							thisSize * tabSize;
+						);
+						Pen.fillColor = Color.grey(0.8);
+						Pen.fillRect(rect);
+						Pen.strokeRect(rect);
+						Pen.color = Color.black;
+						Pen.stringInRect(
+							" Group" + node.key.asString +
+							(node.key == 1).if("- default group", ""),
+							rect
+						);
+						drawFunc.value(node.value);
+						ytabs = endYTabs;
+					},{
+						rect = Rect(xtabs * tabSize + 0.5,
+							ytabs * tabSize + 0.5,
+							7 * tabSize,
+							0.8 * tabSize
+						);
+						Pen.fillColor = Color.white;
+						Pen.fillRect(rect);
+						Pen.strokeRect(rect);
+						Pen.color = Color.black;
+						Pen.stringInRect(
+							" " ++ node.key.asString + node.value.asString,
+							rect
+						);
+						ytabs = ytabs + 1;
+					});
+				});
+				xtabs = xtabs - 1;
+			};
+			drawFunc.value(levels);
+		};
 
 		// msg[1] controls included
 		// msg[2] nodeID of queried group
 		// initial number of children
 		resp = OSCFunc({ arg msg;
-
 			var finalEvent;
 			var i = 2, j, controls, printControls = false, dumpFunc;
 			if(msg[1] != 0, {printControls = true});
@@ -369,7 +438,6 @@
 						j = 4;
 						child = ().synth.instrument_(msg[i+2]);
 						if(printControls, {
-
 							controls = ();
 							msg[i+3].do({
 								controls[msg[i + j]] = msg[i + j + 1];
@@ -385,102 +453,50 @@
 				event;
 			};
 			finalEvent = dumpFunc.value(msg[3]);
-
 			done = true;
-			{
-				var collectChildren, levels, countSize;
-				var window, view, bounds;
-				var tabSize = 25;
-				collectChildren = {|group|
-					group.children.collect({|child|
-						if(child.children.notNil,{
-							child.id -> collectChildren.value(child);
-						}, {
-							child.id -> child.instrument;
-						});
+			collectChildren = {|group|
+				group.children.collect({|child|
+					if(child.children.notNil,{
+						child.id -> collectChildren.value(child);
+					}, {
+						child.id -> child.instrument;
 					});
-				};
-				levels = collectChildren.value(finalEvent);
+				});
+			};
+			levels = collectChildren.value(finalEvent);
+			countSize = {|array|
+				var size = 0;
+				array.do({|elem|
+					if(elem.value.isArray, { size = size + countSize.value(elem.value) + 2}, {size = size + 1;});
+				});
+				size
+			};
+			defer {
+				view.bounds = Rect(0, 0, 400, max(400, tabSize * (countSize.value(levels) + 2)));
+				view.refresh;
+			}
+		}, '/g_queryTree.reply', addr).fix;
 
-				countSize = {|array|
-					var size = 0;
-					array.do({|elem|
-						if(elem.value.isArray, { size = size + countSize.value(elem.value) + 2}, {size = size + 1;});
-					});
-					size
-				};
-
-				window = Window.new(name.asString + "Node Tree",
-					Rect(128, 64, 400, 400),
-					scroll:true
-				).front;
-				window.view.hasHorizontalScroller_(false).background_(Color.black);
-
-				bounds = Rect(0, 0, 400, max(400, tabSize * (countSize.value(levels) + 2)));
-				view = UserView.new(window, bounds);
-
-				view.drawFunc = {
-					var xtabs = 0, ytabs = 0, drawFunc;
-
-					drawFunc = {|group|
-						var thisSize, rect, endYTabs;
-						xtabs = xtabs + 1;
-						ytabs = ytabs + 1;
-						Pen.font = Font(Font.defaultSansFace, 11);
-						group.do({|node|
-							if(node.value.isArray, {
-
-								thisSize = countSize.value(node);
-								endYTabs = ytabs + thisSize + 0.2;
-								rect = Rect(xtabs * tabSize,
-									ytabs * tabSize,
-									window.view.bounds.width - (xtabs * tabSize * 2),
-									thisSize * tabSize;
-								);
-								Pen.fillColor = Color.green.alpha_(0.5);
-								Pen.fillRect(rect);
-								Pen.strokeRect(rect);
-								Pen.color = Color.black;
-								Pen.stringInRect(
-									" Group" + node.key.asString +
-									(node.key == 1).if("- default group", ""),
-									rect
-								);
-								drawFunc.value(node.value);
-								ytabs = endYTabs;
-								//ytabs.postln;
-							},{
-								rect = Rect(xtabs * tabSize,
-									ytabs * tabSize,
-									7 * tabSize,
-									0.8 * tabSize
-								);
-								//rect.postln;
-								Pen.fillColor = Color.red;
-								Pen.fillRect(rect);
-								Pen.strokeRect(rect);
-								Pen.color = Color.black;
-								Pen.stringInRect(
-									" " ++ node.key.asString + node.value.asString,
-									rect
-								);
-								ytabs = ytabs + 1;
-							});
-						});
-						xtabs = xtabs - 1;
-					};
-					drawFunc.value(levels);
-				};
-			}.defer
-		}, '/g_queryTree.reply', addr).oneShot;
-		this.sendMsg("/g_queryTree", 0, 0);
+		updateFunc = {
+			fork {
+				loop {
+					this.sendMsg("/g_queryTree", 0, 0);
+					interval.wait;
+				}
+			}
+		};
+		updater = updateFunc.value;
+		CmdPeriod.add(updateFunc);
+		window.onClose = {
+			updater.stop;
+			CmdPeriod.remove(updateFunc);
+			resp.free;
+		};
 		SystemClock.sched(3, {
-			done.not.if({
-				resp.free;
+			if(done.not, {
+				defer {window.close};
 				"Server failed to respond to Group:queryTree!".warn;
 			});
 		});
-
-
 	}
 }

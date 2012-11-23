@@ -30,15 +30,26 @@ SCDocHTMLRenderer : SCDocRenderer {
     }
 
     findHelpFile {|str|
-        var path = "Help.html";
-        if(str.notNil and: {str.notEmpty}) {
-            path = if(str[0].isUpper) {
-                if(str.asSymbol.asClass.notNil)
-                    {"Classes" +/+ str ++ ".html"}
-                    {"Search.html#" ++ str};
-            } {"Overviews/Methods.html#" ++ str};
+        var old, sym, pfx = "file://" ++ SCDoc.helpTargetDir;
+
+        if(str.isNil or: {str.isEmpty}) { ^pfx +/+ "Help.html" };
+        if(SCDoc.findHelpSource(str).notNil) { ^pfx +/+ str ++ ".html" };
+
+        sym = str.asSymbol;
+        if(sym.asClass.notNil) {
+            ^pfx +/+ (if(SCDoc.findHelpSource("Classes"+/+str).isNil) {
+                (old = Help.findHelpFile(str)) !? {
+                    "OldHelpWrapper.html#"++old++"?"++SCDoc.helpTargetDir +/+ "Classes" +/+ str ++ ".html"
+                }
+            } ?? { "Classes" +/+ str ++ ".html" })
         };
-        ^ "file://" ++ SCDoc.helpTargetDir +/+ path;
+
+        ^pfx +/+ if(block {|brk|
+            Class.allClasses.do{|c| if(c.findMethod(sym).notNil) {brk.value(true)}};
+            false;
+        }) {
+            "Overviews/Methods.html#" ++ str
+        } { "Search.html#" ++ str }
     }
 
     *checkBrokenLinks {
@@ -165,7 +176,7 @@ SCDocHTMLRenderer : SCDocRenderer {
         switch(node.tag,
             'prose', {
                 if(node.display == \block, {
-                    file.write("<p>");
+                    file.write("\n<p>");
                 });
                 // FIXME: using autoLinkClasses here is often very nice, but a bit ugly when the word is not meant to be a class,
                 // like "In this building lives a big cat" or "Control your mind", etc..
@@ -268,8 +279,7 @@ SCDocHTMLRenderer : SCDocRenderer {
                         mstat = 1;
                     };
                     file.write("<h3 class='"++css++"'>");
-//                    file.write("<a class='anchor' name='"++(pfx??".")++mname++"'>");
-                    file.write("<span class='methprefix'>"++"<a class='anchor' name='"++(pfx??".")++mname++"'>"++(pfx??"&nbsp;")++"</a></span>"++"<a href='"++baseDir+/+"Overviews/Methods.html#"++this.escapeSpecialChars(mname)++"'>"++this.escapeSpecialChars(mname)++"</a>");
+                    file.write("<span class='methprefix'>"++(pfx??"&nbsp;")++"</span>"++"<a name='"++(pfx??".")++mname++"' href='"++baseDir+/+"Overviews/Methods.html#"++this.escapeSpecialChars(mname)++"'>"++this.escapeSpecialChars(mname)++"</a>");
 
                     switch (mstat,
                         // getter only
@@ -357,6 +367,13 @@ SCDocHTMLRenderer : SCDocRenderer {
             'emphasis', {
                 file.write("<em>"++this.escapeSpecialChars(node.text)++"</em>");
             },
+            'teletype', {
+                if(node.display == \block, {
+                    file.write("<pre>"++this.escapeSpecialChars(node.text)++"</pre>");
+                }, {
+                    file.write("<code>"++this.escapeSpecialChars(node.text)++"</code>");
+                });
+            },
             'strong', {
                 file.write("<strong>"++this.escapeSpecialChars(node.text)++"</strong>");
             },
@@ -376,14 +393,14 @@ SCDocHTMLRenderer : SCDocRenderer {
                 if(node.display == \block, {
                     file.write("<pre class='code prettyprint lang-sc'>"++this.autoLinkClasses(this.escapeSpecialChars(node.text))++"</pre>\n");
                 }, {
-                    file.write("<code class='code prettyprint lang-sc'>"++this.autoLinkClasses(this.escapeSpecialChars(node.text))++"</code>\n");
+                    file.write("<code class='code prettyprint lang-sc'>"++this.autoLinkClasses(this.escapeSpecialChars(node.text))++"</code>");
                 });
             },
             'formula', {
                 if(node.display == \block, {
                     file.write("<pre class='formula'>"++this.escapeSpecialChars(node.text)++"</pre>\n");
                 }, {
-                    file.write("<code class='formula'>"++this.escapeSpecialChars(node.text)++"</code>\n");
+                    file.write("<code class='formula'>"++this.escapeSpecialChars(node.text)++"</code>");
                 });
             },
             'image', {
@@ -550,6 +567,7 @@ SCDocHTMLRenderer : SCDocRenderer {
     renderHTMLHeader {|f,name,type,subtarget,toc=true|
         var x, cats, m, z;
         var folder = subtarget.dirname;
+        var undocumented = false;
         f.write("<html><head><title>"++name++"</title>");
         f.write("<link rel='stylesheet' href='"++baseDir++"/scdoc.css' type='text/css' />");
         f.write("<link rel='stylesheet' href='"++baseDir++"/frontend.css' type='text/css' />");
@@ -575,6 +593,7 @@ SCDocHTMLRenderer : SCDocRenderer {
         f.write("</div>");
         x = parser.findNode(\categories);
         if(x.text.notEmpty, {
+            undocumented = x.text.find("Undocumented").notNil;
             f.write("<div id='categories'>");
             f.write(SCDoc.splitList(x.text).collect {|r|
                 "<a href='"++baseDir +/+ "Browse.html#"++r++"'>"++r++"</a>"
@@ -638,9 +657,14 @@ SCDocHTMLRenderer : SCDocRenderer {
         });
 
         // FIXME: Remove this when conversion to new help system is done!
-        if((type==\class) and: {currentClass.notNil}, {
-            f.write("[ <a href='"++Help.findHelpFile(currentClass.name.asString)++"'>old help</a> ]");
-        });
+        if(undocumented) {
+            x = Help.findHelpFile(name);
+            x !? {
+                f.write("[ <a href='" ++ baseDir ++ "/OldHelpWrapper.html#"
+                ++x++"?"++SCDoc.helpTargetDir +/+ subtarget ++ ".html"
+                ++"'>old help</a> ]")
+            };
+        };
 
         f.write("</div>");
         if(toc, {this.renderTOC(f,name)});
@@ -654,7 +678,7 @@ SCDocHTMLRenderer : SCDocRenderer {
             "<a href=\""++link++"\">"++this.escapeSpecialChars(f)++"</a>";
         } {
             #n, m, f = link.split($#); // link, anchor, label
-            c = if(n.size>0) {baseDir+/+n++".html"} {""}; // url
+            c = if(n.size>0) {baseDir+/+n++if("[^.]+\\.[a-zA-Z0-9]+$".matchRegexp(n),"",".html")} {""}; // url
             if(m.size>0) {c=c++"#"++m}; // add #anchor
             if(f.size<1) { // no label
                 if(n.size>0) {
@@ -762,7 +786,8 @@ SCDocHTMLRenderer : SCDocRenderer {
         this.renderFootNotes(f);
 
         parser.currentFile !? {
-            f.write("<div class='doclink'>source: <a href='file://"++parser.currentFile++"'>"++parser.currentFile++"</a></div>");
+            f.write("<div class='doclink'>source: <a href='file://"++parser.currentFile++"'>"++parser.currentFile++"</a><br>");
+            f.write("link::"++subtarget++"::</div>");
         };
         //f.write("<div class='version'>SuperCollider version "++Main.version++"</div>");
         f.write("</div></body></html>");

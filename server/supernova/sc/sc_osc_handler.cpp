@@ -470,7 +470,7 @@ void sc_scheduled_bundles::execute_bundles(time_tag const & last, time_tag const
 
         if (last < next_timestamp) {
             // between last and now
-            time_tag time_since_last = last - next_timestamp;
+            time_tag time_since_last = next_timestamp - last;
             float samples_since_last = time_since_last.to_samples(world->mSampleRate);
 
             float sample_offset;
@@ -556,7 +556,11 @@ void sc_osc_handler::handle_receive_udp(const boost::system::error_code& error,
         handle_packet_async(recv_buffer_.begin(), bytes_transferred, udp_remote_endpoint_);
     else {
         overflow_vector.insert(overflow_vector.end(), recv_buffer_.begin(), recv_buffer_.end());
+#ifdef __PATHCC__
+        handle_packet_async(&overflow_vector.front(), overflow_vector.size(), udp_remote_endpoint_);
+#else
         handle_packet_async(overflow_vector.data(), overflow_vector.size(), udp_remote_endpoint_);
+#endif
         overflow_vector.clear();
     }
 
@@ -771,17 +775,21 @@ void status_perform(nova_endpoint const & endpoint)
 
     char buffer[1024];
     typedef osc::int32 i32;
+
+    float peak_load, average_load;
+    instance->cpu_load(peak_load, average_load);
+
     osc::OutboundPacketStream p(buffer, 1024);
     p << osc::BeginMessage("/status.reply")
-      << (i32)1                                    /* unused */
-      << (i32)sc_factory->ugen_count()   /* ugens */
-      << (i32)instance->synth_count()     /* synths */
-      << (i32)instance->group_count()     /* groups */
-      << (i32)instance->prototype_count() /* synthdefs */
-      << instance->cpu_load()                 /* average cpu % */
-      << instance->cpu_load()                 /* peak cpu % */
-      << instance->get_samplerate()           /* nominal samplerate */
-      << instance->get_samplerate()           /* actual samplerate */
+      << (i32)1                                 /* unused */
+      << (i32)sc_factory->ugen_count()          /* ugens */
+      << (i32)instance->synth_count()           /* synths */
+      << (i32)instance->group_count()           /* groups */
+      << (i32)instance->prototype_count()       /* synthdefs */
+      << average_load                           /* average cpu % */
+      << peak_load                              /* peak cpu % */
+      << instance->get_samplerate()             /* nominal samplerate */
+      << instance->get_samplerate()             /* actual samplerate */
       << osc::EndMessage;
 
     instance->send(p.Data(), p.Size(), endpoint);
@@ -849,7 +857,7 @@ sc_synth * add_synth(const char * name, int node_id, int action, int target_id)
     node_position_constraint pos = make_pair(target, node_position(action));
     abstract_synth * synth = instance->add_synth(name, node_id, pos);
     if (!synth)
-        log_printf("Cannot create synth (synthdef: %s, node id: %d\n", name, node_id);
+        log_printf("Cannot create synth (synthdef: %s, node id: %d)\n", name, node_id);
 
     last_generated = node_id;
     return static_cast<sc_synth*>(synth);
@@ -883,31 +891,41 @@ void set_control_array(server_node * node, control_id_type control, osc::Receive
 {
     size_t array_size = it->ArraySize(); ++it;
 
-    for (size_t i = 0; i != array_size; ++i) {
-        if (it->IsString() || it->IsSymbol()) {
-            char const * name = it->AsStringUnchecked(); ++it;
-            int bus_id;
+    if (it->IsArrayStart()) {
+        // nested arrays are basically user errors, but we handle them like normal arrays
+        log("Warning in /s_new handler: nested array argument detected");
+        set_control_array<control_id_type>(node, control, it);
+        return;
+    } else {
+        for (size_t i = 0; i != array_size; ++i) {
+            if (it->IsString() || it->IsSymbol()) {
+                char const * name = it->AsStringUnchecked(); ++it;
+                int bus_id;
 
-            switch (name[0]) {
-            case 'c':
-                bus_id = atoi(name+1);
-                static_cast<sc_synth*>(node)->map_control_bus<false>(control, i, bus_id);
-                break;
+                switch (name[0]) {
+                case 'c':
+                    bus_id = atoi(name+1);
+                    static_cast<sc_synth*>(node)->map_control_bus<false>(control, i, bus_id);
+                    break;
 
-            case 'a':
-                bus_id = atoi(name+1);
-                static_cast<sc_synth*>(node)->map_control_bus<true>(control, i, bus_id);
-                break;
+                case 'a':
+                    bus_id = atoi(name+1);
+                    static_cast<sc_synth*>(node)->map_control_bus<true>(control, i, bus_id);
+                    break;
 
-            default:
-                throw runtime_error("invalid name for control mapping");
+                default:
+                    throw runtime_error("invalid name for control mapping");
+                }
+            } else {
+                float value = extract_float_argument(it++);
+                node->set_control_array_element(control, i, value);
             }
-        } else {
-            float value = extract_float_argument(it++);
-            node->set_control_array_element(control, i, value);
         }
     }
-    assert(it->IsArrayEnd()); ++it; // skip array end
+
+    if (!it->IsArrayEnd())
+        throw runtime_error("missing array end tag");
+    ++it; // skip array end
 }
 
 template <typename ControlSpecifier>
@@ -941,10 +959,11 @@ void set_control(server_node * node, ControlSpecifier const & control, osc::Rece
 }
 
 /* set control values of node from string/float or int/float pair */
-void set_control(server_node * node, osc::ReceivedMessageArgumentIterator & it)
+void set_control(server_node * node, osc::ReceivedMessageArgumentIterator & it, osc::ReceivedMessageArgumentIterator end)
 {
     if (it->IsInt32()) {
         osc::int32 index = it->AsInt32Unchecked(); ++it;
+        if (it == end) return; // sclang sometimes uses an integer instead of an empty argument list
         set_control(node, index, it);
     } else if (it->IsString()) {
         const char * str = it->AsStringUnchecked(); ++it;
@@ -955,7 +974,7 @@ void set_control(server_node * node, osc::ReceivedMessageArgumentIterator & it)
 
 void handle_s_new(received_message const & msg)
 {
-    osc::ReceivedMessageArgumentIterator args = msg.ArgumentsBegin();
+    osc::ReceivedMessageArgumentIterator args = msg.ArgumentsBegin(), end = msg.ArgumentsEnd();
 
     const char * def_name = args->AsString(); ++args;
     int32_t id = args->AsInt32(); ++args;
@@ -965,12 +984,12 @@ void handle_s_new(received_message const & msg)
 
     int32_t action, target;
 
-    if (args != msg.ArgumentsEnd()) {
+    if (args != end) {
         action = args->AsInt32(); ++args;
     } else
         action = 0;
 
-    if (args != msg.ArgumentsEnd()) {
+    if (args != end) {
         target = args->AsInt32(); ++args;
     } else
         target = 0;
@@ -980,12 +999,11 @@ void handle_s_new(received_message const & msg)
     if (synth == NULL)
         return;
 
-    while (args != msg.ArgumentsEnd()) {
-        try {
-            set_control(synth, args);
-        } catch(std::exception & e) {
-            log_printf("exception in /s_new: %s\n", e.what());
-        }
+    try {
+        while (args != end)
+            set_control(synth, args, end);
+    } catch(std::exception & e) {
+        log_printf("exception in /s_new: %s\n", e.what());
     }
 }
 
@@ -1085,6 +1103,9 @@ void g_query_tree_fill_node(osc::OutboundPacketStream & p, bool flag, server_nod
                     p << scsynth.mControls[i];
             }
         }
+    } else {
+        abstract_group const & group = static_cast<abstract_group const &>(node);
+        group.apply_on_children(boost::bind(g_query_tree_fill_node, boost::ref(p), flag, _1));
     }
 }
 
@@ -1245,15 +1266,26 @@ void handle_n_##cmd(received_message const & msg)                       \
     if (!node)                                                          \
         return;                                                         \
                                                                         \
-    while (it != msg.ArgumentsEnd()) {                                  \
-        try {                                                           \
+    try {                                                               \
+        while (it != msg.ArgumentsEnd())                                \
             function(node, it);                                         \
-        } catch(std::exception & e) {                                   \
-            log_printf("Exception during /n_" #cmd "handler: %s\n", e.what());\
-            return;                                                     \
-        }                                                               \
+    } catch(std::exception & e) {                                       \
+        log_printf("Exception during /n_" #cmd "handler: %s\n", e.what());\
     }                                                                   \
 }
+
+void set_control(server_node * node, osc::ReceivedMessageArgumentIterator & it)
+{
+    if (it->IsInt32()) {
+        osc::int32 index = it->AsInt32Unchecked(); ++it;
+        set_control(node, index, it);
+    } else if (it->IsString()) {
+        const char * str = it->AsStringUnchecked(); ++it;
+        set_control(node, str, it);
+    } else
+        throw runtime_error("invalid argument");
+}
+
 
 HANDLE_N_DECORATOR(set, set_control)
 
@@ -1321,7 +1353,7 @@ template <bool IsAudio, typename slot_type>
 void apply_control_busn_mapping(server_node & node, slot_type slot, int bus_index, int count)
 {
     if (node.is_synth())
-        static_cast<sc_synth&>(node).map_control_bus<IsAudio>(slot, bus_index, count);
+        static_cast<sc_synth&>(node).map_control_buses<IsAudio>(slot, bus_index, count);
     else
         static_cast<abstract_group&>(node).apply_on_children(boost::bind(apply_control_busn_mapping<IsAudio, slot_type>, _1,
                                                                          slot, bus_index, count));
@@ -1664,8 +1696,7 @@ struct completion_message
     completion_message(size_t size, const void * data):
         size_(size)
     {
-        if (size)
-        {
+        if (size) {
             data_ = system_callback::allocate(size);
             memcpy(data_, data, size);
         }
@@ -1679,9 +1710,15 @@ struct completion_message
     /** copy constructor has move semantics!!! */
     completion_message(completion_message const & rhs)
     {
+        operator=(rhs);
+    }
+
+    completion_message& operator=(completion_message const & rhs)
+    {
         size_ = rhs.size_;
         data_ = rhs.data_;
         const_cast<completion_message&>(rhs).size_ = 0;
+        return *this;
     }
 
     ~completion_message(void)
@@ -1695,8 +1732,7 @@ struct completion_message
      */
     void trigger_async(nova_endpoint const & endpoint)
     {
-        if (size_)
-        {
+        if (size_) {
             sc_osc_handler::received_packet * p =
                 sc_osc_handler::received_packet::alloc_packet((char*)data_, size_, endpoint);
             instance->add_sync_callback(p);

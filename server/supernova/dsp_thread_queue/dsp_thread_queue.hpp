@@ -37,7 +37,9 @@
 #include <boost/lockfree/stack.hpp>
 
 #include "nova-tt/semaphore.hpp"
+
 #include "utilities/branch_hints.hpp"
+#include "utilities/utils.hpp"
 
 namespace nova
 {
@@ -196,11 +198,9 @@ public:
         printf("\titem %p\n", this);
         printf("\tactivation limit %d\n", int(activation_limit));
 
-        if (!successors.empty())
-        {
+        if (!successors.empty()) {
             printf("\tsuccessors:\n");
-            BOOST_FOREACH(dsp_thread_queue_item * item, successors)
-            {
+            BOOST_FOREACH(dsp_thread_queue_item * item, successors) {
                 printf("\t\t%p\n", item);
             }
         }
@@ -224,8 +224,7 @@ private:
     {
         dsp_thread_queue_item * ptr;
         std::size_t i = 0;
-        for (;;)
-        {
+        for (;;) {
             if (i == successors.size())
                 return NULL;
 
@@ -234,8 +233,7 @@ private:
                 break; // no need to update the next item to run
         }
 
-        while (i != successors.size())
-        {
+        while (i != successors.size()) {
             dsp_thread_queue_item * next = successors[i++]->dec_activation_count(interpreter);
             if (next)
                 interpreter.mark_as_runnable(next);
@@ -272,7 +270,9 @@ class dsp_thread_queue
     typedef boost::uint_fast16_t node_count_t;
 
     typedef nova::dsp_thread_queue_item<runnable, Alloc> dsp_thread_queue_item;
-    typedef std::vector<dsp_thread_queue_item*, Alloc> item_vector_t;
+    typedef std::vector<dsp_thread_queue_item*,
+                        typename Alloc::template rebind<dsp_thread_queue_item*>::other
+                       > item_vector_t;
 
     typedef typename Alloc::template rebind<dsp_thread_queue_item>::other item_allocator;
 
@@ -547,19 +547,44 @@ public:
 
 
 private:
+    struct backup
+    {
+        backup(int min, int max): min(min), max(max), loops(min) {}
+
+        void run(void)
+        {
+            for (int i = 0; i != loops; ++i)
+                asm(""); // empty asm to avoid optimization
+
+            loops = std::min(loops * 2, max);
+        }
+
+        void reset(void)
+        {
+            loops = min;
+        }
+
+        int min, max, loops;
+    };
+
     void run_item(thread_count_t index)
     {
-        for (;;)
-        {
-            if (node_count.load(boost::memory_order_acquire))
-            {
+        backup b(256, 32768);
+        for (;;) {
+            if (node_count.load(boost::memory_order_acquire)) {
                 /* we still have some nodes to process */
                 int state = run_next_item(index);
 
-                if (state == no_remaining_items)
+                switch (state) {
+                case no_remaining_items:
                     return;
-            }
-            else
+                case fifo_empty:
+                    b.run();
+
+                default:
+                    b.reset();
+                }
+            } else
                 return;
         }
     }
@@ -584,7 +609,7 @@ private:
         {} // busy-wait for helper threads to finish
     }
 
-    int run_next_item(thread_count_t index)
+    HOT int run_next_item(thread_count_t index)
     {
         dsp_thread_queue_item * item;
         bool success = runnable_set.pop(item);
@@ -594,8 +619,7 @@ private:
 
         node_count_t consumed = 0;
 
-        do
-        {
+        do {
             item = item->run(*this, index);
             consumed += 1;
         } while (item != NULL);

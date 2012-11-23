@@ -20,11 +20,11 @@
 
 #include "SC_PlugIn.h"
 #include <cstdio>
+#include <cmath>
+#include <limits>
 
-#ifndef MAXFLOAT
-# include <float.h>
-# define MAXFLOAT FLT_MAX
-#endif
+using std::floor;
+using std::numeric_limits;
 
 static InterfaceTable *ft;
 
@@ -312,7 +312,7 @@ void Demand_next_aa(Demand *unit, int inNumSamples)
 			for (int j=2, k=0; j<unit->mNumInputs; ++j, ++k) {
 				float x = DEMANDINPUT_A(j, i + 1);
 				//printf("in  %d %g\n", k, x);
-				if (sc_isnan(x)) x = prevout[k];
+				if (sc_isnan(x)) { x = prevout[k]; unit->mDone = true; }
 				else prevout[k] = x;
 				out[k][i] = x;
 			}
@@ -356,7 +356,7 @@ void Demand_next_ak(Demand *unit, int inNumSamples)
 		if (ztrig > 0.f && prevtrig <= 0.f) {
 			for (int j=2, k=0; j<unit->mNumInputs; ++j, ++k) {
 				float x = DEMANDINPUT_A(j, i + 1);
-				if (sc_isnan(x)) x = prevout[k];
+				if (sc_isnan(x)) { x = prevout[k]; unit->mDone = true; }
 				else prevout[k] = x;
 				out[k][i] = x;
 			}
@@ -401,7 +401,7 @@ void Demand_next_ka(Demand *unit, int inNumSamples)
 		if (ztrig > 0.f && prevtrig <= 0.f) {
 			for (int j=2, k=0; j<unit->mNumInputs; ++j, ++k) {
 				float x = DEMANDINPUT_A(j, i + 1);
-				if (sc_isnan(x)) x = prevout[k];
+				if (sc_isnan(x)) { x = prevout[k]; unit->mDone = true; }
 				else prevout[k] = x;
 				out[k][i] = x;
 			}
@@ -723,7 +723,7 @@ void DemandEnvGen_next_k(DemandEnvGen *unit, int inNumSamples)
 				if(sc_isnan(dur)) {
 					release = true;
 					running = false;
-					phase = MAXFLOAT;
+					phase = numeric_limits<float>::max();
 				} else {
 					phase = dur * ZIN0(d_env_timeScale) * SAMPLERATE + phase;
 				}
@@ -987,7 +987,7 @@ void DemandEnvGen_next_a(DemandEnvGen *unit, int inNumSamples)
 				if(sc_isnan(dur)) {
 					release = true;
 					running = false;
-					phase = MAXFLOAT;
+					phase = numeric_limits<float>::max();
 				} else {
 					phase = dur * ZIN0(d_env_timeScale) * SAMPLERATE + phase;
 				}
@@ -1566,6 +1566,7 @@ void Dseq_next(Dseq *unit, int inNumSamples)
 			float x = DEMANDINPUT_A(0, inNumSamples);
 			unit->m_repeats = sc_isnan(x) ? 0.f : floor(x + 0.5f);
 		}
+		int attempts = 0;
 		while (true) {
 			//Print("   unit->m_index %d   unit->m_repeatCount %d\n", unit->m_index, unit->m_repeatCount);
 			if (unit->m_index >= unit->mNumInputs) {
@@ -1596,6 +1597,11 @@ void Dseq_next(Dseq *unit, int inNumSamples)
 				//Print("   unit->m_index %d   OUT0(0) %g\n", unit->m_index, OUT0(0));
 				unit->m_index++;
 				unit->m_needToResetChild = true;
+				return;
+			}
+
+			if (attempts++ > unit->mNumInputs) {
+				Print("Warning: empty sequence in Dseq\n");
 				return;
 			}
 		}
@@ -1971,26 +1977,23 @@ void Dswitch1_Ctor(Dswitch1 *unit)
 
 void Dswitch_next(Dswitch *unit, int inNumSamples)
 {
-	int index;
-	float ival;
 	if (inNumSamples) {
 		float val = DEMANDINPUT_A(unit->m_index, inNumSamples);
 		//printf("index: %i\n", (int) val);
 		if(sc_isnan(val)) {
-			ival = DEMANDINPUT_A(0, inNumSamples);
+			float ival = DEMANDINPUT_A(0, inNumSamples);
 
-			if(sc_isnan(ival)) {
-				OUT0(0) = ival;
-				return;
+			if(sc_isnan(ival))
+				val = ival;
+			else {
+				int index = (int32)floor(ival + 0.5f);
+				index = sc_wrap(index, 0, unit->mNumInputs - 2) + 1;
+				val = DEMANDINPUT_A(index, inNumSamples);
+
+				RESETINPUT(unit->m_index);
+				// printf("resetting index: %i\n", unit->m_index);
+				unit->m_index = index;
 			}
-
-			index = (int32)floor(ival + 0.5f);
-			index = sc_wrap(index, 0, unit->mNumInputs - 2) + 1;
-			val = DEMANDINPUT_A(unit->m_index, inNumSamples);
-
-			RESETINPUT(unit->m_index);
-			// printf("resetting index: %i\n", unit->m_index);
-			unit->m_index = index;
 		}
 		OUT0(0) = val;
 
@@ -1999,7 +2002,7 @@ void Dswitch_next(Dswitch *unit, int inNumSamples)
 		for (int i=0; i<unit->mNumInputs; ++i) {
 			RESETINPUT(i);
 		}
-		index = (int32)floor(DEMANDINPUT(0) + 0.5f);
+		int index = (int32)floor(DEMANDINPUT(0) + 0.5f);
 		index = sc_wrap(index, 0, unit->mNumInputs - 1) + 1;
 		unit->m_index = index;
 	}

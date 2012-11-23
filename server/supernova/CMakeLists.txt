@@ -49,6 +49,8 @@ set(libsupernova_src
     sc/sc_ugen_factory.cpp
     ../scsynth/Samp.cpp
     ${CMAKE_SOURCE_DIR}/common/SC_fftlib.cpp
+    ${CMAKE_SOURCE_DIR}/common/SC_DirUtils.cpp
+    ${CMAKE_SOURCE_DIR}/common/SC_StandAloneInfo_Darwin.cpp
     server/buffer_manager.cpp
     server/dsp_context.cpp
     server/memory_pool.cpp
@@ -100,6 +102,10 @@ if (FFTW3F_FOUND)
 	target_link_libraries(libsupernova ${FFTW3F_LIBRARY})
 endif()
 
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    target_link_libraries(libsupernova rt)
+endif()
+
 target_link_libraries(libsupernova oscpack tlsf boost_thread boost_system boost_filesystem boost_program_options ${PTHREADS_LIBRARIES})
 target_link_libraries(supernova libsupernova)
 
@@ -128,5 +134,5 @@ endif()
 
 if (APPLE)
     target_link_libraries(supernova "-framework vecLib")
-    target_link_libraries(supernova "-framework CoreAudio")
+    target_link_libraries(supernova "-framework CoreAudio -framework CoreServices")
 endif()

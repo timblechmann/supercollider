@@ -48,7 +48,7 @@ class sc_synthdef
     typedef std::vector<char, aligned_allocator<char> > char_vector;
 
 public:
-    typedef std::map<string, int, std::less<string>, aligned_allocator<int> > parameter_map_t;
+    typedef std::map<string, int, std::less<string>, aligned_allocator<string> > parameter_map_t;
 
     struct input_spec
     {
@@ -68,7 +68,7 @@ public:
         int16_t source;   /* index of ugen or -1 for constant */
         int16_t index;    /* number of output or constant index */
     };
-    typedef std::vector<input_spec, aligned_allocator<struct input_spec> > input_spec_vector;
+    typedef std::vector<input_spec, aligned_allocator<input_spec> > input_spec_vector;
 
     struct unit_spec_t
     {
@@ -85,6 +85,11 @@ public:
         unit_spec_t(unit_spec_t && rhs):
             name(std::move(rhs.name)), rate(rhs.rate), special_index(rhs.special_index),
             input_specs(std::move(rhs.input_specs)), output_specs(std::move(rhs.output_specs))
+        {}
+
+        unit_spec_t(unit_spec_t const & rhs):
+            name(rhs.name), rate(rhs.rate), special_index(rhs.special_index),
+            input_specs(rhs.input_specs), output_specs(rhs.output_specs)
         {}
 #endif
         string name;
@@ -120,6 +125,12 @@ public:
         name_(std::move(rhs.name_)), constants(std::move(rhs.constants)), parameters(std::move(rhs.parameters)),
         parameter_map(std::move(rhs.parameter_map)), graph(std::move(rhs.graph)), buffer_count(rhs.buffer_count),
         calc_unit_indices(std::move(rhs.calc_unit_indices)), memory_requirement_(rhs.memory_requirement_)
+    {}
+
+    sc_synthdef(sc_synthdef const & rhs):
+        name_(rhs.name_), constants(rhs.constants), parameters(rhs.parameters),
+        parameter_map(rhs.parameter_map), graph(rhs.graph), buffer_count(rhs.buffer_count),
+        calc_unit_indices(rhs.calc_unit_indices), memory_requirement_(rhs.memory_requirement_)
     {}
 #endif
 

@@ -317,6 +317,19 @@ function SChelp(subject)
 	endif
 endfun
 
+" search help files for word under the cursor
+" or open the HelpBrowser front page
+function! HelpBrowser(subject)
+    if strlen(a:subject) > 0 && a:subject!~" " && a:subject!~"\t" 
+        let string= "HelpBrowser.openHelpFor"
+        let format= "(\"" . a:subject . "\");"
+        let string= string . format
+        call SendToSC(string)
+    else 
+        call SendToSC('Help.gui;')
+    endif
+endfunction
+
 function ListSCObjects(A,L,P)
 	return system("cat $SCVIM_CACHE_DIR/sc_object_completion")
 endfun

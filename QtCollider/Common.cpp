@@ -1,11 +1,28 @@
 #include "Common.h"
+#include "Slot.h"
 
-void QtCollider::lockLang()
+#include <PyrKernel.h>
+#include <VMGlobals.h>
+#include <PyrLexer.h>
+
+// WARNING: QtCollider::lockLang() must be called before
+void QtCollider::runLang (
+  PyrObjectHdr *receiver,
+  PyrSymbol *method,
+  const QList<QVariant> & args,
+  PyrSlot *result )
 {
-  qcDebugMsg(2,"locking lang!");
-  pthread_mutex_lock (&gLangMutex);
-  qcDebugMsg(2,"locked");
-  return;
+  VMGlobals *g = gMainVMGlobals;
+  g->canCallOS = true;
+  ++g->sp;  SetObject(g->sp, receiver);
+  Q_FOREACH( QVariant var, args ) {
+    ++g->sp;
+    if( !Slot::setVariant( g->sp, var ) )
+      SetNil( g->sp );
+  }
+  runInterpreter(g, method, args.size() + 1);
+  g->canCallOS = false;
+  if (result) slotCopy(result, &g->result);
 }
 
 int QtCollider::wrongThreadError ()

@@ -10,6 +10,7 @@ include_directories(
 	${CMAKE_SOURCE_DIR}/include/common
 	${CMAKE_SOURCE_DIR}/include/lang
 	${CMAKE_SOURCE_DIR}/include/plugin_interface
+	${CMAKE_SOURCE_DIR}/include/server
 	${CMAKE_SOURCE_DIR}/editors/scapp/include
 	${CMAKE_SOURCE_DIR}/editors/scapp/include/SMLAdvancedFind
 	${CMAKE_SOURCE_DIR}/editors/scapp/include/SMLAdvancedFind/ICU
@@ -19,6 +20,8 @@ include_directories(
 	${CMAKE_SOURCE_DIR}/external_libraries/boost_lockfree
 	${CMAKE_SOURCE_DIR}/external_libraries/boost
 	${CMAKE_SOURCE_DIR}/external_libraries/threadpool
+	${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.2.6/include
+	${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src
 	)
 
 find_package(Sndfile)
@@ -40,7 +43,6 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/PyrPlatformPrim.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/PyrSerialPrim.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/PyrStringPrim.cpp
-	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/PyrUStringPrim.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/PyrSymbolPrim.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/PyrUnixPrim.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/SC_Speech.M
@@ -83,7 +85,6 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/common/SC_StringParser.cpp
 	${CMAKE_SOURCE_DIR}/common/scsynthsend.cpp
 	${CMAKE_SOURCE_DIR}/common/sc_popen.cpp
-	${CMAKE_SOURCE_DIR}/common/strtod.c
 
 	${CMAKE_SOURCE_DIR}/editors/scapp/CocoaBridgePrimitives.M
 	${CMAKE_SOURCE_DIR}/editors/scapp/CocoaFilePrimitives.M
@@ -107,7 +108,7 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/editors/scapp/TabletEvents.m
 	${CMAKE_SOURCE_DIR}/editors/scapp/TextFinder.m
 	${CMAKE_SOURCE_DIR}/editors/scapp/UserPanel.M
-	${CMAKE_SOURCE_DIR}/editors/scapp/main.m
+	${CMAKE_SOURCE_DIR}/editors/scapp/main.M
 	${CMAKE_SOURCE_DIR}/editors/scapp/post_queue.M
 	${CMAKE_SOURCE_DIR}/editors/scapp/syntaxColorize.M
 	${CMAKE_SOURCE_DIR}/editors/scapp/SMLAdvancedFind/SMLAdvancedFindController.m
@@ -117,8 +118,22 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/editors/scapp/SMLAdvancedFind/ICU/NSStringICUAdditions.m
 	)
 
+file(GLOB boost_system_sources ${CMAKE_SOURCE_DIR}/external_libraries/boost/libs/system/src/*cpp)
+file(GLOB boost_fs_sources ${CMAKE_SOURCE_DIR}/external_libraries/boost/libs/filesystem/v3/src/*cpp)
+file(GLOB boost_regex_sources ${CMAKE_SOURCE_DIR}/external_libraries/boost/libs/regex/src/*cpp)
+list(APPEND scapp_sources ${boost_fs_sources} ${boost_system_sources} ${boost_regex_sources})
+
+file(GLOB yaml_sources ${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.2.6/src/*cpp)
+list(APPEND scapp_sources ${yaml_sources})
+
+if(SC_QT)
+	include(${CMAKE_SOURCE_DIR}/QtCollider/CMakeLists.txt)
+	list(APPEND scapp_sources ${QT_COLLIDER_SRCS})
+endif()
+
 set(objcpp_sources
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/SC_Speech.M
+	${CMAKE_SOURCE_DIR}/editors/scapp/main.M
 	${CMAKE_SOURCE_DIR}/editors/scapp/CocoaBridgePrimitives.M
 	${CMAKE_SOURCE_DIR}/editors/scapp/CocoaFilePrimitives.M
 	${CMAKE_SOURCE_DIR}/editors/scapp/DrawBackground.M
@@ -145,7 +160,6 @@ set(objc_sources
 	${CMAKE_SOURCE_DIR}/editors/scapp/SCNSWindow.m
 	${CMAKE_SOURCE_DIR}/editors/scapp/TabletEvents.m
 	${CMAKE_SOURCE_DIR}/editors/scapp/TextFinder.m
-	${CMAKE_SOURCE_DIR}/editors/scapp/main.m
 	${CMAKE_SOURCE_DIR}/editors/scapp/SMLAdvancedFind/SMLAdvancedFindController.m
 	${CMAKE_SOURCE_DIR}/editors/scapp/SMLAdvancedFind/SMLStatusBarTextFieldCell.m
 	${CMAKE_SOURCE_DIR}/editors/scapp/SMLAdvancedFind/ICU/ICUMatcher.m
@@ -198,13 +212,8 @@ else()
 		)
 endif()
 
-if (SC_QT)
-	include_directories(${CMAKE_SOURCE_DIR}/include/QtCollider)
-	target_link_libraries(${scappbundlename} QtCollider)
-	set_property(TARGET ${scappbundlename}
-		APPEND
-		PROPERTY COMPILE_DEFINITIONS SC_QT
-		)
+if(SC_QT)
+	target_link_libraries(${scappbundlename} ${QT_COLLIDER_LIBS})
 endif()
 
 # for processing into the plist:

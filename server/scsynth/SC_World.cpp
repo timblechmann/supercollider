@@ -59,6 +59,9 @@
 # include <sys/mman.h>
 #endif
 
+#include "server_shm.hpp"
+
+
 InterfaceTable gInterfaceTable;
 PrintFunc gPrint = 0;
 
@@ -67,8 +70,14 @@ extern HashTable<struct BufGen, Malloc> *gBufGenLib;
 extern HashTable<PlugInCmd, Malloc> *gPlugInCmds;
 
 extern "C" {
+
+#ifdef NO_LIBSNDFILE
+struct SF_INFO {};
+#endif
+
 int sndfileFormatInfoFromStrings(struct SF_INFO *info,
 	const char *headerFormatString, const char *sampleFormatString);
+
 bool SendMsgToEngine(World *inWorld, FifoMsg& inMsg);
 bool SendMsgFromEngine(World *inWorld, FifoMsg& inMsg);
 }
@@ -184,7 +193,10 @@ void *zalloc(size_t n, size_t size)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void InterfaceTable_Init();
+static bool getScopeBuffer(World *inWorld, int index, int channels, int maxFrames, ScopeBufferHnd &hnd);
+static void pushScopeBuffer(World *inWorld, ScopeBufferHnd &hnd, int frames);
+static void releaseScopeBuffer(World *inWorld, ScopeBufferHnd &hnd);
+
 void InterfaceTable_Init()
 {
 	InterfaceTable *ft = &gInterfaceTable;
@@ -245,6 +257,10 @@ void InterfaceTable_Init()
 	ft->fSCfftDestroy = &scfft_destroy;
 	ft->fSCfftDoFFT = &scfft_dofft;
 	ft->fSCfftDoIFFT = &scfft_doifft;
+
+	ft->fGetScopeBuffer = &getScopeBuffer;
+	ft->fPushScopeBuffer = &pushScopeBuffer;
+	ft->fReleaseScopeBuffer = &releaseScopeBuffer;
 }
 
 void initialize_library(const char *mUGensPluginPath);
@@ -271,7 +287,7 @@ void World_LoadGraphDefs(World* world)
 			sc_GetResourceDirectory(resourceDir, MAXPATHLEN);
 		else
 			sc_GetUserAppSupportDirectory(resourceDir, MAXPATHLEN);
-		sc_AppendToPath(resourceDir, "synthdefs");
+		sc_AppendToPath(resourceDir, MAXPATHLEN, "synthdefs");
 		if(world->mVerbosity > 0)
 			scprintf("Loading synthdefs from default path: %s\n", resourceDir);
 		list = GraphDef_LoadDir(world, resourceDir, list);
@@ -357,13 +373,18 @@ SC_DLLEXPORT_C World* World_New(WorldOptions *inOptions)
 		world->mErrorNotification = 1;  // i.e., 0x01 | 0x02
 		world->mLocalErrorNotification = 0;
 
-		world->mNumSharedControls = inOptions->mNumSharedControls;
+		if (inOptions->mSharedMemoryID) {
+			server_shared_memory_creator::cleanup(inOptions->mSharedMemoryID);
+			hw->mShmem = new server_shared_memory_creator(inOptions->mSharedMemoryID, inOptions->mNumControlBusChannels);
+			world->mControlBus = hw->mShmem->get_control_busses();
+		} else
+			world->mControlBus = (float*)zalloc(world->mNumControlBusChannels, sizeof(float));
+
+		world->mNumSharedControls = 0;
 		world->mSharedControls = inOptions->mSharedControls;
 
 		int numsamples = world->mBufLength * world->mNumAudioBusChannels;
 		world->mAudioBus = (float*)zalloc(numsamples, sizeof(float));
-
-		world->mControlBus = (float*)zalloc(world->mNumControlBusChannels, sizeof(float));
 
 		world->mAudioBusTouched = (int32*)zalloc(inOptions->mNumAudioBusChannels, sizeof(int32));
 		world->mControlBusTouched = (int32*)zalloc(inOptions->mNumControlBusChannels, sizeof(int32));
@@ -1025,7 +1046,10 @@ SC_DLLEXPORT_C void World_Cleanup(World *world)
 
 	free(world->mControlBusTouched);
 	free(world->mAudioBusTouched);
-	free(world->mControlBus);
+	if (hw->mShmem) {
+		delete hw->mShmem;
+	} else
+		free(world->mControlBus);
 	free(world->mAudioBus);
 	delete [] world->mRGen;
 	if (hw) {
@@ -1054,6 +1078,41 @@ void World_NRTLock(World *world)
 void World_NRTUnlock(World *world)
 {
 	world->mNRTLock->Unlock();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+bool getScopeBuffer(World *inWorld, int index, int channels, int maxFrames, ScopeBufferHnd &hnd)
+{
+	server_shared_memory_creator * shm = inWorld->hw->mShmem;
+
+	scope_buffer_writer writer = shm->get_scope_buffer_writer( index, channels, maxFrames );
+
+	if( writer.valid() ) {
+		hnd.internalData = writer.buffer;
+		hnd.data = writer.data();
+		hnd.channels = channels;
+		hnd.maxFrames = maxFrames;
+		return true;
+	}
+	else {
+		hnd.internalData = 0;
+		return false;
+	}
+}
+
+void pushScopeBuffer(World *inWorld, ScopeBufferHnd &hnd, int frames)
+{
+	scope_buffer_writer writer(reinterpret_cast<scope_buffer*>(hnd.internalData));
+	writer.push(frames);
+	hnd.data = writer.data();
+}
+
+void releaseScopeBuffer(World *inWorld, ScopeBufferHnd &hnd)
+{
+	scope_buffer_writer writer(reinterpret_cast<scope_buffer*>(hnd.internalData));
+	server_shared_memory_creator * shm = inWorld->hw->mShmem;
+	shm->release_scope_buffer_writer( writer );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1160,7 +1219,14 @@ int sndfileFormatInfoFromStrings(struct SF_INFO *info, const char *headerFormatS
 	info->format = (unsigned int)(headerFormat | sampleFormat);
 	return kSCErr_None;
 }
-#endif
+
+#else // NO_LIBSNDFILE
+
+int sndfileFormatInfoFromStrings(struct SF_INFO *info, const char *headerFormatString, const char *sampleFormatString) {
+	return kSCErr_Failed;
+}
+
+#endif // NO_LIBSNDFILE
 
 #include "scsynthsend.h"
 

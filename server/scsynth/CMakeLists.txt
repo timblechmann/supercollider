@@ -19,7 +19,9 @@ else()
 endif()
 
 
-if (APPLE)
+if (NO_AVAHI)
+
+elseif (APPLE)
 	add_definitions(-DUSE_RENDEZVOUS=1)
 else()
 	find_package(Avahi)
@@ -89,6 +91,8 @@ set(scsynth_sources
 	${CMAKE_SOURCE_DIR}/common/SC_StringParser.cpp
 	${CMAKE_SOURCE_DIR}/common/scsynthsend.cpp
 	${CMAKE_SOURCE_DIR}/common/sc_popen.cpp
+
+	${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src/tlsf.c
 )
 
 if(WIN32)
@@ -96,7 +100,7 @@ if(WIN32)
 endif()
 
 if (FFT_GREEN)
-	list(APPEND scsynth_sources ../common/fftlib.c)
+	list(APPEND scsynth_sources ../../common/fftlib.c)
 endif()
 
 if (FFTW3F_FOUND)
@@ -105,12 +109,15 @@ endif()
 
 
 include_directories(${CMAKE_SOURCE_DIR}/include/common
+                    ${CMAKE_SOURCE_DIR}/common
                     ${CMAKE_SOURCE_DIR}/include/server
                     ${CMAKE_SOURCE_DIR}/include/plugin_interface)
 
+include_directories (${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src)
+
 set_property(DIRECTORY
              APPEND
-             PROPERTY COMPILE_DEFINITIONS SC_MEMORY_ALIGNMENT=16)
+             PROPERTY COMPILE_DEFINITIONS SC_MEMORY_ALIGNMENT=32)
 
 if (AUDIOAPI STREQUAL jack)
 	list(APPEND scsynth_sources SC_Jack.cpp)
@@ -187,6 +194,11 @@ endif()
 if (APPLE)
 	target_link_libraries(libscsynth "-framework vecLib -framework CoreServices")
 endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	target_link_libraries(libscsynth rt)
+endif()
+
 
 add_executable(scsynth scsynth_main.cpp)
 target_link_libraries(scsynth libscsynth ${PTHREADS_LIBRARY})

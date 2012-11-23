@@ -1,6 +1,6 @@
 SCDoc {
     // Increment this whenever we make a change to the SCDoc system so that all help-files should be processed again
-    classvar version = 17;
+    classvar version = 21;
 
     classvar <helpTargetDir;
     classvar <helpSourceDir;
@@ -142,7 +142,7 @@ SCDoc {
         var cats, c, map;
         this.postProgress("Creating category map...");
         map = Dictionary.new;
-        doc_map.pairsDo {|k,v|
+        this.docMap.pairsDo {|k,v|
             cats = this.splitList(v.categories);
             cats = cats ? ["Uncategorized"];
             cats.do {|cat|
@@ -303,8 +303,23 @@ SCDoc {
         }
     }
 
+    *findHelpSource {|subtarget|
+        var src;
+        this.findHelpSourceDirs;
+        block {|break|
+            helpSourceDirs.do {|dir|
+                var x = dir+/+subtarget++".schelp";
+                if(File.exists(x)) {
+                    src = x;
+                    break.value;
+                };
+            };
+        };
+        ^src
+    }
+
     *prepareHelpForURL {|url|
-        var proto, path, anchor;
+        var proto, path, query, anchor;
         var subtarget, src, c, cmd;
         var verpath = this.helpTargetDir +/+ "version";
 
@@ -327,7 +342,7 @@ SCDoc {
 
             // parse URL
             url = url.replace("%20"," ");
-            #proto, path, anchor = url.findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1];
+            #proto, path, query, anchor = url.findRegexp("(^\\w+://)?([^#?]+)(\\?[^#]+)?(#.*)?")[1..].flop[1];
             if(proto.isEmpty) {proto="file://"};
             if(proto!="file://") {isProcessing = false; ^url}; // just pass through remote url's
             if(path.beginsWith(helpTargetDir).not) {isProcessing = false; ^url}; // just pass through remote url's
@@ -346,16 +361,7 @@ SCDoc {
             subtarget = path[helpTargetDir.size+1 .. path.findBackwards(".")?path.size-1];
 
             // find help source file
-            block {|break|
-                src = nil;
-                helpSourceDirs.do {|dir|
-                    var x = dir+/+subtarget++".schelp";
-                    if(File.exists(x)) {
-                        src = x;
-                        break.value;
-                    };
-                };
-            };
+            src = this.findHelpSource(subtarget);
 
             // create a simple stub if class was undocumented
             if(src.isNil and: {subtarget.dirname=="Classes"}) {
@@ -530,7 +536,7 @@ SCDoc {
         this.postProgress("Synchronizing non-schelp files...");
         this.checkSystemCmd("rsync");
 
-        cmd = "rsync -rlt --exclude '*.schelp' --exclude '.*' %/ %";
+        cmd = "rsync -rlt --chmod=u+rwX --exclude '*.schelp' --exclude '.*' %/ %";
 
         if(doWait) {
             c = Condition.new;
@@ -700,7 +706,7 @@ SCDoc {
     }
 
     *findHelpFile {|str|
-        ^r.findHelpFile(str);
+        ^r.findHelpFile(str.stripWhiteSpace);
     }
 }
 
@@ -736,4 +742,10 @@ SCDoc {
                     {true})
         );
     }
+}
+
++ Help {
+	*dir {
+		^SCDoc.helpTargetDir
+	}
 }

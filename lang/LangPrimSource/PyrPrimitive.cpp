@@ -45,6 +45,15 @@
 #include "PyrDeepFreezer.h"
 //#include "Wacom.h"
 #include "InitAlloc.h"
+#include "SC_LibraryConfig.h"
+#include "SC_DirUtils.h"
+
+
+#ifdef SC_WIN32
+# include <direct.h>
+#else
+# include <sys/param.h>
+#endif
 
 #ifdef SC_QT
 #  include "QtCollider.h"
@@ -2038,62 +2047,83 @@ int prDumpBackTrace(struct VMGlobals *g, int numArgsPushed)
 	return errNone;
 }
 
-
-void MakeDebugFrame(VMGlobals *g, PyrFrame *frame, PyrSlot *outSlot);
-void MakeDebugFrame(VMGlobals *g, PyrFrame *frame, PyrSlot *outSlot)
+/* the DebugFrameConstructor uses a work queue in order to avoid recursions, which could lead to stack overflows */
+struct DebugFrameConstructor
 {
-	int i, j;
-	PyrMethod *meth;
-	PyrMethodRaw *methraw;
+	void makeDebugFrame (VMGlobals *g, PyrFrame *frame, PyrSlot *outSlot)
+	{
+		workQueue.push_back(std::make_pair(frame, outSlot));
+		run_queue(g);
+	}
 
-	meth = slotRawMethod(&frame->method);
-	methraw = METHRAW(meth);
-
-	PyrObject* debugFrameObj = instantiateObject(g->gc, getsym("DebugFrame")->u.classobj, 0, false, true);
-	SetObject(outSlot, debugFrameObj);
-
-	SetObject(debugFrameObj->slots + 0, meth);
-	SetPtr(debugFrameObj->slots + 5, meth);
-
-	//int numtemps = methraw->numargs;
-	int numargs = methraw->numargs;
-	int numvars = methraw->numvars;
-	if (numargs) {
-		PyrObject* argArray = (PyrObject*)newPyrArray(g->gc, numargs, 0, false);
-		SetObject(debugFrameObj->slots + 1, argArray);
-		for (i=0; i<numargs; ++i) {
-			slotCopy(&argArray->slots[i],&frame->vars[i]);
+private:
+	void run_queue(VMGlobals *g)
+	{
+		while (!workQueue.empty()) {
+			WorkQueueItem work = workQueue.back();
+			workQueue.pop_back();
+			fillDebugFrame(g, work.first, work.second);
 		}
-		argArray->size = numargs;
-	} else {
-		SetNil(debugFrameObj->slots + 1);
-	}
-	if (numvars) {
-		PyrObject* varArray = (PyrObject*)newPyrArray(g->gc, numvars, 0, false);
-		SetObject(debugFrameObj->slots + 2, varArray);
-		for (i=0,j=numargs; i<numvars; ++i,++j) {
-			slotCopy(&varArray->slots[i],&frame->vars[j]);
-		}
-		varArray->size = numvars;
-	} else {
-		SetNil(debugFrameObj->slots + 2);
 	}
 
-	if (slotRawFrame(&frame->caller)) {
-		MakeDebugFrame(g, slotRawFrame(&frame->caller), debugFrameObj->slots + 3);
-	} else {
-		SetNil(debugFrameObj->slots + 3);
+	void fillDebugFrame(VMGlobals *g, PyrFrame *frame, PyrSlot *outSlot)
+	{
+		PyrMethod *meth = slotRawMethod(&frame->method);
+		PyrMethodRaw * methraw = METHRAW(meth);
+
+		PyrObject* debugFrameObj = instantiateObject(g->gc, getsym("DebugFrame")->u.classobj, 0, false, true);
+		SetObject(outSlot, debugFrameObj);
+
+		SetObject(debugFrameObj->slots + 0, meth);
+		SetPtr(debugFrameObj->slots + 5, meth);
+
+		int numargs = methraw->numargs;
+		int numvars = methraw->numvars;
+		if (numargs) {
+			PyrObject* argArray = (PyrObject*)newPyrArray(g->gc, numargs, 0, false);
+			SetObject(debugFrameObj->slots + 1, argArray);
+			for (int i=0; i<numargs; ++i)
+				slotCopy(&argArray->slots[i], &frame->vars[i]);
+
+			argArray->size = numargs;
+		} else
+			SetNil(debugFrameObj->slots + 1);
+
+		if (numvars) {
+			PyrObject* varArray = (PyrObject*)newPyrArray(g->gc, numvars, 0, false);
+			SetObject(debugFrameObj->slots + 2, varArray);
+			for (int i=0, j=numargs; i<numvars; ++i,++j)
+				slotCopy(&varArray->slots[i], &frame->vars[j]);
+
+			varArray->size = numvars;
+		} else
+			SetNil(debugFrameObj->slots + 2);
+
+		if (slotRawFrame(&frame->caller)) {
+			WorkQueueItem newWork = std::make_pair(slotRawFrame(&frame->caller), debugFrameObj->slots + 3);
+			workQueue.push_back(newWork);
+		} else
+			SetNil(debugFrameObj->slots + 3);
+
+		if (IsObj(&frame->context) && slotRawFrame(&frame->context) == frame)
+			SetObject(debugFrameObj->slots + 4, debugFrameObj);
+		else if (NotNil(&frame->context)) {
+			WorkQueueItem newWork = std::make_pair(slotRawFrame(&frame->context), debugFrameObj->slots + 4);
+			workQueue.push_back(newWork);
+		} else
+			SetNil(debugFrameObj->slots + 4);
 	}
 
-	if (IsObj(&frame->context) && slotRawFrame(&frame->context) == frame) {
-		SetObject(debugFrameObj->slots + 4,  debugFrameObj);
-	} else if (NotNil(&frame->context)) {
-		MakeDebugFrame(g, slotRawFrame(&frame->context), debugFrameObj->slots + 4);
-	} else {
-		SetNil(debugFrameObj->slots + 4);
-	}
+	typedef std::pair<PyrFrame*, PyrSlot*> WorkQueueItem;
+	typedef std::vector<WorkQueueItem> WorkQueueType;
+	WorkQueueType workQueue;
+};
+
+static void MakeDebugFrame(VMGlobals *g, PyrFrame *frame, PyrSlot *outSlot)
+{
+	DebugFrameConstructor constructor;
+	constructor.makeDebugFrame(g, frame, outSlot);
 }
-
 
 int prGetBackTrace(VMGlobals *g, int numArgsPushed);
 int prGetBackTrace(VMGlobals *g, int numArgsPushed)
@@ -3383,7 +3413,7 @@ int prOverwriteMsg(struct VMGlobals *g, int numArgsPushed);
 int prOverwriteMsg(struct VMGlobals *g, int numArgsPushed)
 {
 	PyrSlot *a = g->sp;
-	PyrString* string = newPyrString(g->gc, overwriteMsg, 0, false);
+	PyrString* string = newPyrString(g->gc, overwriteMsg.c_str(), 0, false);
 	SetObject(a, string);
 	return errNone;
 }
@@ -3394,6 +3424,134 @@ int prAppClockSchedNotify(struct VMGlobals *g, int numArgsPushed)
 	// if they wish to respond to AppClock scheduling notifications
 	return errNone;
 }
+
+enum {includePaths, excludePaths};
+
+static int prLanguageConfig_getLibraryPaths(struct VMGlobals * g, int numArgsPushed, int pathType)
+{
+	PyrSlot *result = g->sp;
+
+	typedef SC_LanguageConfig::DirVector DirVector;
+
+	DirVector const & dirVector = (pathType == includePaths) ? gLibraryConfig->includedDirectories()
+															 : gLibraryConfig->excludedDirectories();
+
+	size_t numberOfPaths = dirVector.size();
+	PyrObject * resultArray = newPyrArray(g->gc, numberOfPaths, 0, true);
+	SetObject(result, resultArray);
+	resultArray->size = numberOfPaths;
+
+	for (size_t i = 0; i != numberOfPaths; ++i)
+		SetObject(resultArray->slots + i, newPyrString(g->gc, dirVector[i].c_str(), 0, true));
+	return errNone;
+}
+
+static int prLanguageConfig_getIncludePaths(struct VMGlobals * g, int numArgsPushed)
+{
+	return prLanguageConfig_getLibraryPaths(g, numArgsPushed, includePaths);
+}
+
+static int prLanguageConfig_getExcludePaths(struct VMGlobals * g, int numArgsPushed)
+{
+	return prLanguageConfig_getLibraryPaths(g, numArgsPushed, excludePaths);
+}
+
+static int prLanguageConfig_addLibraryPath(struct VMGlobals * g, int numArgsPushed, int pathType)
+{
+	PyrSlot *result = g->sp - 1;
+	PyrSlot *removeString = g->sp;
+
+	char path[MAXPATHLEN];
+	bool error = slotStrVal(removeString, path, MAXPATHLEN);
+	if (error)
+		return errWrongType;
+
+	if (pathType == includePaths)
+		gLibraryConfig->addIncludedDirectory(path);
+	else
+		gLibraryConfig->addExcludedDirectory(path);
+	return errNone;
+}
+
+static int prLanguageConfig_addIncludePath(struct VMGlobals * g, int numArgsPushed)
+{
+	return prLanguageConfig_addLibraryPath(g, numArgsPushed, includePaths);
+}
+
+static int prLanguageConfig_addExcludePath(struct VMGlobals * g, int numArgsPushed)
+{
+	return prLanguageConfig_addLibraryPath(g, numArgsPushed, excludePaths);
+}
+
+static int prLanguageConfig_removeLibraryPath(struct VMGlobals * g, int numArgsPushed, int pathType)
+{
+	PyrSlot *result = g->sp - 1;
+	PyrSlot *dirString = g->sp;
+
+	char path[MAXPATHLEN];
+	bool error = slotStrVal(dirString, path, MAXPATHLEN);
+	if (error)
+		return errWrongType;
+
+	if (pathType == includePaths)
+		gLibraryConfig->removeIncludedDirectory(path);
+	else
+		gLibraryConfig->removeExcludedDirectory(path);
+	return errNone;
+}
+
+static int prLanguageConfig_removeIncludePath(struct VMGlobals * g, int numArgsPushed)
+{
+	return prLanguageConfig_removeLibraryPath(g, numArgsPushed, includePaths);
+}
+
+static int prLanguageConfig_removeExcludePath(struct VMGlobals * g, int numArgsPushed)
+{
+	return prLanguageConfig_removeLibraryPath(g, numArgsPushed, excludePaths);
+}
+
+static int prLanguageConfig_writeConfigFile(struct VMGlobals * g, int numArgsPushed)
+{
+	PyrSlot *result = g->sp - 1;
+	PyrSlot *fileString = g->sp;
+
+	char path[MAXPATHLEN];
+	if (NotNil(fileString)) {
+		bool error = slotStrVal(fileString, path, MAXPATHLEN);
+		if (error)
+			return errWrongType;
+	} else {
+		sc_GetUserConfigDirectory(path, PATH_MAX);
+		sc_AppendToPath(path, MAXPATHLEN, "sclang_conf.yaml");
+	}
+
+	gLibraryConfig->writeLibraryConfigYAML(path);
+	return errNone;
+}
+
+extern bool gPostInlineWarnings;
+static int prLanguageConfig_getPostInlineWarnings(struct VMGlobals * g, int numArgsPushed)
+{
+	PyrSlot *result = g->sp;
+	SetBool(result, gPostInlineWarnings);
+	return errNone;
+}
+
+static int prLanguageConfig_setPostInlineWarnings(struct VMGlobals * g, int numArgsPushed)
+{
+	PyrSlot *result = g->sp - 1;
+	PyrSlot *arg    = g->sp;
+
+	if (IsTrue(arg))
+		gPostInlineWarnings = true;
+	else if (IsFalse(arg))
+		gPostInlineWarnings = false;
+	else
+		return errWrongType;
+
+	return errNone;
+}
+
 
 #define PRIMGROWSIZE 480
 PrimitiveTable gPrimitiveTable;
@@ -3949,6 +4107,15 @@ void initPrimitives()
 	definePrimitive(base, index++, "_MainOverwriteMsg", prOverwriteMsg, 1, 0);
 
 	definePrimitive(base, index++, "_AppClock_SchedNotify", prAppClockSchedNotify, 1, 0);
+	definePrimitive(base, index++, "_LanguageConfig_getIncludePaths", prLanguageConfig_getIncludePaths, 1, 0);
+	definePrimitive(base, index++, "_LanguageConfig_getExcludePaths", prLanguageConfig_getExcludePaths, 1, 0);
+	definePrimitive(base, index++, "_LanguageConfig_addIncludePath", prLanguageConfig_addIncludePath, 2, 0);
+	definePrimitive(base, index++, "_LanguageConfig_addExcludePath", prLanguageConfig_addExcludePath, 2, 0);
+	definePrimitive(base, index++, "_LanguageConfig_removeIncludePath", prLanguageConfig_removeIncludePath, 2, 0);
+	definePrimitive(base, index++, "_LanguageConfig_removeExcludePath", prLanguageConfig_removeExcludePath, 2, 0);
+	definePrimitive(base, index++, "_LanguageConfig_writeConfigFile", prLanguageConfig_writeConfigFile, 2, 0);
+	definePrimitive(base, index++, "_LanguageConfig_getPostInlineWarnings", prLanguageConfig_getPostInlineWarnings, 1, 0);
+	definePrimitive(base, index++, "_LanguageConfig_setPostInlineWarnings", prLanguageConfig_setPostInlineWarnings, 2, 0);
 
 	//void initOscilPrimitives();
 	//void initControllerPrimitives();
@@ -3982,9 +4149,6 @@ void initPlatformPrimitives();
 
 void initStringPrimitives();
 	initStringPrimitives();
-
-void initUStringPrimitives();
-	initUStringPrimitives();
 
 void initListPrimitives();
 	initListPrimitives();

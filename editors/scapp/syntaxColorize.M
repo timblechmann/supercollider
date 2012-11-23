@@ -37,11 +37,11 @@ SCColor synColText = SCMakeColor(0, 0, 0, 1),
 		synColString = SCMakeColor(0.375, 0.375, 0.375, 1), 
 		synColSymbol = SCMakeColor(0, 0.45, 0, 1), 
 		synColComment = SCMakeColor(0.75, 0, 0, 1), 
-		synColNumber = SCMakeColor(0.0, 0.4, 0.4, 1),
+		synColNumber = SCMakeColor(0.0, 0.0, 0.0, 1),
 		synColSpecialVals = SCMakeColor(0.2, 0.2, 0.75, 1), // true false nil inf 
 		synColSpecialVars = SCMakeColor(0.4, 0.4, 0.75, 1), // super, thisProcess
 		synColDecl = SCMakeColor(0, 0, 1, 1), // var, const, args
-		synColPunc = SCMakeColor(0.33333333333333, 0.33333333333333, 0.33333333333333, 1), // : ; ' [ ] { } ( )
+		synColPunc = SCMakeColor(0.0, 0.0, 0.0, 1), // : ; ' [ ] { } ( )
 		synColEnv = SCMakeColor(1.0, 0.4, 0, 1);
 
 static bool streq(char *cstr, unichar *ustr)
@@ -404,12 +404,18 @@ void SyntaxColorize(NSTextView* textView)
  		continue;
 	negnumber:
 		bool numFound = false; //no digit found yet, after minus sign
+		bool reachedStart = false;
 		int tempTextpos = textpos, tempCharno = charno, tempYylen = yylen, tempLineno = lineno;
 		do { //go backwards until you find stg. other than whitespace and numbers
 			unput(c); unput(c); 
 			c = input0();
+			if(textpos <= 1) { //beginning of doc. escape!
+				reachedStart = true;
+				break;
+			}
 		} while (c == ' ' || c == '\n' || c == '\t' || c == '\v' || c == '\f' ||  c == '\r' || c == 0 || (c >= '0' && c <= '9'));
 		textpos = tempTextpos; charno = tempCharno; yylen = tempYylen; lineno = tempLineno; //restore original position
+		if(reachedStart) continue;
 		if(c >= 'A' && c <= 'Z' || c >= 'a' && c <= 'z' || c == '_' || c == ')' || c == ']') continue; //it must be a subtraction operator, skip.
 		startrun = textpos - 1;
 		do {
