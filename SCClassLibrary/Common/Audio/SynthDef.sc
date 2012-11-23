@@ -14,6 +14,7 @@ SynthDef {
 	var <>available;
 	var <>variants;
 	var <>widthFirstUGens;
+	var rewriteInProgress;
 
 	var <>desc, <>metadata;
 
@@ -32,7 +33,7 @@ SynthDef {
 	}
 
 	*new { arg name, ugenGraphFunc, rates, prependArgs, variants, metadata;
-		^this.prNew(name).variants_(variants).metadata_(metadata)
+		^this.prNew(name).variants_(variants).metadata_(metadata).children_(Array.new(64))
 			.build(ugenGraphFunc, rates, prependArgs)
 	}
 	*prNew { arg name;
@@ -299,6 +300,7 @@ SynthDef {
 				.format(name), this).throw
 		}
 	}
+	
 	writeDef { arg file;
 		// This describes the file format for the synthdef files.
 		var allControlNamesTemp, allControlNamesMap;
@@ -308,21 +310,21 @@ SynthDef {
 		this.writeConstants(file);
 
 		//controls have been added by the Control UGens
-		file.putInt16(controls.size);
+		file.putInt32(controls.size);
 		controls.do { | item |
 			file.putFloat(item);
 		};
 
 		allControlNamesTemp = allControlNames.reject { |cn| cn.rate == \noncontrol };
-		file.putInt16(allControlNamesTemp.size);
+		file.putInt32(allControlNamesTemp.size);
 		allControlNamesTemp.do { | item |
 			if (item.name.notNil) {
 				file.putPascalString(item.name.asString);
-				file.putInt16(item.index);
+				file.putInt32(item.index);
 			};
 		};
 
-		file.putInt16(children.size);
+		file.putInt32(children.size);
 		children.do { | item |
 			item.writeDef(file);
 		};
@@ -368,15 +370,16 @@ SynthDef {
 					file.putFloat(item);
 				};
 			};
-		}
+		};
 	}
+	
 	writeConstants { arg file;
 		var array = FloatArray.newClear(constants.size);
 		constants.keysValuesDo { arg value, index;
 			array[index] = value;
 		};
 
-		file.putInt16(constants.size);
+		file.putInt32(constants.size);
 		array.do { | item |
 			file.putFloat(item)
 		};
@@ -387,13 +390,10 @@ SynthDef {
 		children.do { arg ugen;
 			var err;
 			if ((err = ugen.checkInputs).notNil) {
-				if(firstErr.isNil){
-					firstErr = if(err.indexOf($:).isNil){err}{
-						err[..err.indexOf($:)-1]
-					};
-				};
-				(ugen.class.asString + err).postln;
+				err = ugen.class.asString + err;
+				err.postln;
 				ugen.dumpArgs;
+				if(firstErr.isNil) { firstErr = err };
 			};
 		};
 		if(firstErr.notNil) {
@@ -407,9 +407,12 @@ SynthDef {
 
 	// UGens do these
 	addUGen { arg ugen;
-		ugen.synthIndex = children.size;
-		ugen.widthFirstAntecedents = widthFirstUGens.copy;
-		children = children.add(ugen);
+		if (rewriteInProgress.isNil) {
+			// we don't add ugens, if a rewrite operation is in progress
+			ugen.synthIndex = children.size;
+			ugen.widthFirstAntecedents = widthFirstUGens.copy;
+			children = children.add(ugen);
+		}
 	}
 	removeUGen { arg ugen;
 		// lazy removal: clear entry and later remove all nil enties
@@ -417,7 +420,7 @@ SynthDef {
 	}
 	replaceUGen { arg a, b;
 		if (b.isKindOf(UGen).not) {
-			error("replaceUGen assumes a UGen ");
+			Error("replaceUGen assumes a UGen").throw;
 		};
 
 		b.widthFirstAntecedents = a.widthFirstAntecedents;
@@ -449,9 +452,12 @@ SynthDef {
 	optimizeGraph {
 		var oldSize;
 		this.initTopoSort;
+
+		rewriteInProgress = true;
 		children.copy.do { arg ugen;
 			ugen.optimizeGraph;
 		};
+		rewriteInProgress = nil;
 
 		// fixup removed ugens
 		oldSize = children.size;
@@ -560,15 +566,15 @@ SynthDef {
 
 	doSend { |server, completionMsg|
 		var bytes = this.asBytes;
-		try {
-			server.sendMsg("/d_recv", this.asBytes, completionMsg)
+		if (bytes.size < (65535 div: 4)) {
+			server.sendMsg("/d_recv", bytes, completionMsg)
 		} {
 			if (server.isLocal) {
-				"Possible buffer overflow when sending SynthDef %. Retrying via synthdef file".format(name).warn;
+				"SynthDef % too big for sending. Retrying via synthdef file".format(name).warn;
 				this.writeDefFile(synthDefDir);
 				server.sendMsg("/d_load", synthDefDir ++ name ++ ".scsyndef", completionMsg)
 			} {
-				"Possible buffer overflow when sending SynthDef %.".format(name).warn;
+				"SynthDef % too big for sending.".format(name).warn;
 			}
 		}
 	}

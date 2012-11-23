@@ -1,6 +1,6 @@
 QPen {
   classvar <font;
-
+  *implementsClass {^'Pen'}
 //-------------------------- Global state control ------------------------------
 
   *push {
@@ -135,12 +135,12 @@ QPen {
     this.nonimpl("path");
   }
 
-  *moveTo {
+  *moveTo { arg point;
     _QPen_MoveTo
     ^this.primitiveFailed;
   }
 
-  *lineTo {
+  *lineTo { arg point;
     _QPen_LineTo
     ^this.primitiveFailed;
   }

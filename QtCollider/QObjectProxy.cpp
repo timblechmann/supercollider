@@ -44,8 +44,11 @@ QObjectProxy::QObjectProxy( QObject *qObject_, PyrObject *scObject_ )
   _scClassName( slotRawSymbol( &scObject_->classptr->name )->name )
 {
   ProxyToken *token = new ProxyToken( this, qObject );
-  connect( qObject, SIGNAL( destroyed( QObject* ) ), this, SLOT( invalidate() ) );
+  // WARNING: make sure the signal is already in normalized signature,
+  // to avoid triggering very expensive normalization!
+  connect( qObject, SIGNAL(destroyed(QObject*)), this, SLOT(invalidate()) );
   qObject->installEventFilter( this );
+  _eventHandlers.reserve(10);
 }
 
 QObjectProxy::~QObjectProxy()
@@ -54,12 +57,13 @@ QObjectProxy::~QObjectProxy()
 }
 
 bool QObjectProxy::compareThread() {
-  return QThread::currentThread() == this->thread();
+  return gMainVMGlobals->canCallOS;
 }
 
 void QObjectProxy::invalidate() {
   qcProxyDebugMsg( 1, QString("Object has been deleted. Invalidating proxy.") );
   mutex.lock(); qObject = 0; mutex.unlock();
+  QApplication::postEvent( this, new QEvent((QEvent::Type) QtCollider::Event_Proxy_Release) );
 }
 
 bool QObjectProxy::invokeMethod( const char *method, PyrSlot *retSlot, PyrSlot *argSlot,
@@ -86,7 +90,7 @@ bool QObjectProxy::invokeMethod( const char *method, PyrSlot *retSlot, PyrSlot *
   // get data from argument slots
   QtCollider::Variant argSlots[10];
 
-  if( isKindOfSlot( argSlot, class_Array ) ) {
+  if( isKindOfSlot( argSlot, class_array ) ) {
     PyrSlot *slots = slotRawObject( argSlot )->slots;
     int size = slotRawObject( argSlot )->size;
     int i;
@@ -184,7 +188,7 @@ void QObjectProxy::invokeScMethod
     QtCollider::runLang( _scObject, method, args, result );
   }
   else {
-    SetNil( result );
+    if(result) SetNil( result );
     qcDebugMsg(1, "WARNING: no SC object");
   }
 
@@ -204,6 +208,9 @@ void QObjectProxy::customEvent( QEvent *event )
       return;
     case (QEvent::Type) QtCollider::Event_Proxy_Destroy:
       destroyEvent( static_cast<DestroyEvent*>(event) );
+      return;
+    case (QEvent::Type) QtCollider::Event_Proxy_Release:
+      invokeScMethod(SC_SYM(prRelease));
       return;
     default: ;
   }
@@ -243,35 +250,40 @@ bool QObjectProxy::setEventHandler( int type, PyrSymbol *method,
   data.type = type;
   data.method = method;
   data.sync = sync;
+  data.enabled = enable;
 
-  // if 'enable' is true, insert the new event handler enabled,
-  // otherwise copy current state, or set disabled if none.
-  if( enable ) {
-    data.enabled = true;
+  EventHandlerData *d = _eventHandlers.data();
+  int n = _eventHandlers.size();
+  while(n--)
+  {
+      if(d->type == type)
+      {
+          *d = data;
+          break;
+      }
+      ++d;
   }
-  else {
-    EventHandlerData d = _eventHandlers.value( type );
-    if( d.type != QEvent::None ) data.enabled = d.enabled;
-    else data.enabled = false;
-  }
-
-  // NOTE: will replace if same key
-  _eventHandlers.insert( type, data );
+  if(n < 0)
+      _eventHandlers.append(data);
 
   return true;
 }
 
 bool QObjectProxy::setEventHandlerEnabled( int type, bool enabled )
 {
-  EventHandlerData d = _eventHandlers.value( type );
-  if( d.type != type ) return false;
-
-  if( d.enabled != enabled ) {
-    d.enabled = enabled;
-    _eventHandlers.insert( type, d );
+  EventHandlerData *d = _eventHandlers.data();
+  int n = _eventHandlers.size();
+  while(n--)
+  {
+      if(d->type == type)
+      {
+          d->enabled = enabled;
+          break;
+      }
+      ++d;
   }
 
-  return true;
+  return n >= 0;
 }
 
 bool QObjectProxy::connectObject( const char *signal, PyrObject *object,
@@ -435,10 +447,24 @@ bool QObjectProxy::eventFilter( QObject * watched, QEvent * event )
 {
   int type = event->type();
 
-  EventHandlerData eh;
+  EventHandlerData *d = _eventHandlers.data();
+  int n = _eventHandlers.size();
+  while(n--)
+  {
+      if(d->type == type)
+          break;
+      ++d;
+  }
+  if(n < 0)
+  {
+      qcProxyDebugMsg(3,QString("No handler for event (%1), forwarding to the widget")
+        .arg(type));
+      return false;
+  }
+
   QList<QVariant> args;
 
-  if( !filterEvent( watched, event, eh, args ) ) {
+  if( !filterEvent( watched, event, *d, args ) ) {
     qcProxyDebugMsg(3,QString("Event (%1, %2) not handled, forwarding to the widget")
       .arg(type)
       .arg(event->spontaneous() ? "spontaneous" : "inspontaneous") );
@@ -448,10 +474,10 @@ bool QObjectProxy::eventFilter( QObject * watched, QEvent * event )
   qcProxyDebugMsg(1,QString("Will handle event (%1, %2) -> (%3, %4)")
     .arg(type)
     .arg(event->spontaneous() ? "spontaneous" : "inspontaneous")
-    .arg(eh.method->name)
-    .arg(eh.sync == Synchronous ? "sync" : "async") );
+    .arg(d->method->name)
+    .arg(d->sync == Synchronous ? "sync" : "async") );
 
-  return invokeEventHandler( event, eh, args );
+  return invokeEventHandler( event, *d, args );
 }
 
 bool QObjectProxy::invokeEventHandler( QEvent *event, EventHandlerData &eh, QList<QVariant> & args )
@@ -483,9 +509,7 @@ bool QObjectProxy::invokeEventHandler( QEvent *event, EventHandlerData &eh, QLis
 
 bool QObjectProxy::filterEvent( QObject *, QEvent *e, EventHandlerData & eh, QList<QVariant> & args )
 {
-  int type = e->type();
-  eh = _eventHandlers.value( type, EventHandlerData() );
-  return ( eh.type == type ) && eh.enabled;
+  return eh.enabled;
 }
 
 inline void QObjectProxy::scMethodCallEvent( ScMethodCallEvent *e )

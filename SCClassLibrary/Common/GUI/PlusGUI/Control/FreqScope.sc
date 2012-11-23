@@ -3,7 +3,7 @@
 // cross-platform port by Tim Blechmann
 
 PlusFreqScope {
-	classvar <>server;
+	classvar <server;
 
 	var <scope;
 	var <scopebuf;
@@ -13,10 +13,19 @@ PlusFreqScope {
 
 	*initClass {
 		StartUp.add {
-			server = if (GUI.id == \qt) {Server.default} {Server.internal};
+			server = GUI.current.stethoscope.defaultServer;
 
 			this.initSynthDefs;
 		}
+	}
+
+	*server_ {|aServer|
+		if(GUI.current.stethoscope.isValidServer(aServer).not) {
+			Error("PlusFreqScope: can not use server '%' with current GUI scheme (%)"
+				.format(aServer.name, GUI.current.id)).throw;
+		};
+
+		server = aServer;
 	}
 
 	*new { arg parent, bounds;
@@ -27,68 +36,73 @@ PlusFreqScope {
 		// dbFactor -> 2/dbRange
 
 		// linear
-		SynthDef("freqScope0", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02;
+		SynthDef("freqScope0", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, numSamples, mul, add;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			numSamples = (BufSamples.kr(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
+			numSamples = (BufSamples.ir(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
 			signal = In.ar(in);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
 			chain = PV_MagSmear(chain, 1);
 			// -1023 to 1023, 0 to 2046, 2 to 2048 (skip first 2 elements DC and Nyquist)
-			phasor = LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, numSamples, numSamples + 2);
+			phasor = LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, numSamples, numSamples + 2);
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut.ar( ((BufRd.ar(1, fftbufnum, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum);
-		}).add;
-		SynthDef("freqScope0_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02;
+		}, [\kr, \ir, \ir, \ir, \kr]).add;
+		SynthDef("freqScope0_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, numSamples, mul, add;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			numSamples = (BufSamples.kr(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
+			numSamples = (BufSamples.ir(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
 			signal = In.ar(in);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
 			chain = PV_MagSmear(chain, 1);
 			// -1023 to 1023, 0 to 2046, 2 to 2048 (skip first 2 elements DC and Nyquist)
-			phasor = LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, numSamples, numSamples + 2);
+			phasor = LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, numSamples, numSamples + 2);
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut2.ar( ((BufRd.ar(1, fftbufnum, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum, fftBufSize/rate);
-		}).add;
+		}, [\kr, \ir, \ir, \ir, \kr]).add;
 
 		// logarithmic
-		SynthDef("freqScope1", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02;
+		SynthDef("freqScope1", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, halfSamples, mul, add;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			halfSamples = BufSamples.kr(fftbufnum) * 0.5;
+			halfSamples = BufSamples.ir(fftbufnum) * 0.5;
 			signal = In.ar(in);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
 			chain = PV_MagSmear(chain, 1);
-			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
+			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut.ar( ((BufRd.ar(1, fftbufnum, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum);
-		}).add;
+		}, [\kr, \ir, \ir, \ir, \kr]).add;
 
-		SynthDef("freqScope1_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02;
+		SynthDef("freqScope1_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, halfSamples, mul, add;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			halfSamples = BufSamples.kr(fftbufnum) * 0.5;
+			halfSamples = BufSamples.ir(fftbufnum) * 0.5;
 			signal = In.ar(in);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
 			chain = PV_MagSmear(chain, 1);
-			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
+			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut2.ar( ((BufRd.ar(1, fftbufnum, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum, fftBufSize/rate);
-		}).add;
+		}, [\kr, \ir, \ir, \ir, \kr]).add;
 
 		// These next two are based on the original two, but adapted by Dan Stowell
 		// to calculate the frequency response between two channels
-		SynthDef("freqScope0_magresponse", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02, in2=1;
+		SynthDef("freqScope0_magresponse", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02, in2=1;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, numSamples, mul, add;
 			var signal2, chain2, divisionbuf;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			numSamples = (BufSamples.kr(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
+			numSamples = (BufSamples.ir(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
 			signal = In.ar(in);
 			signal2 = In.ar(in2);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
@@ -98,17 +112,18 @@ PlusFreqScope {
 			chain = PV_Div(chain2, chain);
 			chain = PV_MagSmear(chain, 1);
 			// -1023 to 1023, 0 to 2046, 2 to 2048 (skip first 2 elements DC and Nyquist)
-			phasor = LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, numSamples, numSamples + 2);
+			phasor = LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, numSamples, numSamples + 2);
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut.ar( ((BufRd.ar(1, divisionbuf, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum);
-		}).add;
+		}, [\kr, \ir, \ir, \ir, \kr, \ir]).add;
 
-		SynthDef("freqScope0_magresponse_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02, in2=1;
+		SynthDef("freqScope0_magresponse_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02, in2=1;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, numSamples, mul, add;
 			var signal2, chain2, divisionbuf;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			numSamples = (BufSamples.kr(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
+			numSamples = (BufSamples.ir(fftbufnum) - 2) * 0.5; // 1023 (bufsize=2048)
 			signal = In.ar(in);
 			signal2 = In.ar(in2);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
@@ -118,17 +133,18 @@ PlusFreqScope {
 			chain = PV_Div(chain2, chain);
 			chain = PV_MagSmear(chain, 1);
 			// -1023 to 1023, 0 to 2046, 2 to 2048 (skip first 2 elements DC and Nyquist)
-			phasor = LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, numSamples, numSamples + 2);
+			phasor = LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, numSamples, numSamples + 2);
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut2.ar( ((BufRd.ar(1, divisionbuf, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum, fftBufSize/rate);
-		}).add;
+		}, [\kr, \ir, \ir, \ir, \kr, \ir]).add;
 
-		SynthDef("freqScope1_magresponse", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02, in2=1;
+		SynthDef("freqScope1_magresponse", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02, in2=1;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, halfSamples, mul, add;
 			var signal2, chain2, divisionbuf;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			halfSamples = BufSamples.kr(fftbufnum) * 0.5;
+			halfSamples = BufSamples.ir(fftbufnum) * 0.5;
 			signal = In.ar(in);
 			signal2 = In.ar(in2);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
@@ -137,17 +153,18 @@ PlusFreqScope {
 			// Here we perform complex division to estimate the freq response
 			chain = PV_Div(chain2, chain);
 			chain = PV_MagSmear(chain, 1);
-			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
+			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut.ar( ((BufRd.ar(1, divisionbuf, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum);
-		}).add;
+		}, [\kr, \ir, \ir, \ir, \kr, \ir]).add;
 
-		SynthDef("freqScope1_magresponse_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, phase=1, dbFactor = 0.02, in2=1;
+		SynthDef("freqScope1_magresponse_shm", { arg in=0, fftBufSize = 2048, scopebufnum=1, rate=4, dbFactor = 0.02, in2=1;
+			var phase = 1 - (rate * fftBufSize.reciprocal);
 			var signal, chain, result, phasor, halfSamples, mul, add;
 			var signal2, chain2, divisionbuf;
 			var fftbufnum = LocalBuf(fftBufSize, 1);
 			mul = 0.00285;
-			halfSamples = BufSamples.kr(fftbufnum) * 0.5;
+			halfSamples = BufSamples.ir(fftbufnum) * 0.5;
 			signal = In.ar(in);
 			signal2 = In.ar(in2);
 			chain = FFT(fftbufnum, signal, hop: 0.75, wintype:1);
@@ -156,10 +173,10 @@ PlusFreqScope {
 			// Here we perform complex division to estimate the freq response
 			chain = PV_Div(chain2, chain);
 			chain = PV_MagSmear(chain, 1);
-			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.kr(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
+			phasor = halfSamples.pow(LFSaw.ar(rate/BufDur.ir(fftbufnum), phase, 0.5, 0.5)) * 2; // 2 to bufsize
 			phasor = phasor.round(2); // the evens are magnitude
 			ScopeOut2.ar( ((BufRd.ar(1, divisionbuf, phasor, 1, 1) * mul).ampdb * dbFactor) + 1, scopebufnum, fftBufSize/rate);
-		}).add;
+		}, [\kr, \ir, \ir, \ir, \kr, \ir]).add;
 	}
 
 	initFreqScope { arg parent, bounds;
@@ -295,8 +312,10 @@ PlusFreqScope {
 	}
 
 	*response{ |parent, bounds, bus1, bus2, freqMode=1|
-		^this.new(parent, bounds).inBus_(bus1.index)
-			.special("freqScope%_magresponse".format(freqMode), [\in2, bus2])
+		var scope = this.new(parent, bounds).inBus_(bus1.index);
+		var synthDefName = "freqScope%_magresponse%".format(freqMode, if (scope.shmScopeAvailable) {"_shm"} {""});
+
+		^scope.special(synthDefName, [\in2, bus2])
 	}
 
 	doesNotUnderstand { arg selector ... args;
@@ -311,6 +330,7 @@ PlusFreqScope {
 
 PlusFreqScopeWindow {
 	classvar <scopeOpen;
+
 	var <scope, <window;
 
 	*new { arg width=522, height=300, busNum=0, scopeColor, bgColor;
@@ -467,5 +487,12 @@ PlusFreqScopeWindow {
 			}).front;
 			^super.newCopyArgs(scope, window)
 		});
+	}
+
+	*server {
+		^PlusFreqScope.server
+	}
+	*server_ {|aServer|
+		^PlusFreqScope.server_(aServer)
 	}
 }

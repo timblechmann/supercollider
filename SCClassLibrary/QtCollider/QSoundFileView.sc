@@ -2,10 +2,10 @@ QSoundFileView : QView {
 
   var <>soundfile;
   var <metaAction;
-  var <waveColors;
+  var <>elasticMode; // NOTE: no-op, only for compatibility
   var curDoneAction;
 
-  *qtClass { ^"QcWaveform" }
+  *qtClass { ^'QcWaveform' }
 
   load { arg filename, startframe, frames, block, doneAction;
     if( filename.isString && filename != "" ) {
@@ -23,6 +23,26 @@ QSoundFileView : QView {
         this.invokeMethod( \load, filename );
       }
     }
+  }
+
+  alloc { arg frames, channels=1, samplerate=44100;
+    this.invokeMethod( \allocate, [frames.asInteger, channels.asInteger, samplerate.asInteger] );
+  }
+
+  data_ { arg data;
+    this.setData(data);
+  }
+
+  setData { arg data, block, startframe=0, channels=1, samplerate=44100;
+    if( data.isKindOf(DoubleArray).not and: {data.isKindOf(FloatArray).not} )
+      { data = data.as(DoubleArray) };
+    this.invokeMethod( \load, [data, startframe, channels, samplerate] );
+  }
+
+  set { arg offset=0, data;
+    if( data.isKindOf(DoubleArray).not and: {data.isKindOf(FloatArray).not} )
+      { data = data.as(DoubleArray) };
+    this.invokeMethod( \write, [data, offset.asInteger] );
   }
 
   readFile { arg aSoundFile, startframe, frames, block, closeFile, doneAction;
@@ -47,10 +67,8 @@ QSoundFileView : QView {
 
   drawsWaveForm_ { arg boolean; this.setProperty( \drawsWaveform, boolean ); }
 
-  waveColors_ { arg colorArray;
-    this.setProperty( \waveColors, colorArray );
-    waveColors = colorArray;
-  }
+  waveColors { ^this.getProperty( \waveColors ) }
+  waveColors_ { arg colors; this.setProperty( \waveColors, colors ) }
 
   //// Info
 
@@ -166,9 +184,6 @@ QSoundFileView : QView {
   timeCursorPosition { ^this.getProperty( \cursorPosition ); }
   timeCursorPosition_ { arg frame; this.setProperty( \cursorPosition, frame ) }
 
-  timeCursorColor { ^this.getProperty( \cursorColor ); }
-  timeCursorColor_ { arg color; this.setProperty( \cursorColor, color ) }
-
   // grid
 
   gridOn { ^this.getProperty( \gridVisible ); }
@@ -179,6 +194,17 @@ QSoundFileView : QView {
 
   gridOffset { ^this.getProperty( \gridOffset ) }
   gridOffset_ { arg seconds; this.setProperty( \gridOffset, seconds ) }
+
+  // colors
+
+  peakColor { ^this.getProperty(\peakColor) }
+  peakColor_ { arg color; this.setProperty(\peakColor, color) }
+
+  rmsColor { ^this.getProperty(\rmsColor) }
+  rmsColor_ { arg color; this.setProperty(\rmsColor, color) }
+
+  timeCursorColor { ^this.getProperty( \cursorColor ); }
+  timeCursorColor_ { arg color; this.setProperty( \cursorColor, color ) }
 
   gridColor { ^this.getProperty( \gridColor ) }
   gridColor_ { arg color; this.setProperty( \gridColor, color ) }

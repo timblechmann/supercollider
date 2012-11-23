@@ -28,8 +28,6 @@
 #include <jack/jack.h>
 #include <jack/thread.h>
 
-#include "nova-tt/name_thread.hpp"
-#include "nova-tt/thread_affinity.hpp"
 #include "utilities/branch_hints.hpp"
 
 #include "audio_backend_common.hpp"
@@ -97,6 +95,7 @@ public:
         /* initialize callbacks */
         jack_set_thread_init_callback (client, jack_thread_init_callback, this);
         jack_set_process_callback (client, jack_process_callback, this);
+        jack_set_xrun_callback(client, jack_xrun_callback, this);
         jack_on_info_shutdown(client, (JackInfoShutdownCallback)jack_on_info_shutdown_callback, NULL);
 
         /* register ports */
@@ -164,14 +163,14 @@ public:
         cpu_time_accumulator.get(peak, average);
     }
 
-    int connect_input(int channel, const char * portname)
+    int connect_input(size_t channel, const char * portname)
     {
         if (channel >= input_ports.size())
             return -1;
         return jack_connect(client, portname, jack_port_name(input_ports[channel]));
     }
 
-    int connect_output(int channel, const char * portname)
+    int connect_output(size_t channel, const char * portname)
     {
         if (channel >= output_ports.size())
             return -1;
@@ -227,6 +226,11 @@ public:
         return jack_client_max_real_time_priority(client);
     }
 
+    int realtime_priority(void) const
+    {
+        return jack_client_real_time_priority(client);
+    }
+
 private:
     static void jack_thread_init_callback(void * arg)
     {
@@ -250,6 +254,18 @@ private:
         exit(0); // TODO: later we may want to call a function
     }
 
+    static int jack_xrun_callback(void * arg)
+    {
+        return static_cast<jack_backend*>(arg)->handle_xrun();
+    }
+
+    int handle_xrun(void)
+    {
+        time_is_synced = false;
+        engine_functor::log_("Jack: xrun detected - resyncing clock\n");
+        return 0;
+    }
+
     int perform(jack_nframes_t frames)
     {
         if (unlikely(!time_is_synced)) {
@@ -258,8 +274,8 @@ private:
         }
 
         /* get port regions */
-        jack_default_audio_sample_t * inputs[input_channels];
-        jack_default_audio_sample_t * outputs[output_channels];
+        jack_default_audio_sample_t ** inputs   = (jack_default_audio_sample_t **)alloca(input_channels * sizeof(jack_default_audio_sample_t*));
+        jack_default_audio_sample_t ** outputs  = (jack_default_audio_sample_t **)alloca(output_channels * sizeof(jack_default_audio_sample_t*));
         for (uint16_t i = 0; i != input_channels; ++i)
             inputs[i] = (jack_default_audio_sample_t*) jack_port_get_buffer(input_ports[i], frames);
 
@@ -268,65 +284,15 @@ private:
 
         jack_nframes_t processed = 0;
         while (processed != frames) {
-            fetch_inputs(inputs, blocksize_);
-
+            super::fetch_inputs((const float**)inputs, blocksize_, input_channels);
             engine_functor::run_tick();
-
-            deliver_outputs(outputs, blocksize_);
-
+            super::deliver_outputs(outputs, blocksize_, output_channels);
             processed += blocksize_;
         }
 
         cpu_time_accumulator.update(jack_cpu_load(client));
 
         return 0;
-    }
-
-    void fetch_inputs(jack_default_audio_sample_t ** inputs, size_t frames)
-    {
-        if (is_multiple_of_vectorsize(frames)) {
-            for (uint16_t i = 0; i != input_channels; ++i) {
-                if (is_aligned(inputs[i]))
-                    copyvec_simd(super::input_samples[i].get(), inputs[i], frames);
-                else
-                    copyvec(super::input_samples[i].get(), inputs[i], frames);
-                inputs[i] += blocksize_;
-            }
-        } else {
-            for (uint16_t i = 0; i != input_channels; ++i) {
-                copyvec(super::input_samples[i].get(), inputs[i], frames);
-                inputs[i] += blocksize_;
-            }
-        }
-    }
-
-    void deliver_outputs(jack_default_audio_sample_t ** outputs, size_t frames)
-    {
-        if (is_multiple_of_vectorsize(frames)) {
-            for (uint16_t i = 0; i != output_channels; ++i) {
-                if (is_aligned(outputs[i]))
-                    copyvec_simd(outputs[i], super::output_samples[i].get(), frames);
-                else
-                    copyvec(outputs[i], super::output_samples[i].get(), frames);
-                outputs[i] += blocksize_;
-            }
-        } else {
-            for (uint16_t i = 0; i != output_channels; ++i) {
-                copyvec(outputs[i], super::output_samples[i].get(), frames);
-                outputs[i] += blocksize_;
-            }
-        }
-    }
-
-    static bool is_aligned(void * arg)
-    {
-        size_t mask = sizeof(vec<float>::size) * sizeof(float) * 8 - 1;
-        return !((size_t)arg & mask);
-    }
-
-    static bool is_multiple_of_vectorsize(size_t count)
-    {
-        return !(count & (vec<float>::objects_per_cacheline - 1));
     }
 
     static int jack_buffersize_callback(jack_nframes_t frames, void * arg)

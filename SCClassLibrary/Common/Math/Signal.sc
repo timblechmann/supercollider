@@ -123,8 +123,7 @@ Signal[float] : FloatArray {
 
 	play { arg loop=false, mul=0.2, numChannels=1, server;
 		var buf;
-		buf = Buffer.alloc(server ? Server.default, this.size, numChannels);
-		buf.sendCollection(this, 0, 0.1, { buf.play(loop, mul); });
+		buf = Buffer.sendCollection(server ? Server.default, this, numChannels, -1, { buf.play(loop, mul); });
 		^buf
 	}
 
@@ -288,9 +287,9 @@ Signal[float] : FloatArray {
 	imag { ^0.0 }
 
 	//PRIVATE:
-	performBinaryOpOnSignal { arg aSelector, aNumber; ^error("Math operation failed.\n") }
-	performBinaryOpOnComplex { arg aSelector, aComplex; ^aComplex.perform(aSelector, this.asComplex) }
-	performBinaryOpOnSimpleNumber { arg aSelector, aSimpleNumber; ^aSimpleNumber.perform(aSelector, this) }
+	performBinaryOpOnSignal { arg aSelector, aNumber, adverb;
+		BinaryOpFailureError(this, aSelector, [aNumber, adverb]).throw;
+	}
 }
 
 Wavetable[float] : FloatArray {

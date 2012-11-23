@@ -41,30 +41,34 @@ QLineLayout : QLayout {
     this.invokeMethod( \addItem, [[item, stretch, QAlignment(align)]], true );
   }
 
+  insert { arg item, index=0, stretch = 0, align;
+    this.invokeMethod( \insertItem, [[item, index, stretch, QAlignment(align)]], true );
+  }
+
   setStretch { arg item, stretch;
     this.invokeMethod( \setStretch, [item, stretch], true );
   }
 
-  setStretchAt { arg index, stretch; this.setStretch( index, stretch ); }
-
   setAlignment { arg item, align;
     this.invokeMethod( \setAlignment, [item, QAlignment(align)], true );
   }
-
-  setAlignmentAt { arg index, align; this.setAlignment( index, align ); }
 }
 
 QHLayout : QLineLayout {
-  *qtClass { ^'QcHBoxLayout'; }
+  *implementsClass {^'HLayout'}
+  *qtClass { ^'QcHBoxLayout' }
 }
 
 QVLayout : QLineLayout {
-  *qtClass { ^'QcVBoxLayout'; }
+  *implementsClass {^'VLayout'}
+  *qtClass { ^'QcVBoxLayout' }
 }
 
 // GRID LAYOUT ///////////////////////////////////////////////////
 
 QGridLayout : QLayout {
+  *implementsClass {^'GridLayout'}
+
   *new {
     // get rid of QObject's arguments
     ^super.new;
@@ -157,11 +161,11 @@ QGridLayout : QLayout {
   }
 
   setAlignment { arg item, align;
-    this.invokeMethod( \setAlignment, [item, QAlignment(align)], true );
-  }
+    var args = if( item.class === Point )
+      { [item.y, item.x, QAlignment(align)] }
+      { [item, QAlignment(align)] };
 
-  setAlignmentAt { arg row, column, align;
-    this.invokeMethod( \setAlignment, [row, column, QAlignment(align)], true );
+    this.invokeMethod( \setAlignment, args, true );
   }
 
   minRowHeight { arg row; ^this.invokeMethod( \minRowHeight, row ); }
@@ -174,5 +178,34 @@ QGridLayout : QLayout {
 
   setMinColumnWidth { arg column, width;
     this.invokeMethod( \setMinColumnWidth, [column, width] );
+  }
+}
+
+QStackLayout : QLayout
+{
+  *implementsClass {^'StackLayout'}
+
+  *qtClass { ^'QcStackLayout' }
+
+  *new { arg ...views; ^super.new([views]) }
+
+  add { arg view; this.insert(view, -1) }
+
+  insert { arg view, index = 0; this.invokeMethod( \insertWidget, [index, view] ) }
+
+  index { ^this.getProperty(\currentIndex) }
+  index_ { arg value; this.setProperty(\currentIndex, value) }
+
+  count { ^this.getProperty(\count) }
+
+  mode { ^this.getProperty(\stackingMode) }
+  mode_ { arg value;
+    value = value.switch(
+      \stackOne, 0,
+      \stackAll, 1,
+      value
+    );
+    value = value.clip(0, 1).asInteger;
+    this.setProperty(\stackingMode, value)
   }
 }

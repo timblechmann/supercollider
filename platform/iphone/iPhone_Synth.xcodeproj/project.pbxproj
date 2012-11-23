@@ -7,9 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0B09F52114C9D5260048AB9A /* function_attributes.h in Headers */ = {isa = PBXBuildFile; fileRef = 0B09F52014C9D5260048AB9A /* function_attributes.h */; };
 		1D60589F0D05DD5A006BFB54 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1D30AB110D05D00D00671497 /* Foundation.framework */; };
 		1DF5F4E00D08C38300B7A737 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DF5F4DF0D08C38300B7A737 /* UIKit.framework */; };
 		288765FD0DF74451002DB57D /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 288765FC0DF74451002DB57D /* CoreGraphics.framework */; };
+		3939A12814E35A5800ADDAE2 /* SC_Reply.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3939A12714E35A5800ADDAE2 /* SC_Reply.cpp */; };
+		3939A12E14E35A8700ADDAE2 /* SC_Reply.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3939A12714E35A5800ADDAE2 /* SC_Reply.cpp */; };
 		770903C60F50A468005C05DC /* iscsynthAppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 770903C20F50A468005C05DC /* iscsynthAppDelegate.m */; };
 		770903C70F50A468005C05DC /* iSCSynthController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 770903C40F50A468005C05DC /* iSCSynthController.mm */; };
 		770903C80F50A468005C05DC /* iscsynthmain.m in Sources */ = {isa = PBXBuildFile; fileRef = 770903C50F50A468005C05DC /* iscsynthmain.m */; };
@@ -155,10 +158,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0B09F52014C9D5260048AB9A /* function_attributes.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = function_attributes.h; path = ../include/common/function_attributes.h; sourceTree = "<group>"; };
+		0B1F3B1514C9C2E900DCE518 /* SC_WorldOptions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SC_WorldOptions.h; sourceTree = "<group>"; };
 		1D30AB110D05D00D00671497 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		1D6058910D05DD3D006BFB54 /* iscsynth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iscsynth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1DF5F4DF0D08C38300B7A737 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		288765FC0DF74451002DB57D /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		3939A12714E35A5800ADDAE2 /* SC_Reply.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SC_Reply.cpp; sourceTree = "<group>"; };
 		770903C10F50A468005C05DC /* iscsynthAppDelegate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = iscsynthAppDelegate.h; sourceTree = "<group>"; };
 		770903C20F50A468005C05DC /* iscsynthAppDelegate.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = iscsynthAppDelegate.m; sourceTree = "<group>"; };
 		770903C30F50A468005C05DC /* iSCSynthController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = iSCSynthController.h; sourceTree = "<group>"; };
@@ -185,7 +191,6 @@
 		772C0BEB12DA09E4009C0126 /* SC_Unit.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SC_Unit.h; sourceTree = "<group>"; };
 		772C0BEC12DA09E4009C0126 /* SC_Wire.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SC_Wire.h; sourceTree = "<group>"; };
 		772C0BED12DA09E4009C0126 /* SC_World.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SC_World.h; sourceTree = "<group>"; };
-		772C0BEE12DA09E4009C0126 /* SC_WorldOptions.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SC_WorldOptions.h; sourceTree = "<group>"; };
 		772C0BEF12DA09E4009C0126 /* SCComplex.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SCComplex.h; sourceTree = "<group>"; };
 		772C0BF012DA09E4009C0126 /* Unroll.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Unroll.h; sourceTree = "<group>"; };
 		772C0BF112DA09F3009C0126 /* clz.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = clz.h; sourceTree = "<group>"; };
@@ -572,12 +577,14 @@
 		7772497D0EABE96E00732A1C /* common */ = {
 			isa = PBXGroup;
 			children = (
+				0B09F52014C9D5260048AB9A /* function_attributes.h */,
 				7759953812FDE0C900603187 /* SC_fftlib.cpp */,
 				778F12660F50A85200CB6629 /* iPhone */,
 				7772497F0EABE96E00732A1C /* fftlib.c */,
 				777249810EABE96E00732A1C /* SC_AllocPool.cpp */,
 				777249820EABE96E00732A1C /* SC_DirUtils.cpp */,
 				777249830EABE96E00732A1C /* sc_popen.cpp */,
+				3939A12714E35A5800ADDAE2 /* SC_Reply.cpp */,
 				777249840EABE96E00732A1C /* SC_Sem.cpp */,
 				777249850EABE96E00732A1C /* SC_StandAloneInfo_Darwin.cpp */,
 				777249860EABE96E00732A1C /* SC_StringBuffer.cpp */,
@@ -689,7 +696,6 @@
 				772C0BEB12DA09E4009C0126 /* SC_Unit.h */,
 				772C0BEC12DA09E4009C0126 /* SC_Wire.h */,
 				772C0BED12DA09E4009C0126 /* SC_World.h */,
-				772C0BEE12DA09E4009C0126 /* SC_WorldOptions.h */,
 				772C0BEF12DA09E4009C0126 /* SCComplex.h */,
 				772C0BF012DA09E4009C0126 /* Unroll.h */,
 			);
@@ -722,6 +728,7 @@
 				772C0C1E12DA0A03009C0126 /* SC_UnitDef.h */,
 				772C0C1F12DA0A03009C0126 /* SC_UnitSpec.h */,
 				772C0C2012DA0A03009C0126 /* SC_WireSpec.h */,
+				0B1F3B1514C9C2E900DCE518 /* SC_WorldOptions.h */,
 			);
 			path = server;
 			sourceTree = "<group>";
@@ -764,6 +771,7 @@
 			files = (
 				7796FF81148D8D5C003E89BB /* scope_buffer.hpp in Headers */,
 				7796FF82148D8D5C003E89BB /* server_shm.hpp in Headers */,
+				0B09F52114C9D5260048AB9A /* function_attributes.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -907,6 +915,7 @@
 				77476EA512FDE652007449B3 /* PV_UGens.cpp in Sources */,
 				7796FF7C148D8D12003E89BB /* Makefile in Sources */,
 				7796FF7D148D8D12003E89BB /* tlsf.c in Sources */,
+				3939A12814E35A5800ADDAE2 /* SC_Reply.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -968,6 +977,7 @@
 				772C0F0212DA1043009C0126 /* FFTInterfaceTable.cpp in Sources */,
 				772C0F0312DA1047009C0126 /* PartitionedConvolution.cpp in Sources */,
 				7759953912FDE0C900603187 /* SC_fftlib.cpp in Sources */,
+				3939A12E14E35A8700ADDAE2 /* SC_Reply.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -992,8 +1002,8 @@
 				INFOPLIST_FILE = "iPhone Resources/iscsynth.plist";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/iphone/lib\"",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/mac/lib\"",
+					"\"lib\"",
+					"\"../mac/lib\"",
 				);
 				PRODUCT_NAME = iscsynth;
 				SYMROOT = build_iphone;
@@ -1017,8 +1027,8 @@
 				INFOPLIST_FILE = "iPhone Resources/iscsynth.plist";
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/iphone/lib\"",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/mac/lib\"",
+					"\"lib\"",
+					"\"../mac/lib\"",
 				);
 				PRODUCT_NAME = iscsynth;
 				SYMROOT = build_iphone;
@@ -1044,8 +1054,8 @@
 				GENERATE_MASTER_OBJECT_FILE = YES;
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/mac/lib\"",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/iphone/lib\"",
+					"\"../mac/lib\"",
+					"\"lib\"",
 				);
 				PREBINDING = NO;
 				PRODUCT_NAME = libscsynth;
@@ -1076,8 +1086,8 @@
 				GENERATE_MASTER_OBJECT_FILE = YES;
 				LIBRARY_SEARCH_PATHS = (
 					"$(inherited)",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/mac/lib\"",
-					"\"$(SYSTEM_APPS_DIR)/SC3/git/platform/iphone/lib\"",
+					"\"../mac/lib\"",
+					"\"lib\"",
 				);
 				OBJROOT = "$(SYMROOT)";
 				PREBINDING = NO;

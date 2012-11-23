@@ -21,8 +21,13 @@ Clock {
 
 SystemClock : Clock {
 	*clear {
-		_SystemClock_Clear
-		^this.primitiveFailed
+		var queue = thisProcess.prSchedulerQueue;
+		if (queue.size > 1) {
+			forBy(1, queue.size-1, 3) {|i|
+				queue[i+1].removedFromScheduler
+			};
+		};
+		this.prClear;
 	}
 	*sched { arg delta, item;
 		_SystemClock_Sched
@@ -32,27 +37,30 @@ SystemClock : Clock {
 		_SystemClock_SchedAbs
 		^this.primitiveFailed
 	}
-
+	*prClear {
+		_SystemClock_Clear
+		^this.primitiveFailed
+	}
 }
 
 AppClock : Clock {
 	classvar scheduler;
 	*initClass {
-		scheduler = Scheduler.new(this, true);
+		scheduler = Scheduler.new(this, drift:true, recursive:false);
 	}
 	*clear {
 		scheduler.clear;
 	}
 	*sched { arg delta, item;
-		scheduler.sched(delta, item)
+		scheduler.sched(delta, item);
+		this.prSchedNotify;
 	}
 	*tick {
-		var nextTime;
 		var saveClock = thisThread.clock;
 		thisThread.clock = this;
-		nextTime = (scheduler.seconds = Main.elapsedTime);
+		scheduler.seconds = Main.elapsedTime;
 		thisThread.clock = saveClock;
-		^nextTime;
+		^scheduler.queue.topPriority;
 	}
 	*prSchedNotify {
 		// notify clients that something has been scheduled
@@ -61,14 +69,26 @@ AppClock : Clock {
 }
 
 Scheduler {
-	var clock, drift, beats = 0.0, <seconds = 0.0, queue;
+	var clock, drift, <>recursive, beats = 0.0, <seconds = 0.0, <queue, expired, wakeup;
 
-	*new { arg clock, drift = false;
-		^super.newCopyArgs(clock, drift).init;
+	*new { arg clock, drift = false, recursive=true;
+		^super.newCopyArgs(clock, drift, recursive).init;
 	}
 	init {
 		beats = thisThread.beats;
 		queue = PriorityQueue.new;
+		expired = Array.new(8);
+		wakeup = { |item|
+			var delta;
+			try {
+				delta = item.awake( beats, seconds, clock );
+				if (delta.isNumber) { this.sched(delta, item) };
+			} { |error|
+				Error.handling = true;
+				if (Error.debug) { error.inspect } { error.reportError };
+				Error.handling = false;
+			}
+		};
 	}
 
 	play { arg task;
@@ -84,7 +104,6 @@ Scheduler {
 		if (delta.notNil, {
 			fromTime = if (drift, { Main.elapsedTime },{ seconds });
 			queue.put(fromTime + delta, item);
-			clock.prSchedNotify;
 		});
 	}
 	clear {
@@ -98,28 +117,39 @@ Scheduler {
 		this.seconds = seconds + delta;
 	}
 
-	seconds_ { | newSeconds  |
-		// NOTE: first pop ALL the expired items and only then wake
-		// them up, because we want control to return to the caller
-		// before any tasks scheduled as a result of this call are
-		// performed.
-		var delta, items;
-		items = Array.new(8);
-		while ({
-			seconds = queue.topPriority;
-			seconds.notNil and: { seconds <= newSeconds }
-		},{
-			items = items.add( queue.pop );
-		});
-		items.do { | item |
-			delta = item.awake( beats, seconds, clock );
-			if (delta.isNumber, {
-				this.sched(delta, item);
-			});
+	seconds_ { | newSeconds |
+		if( recursive ) {
+			while {
+				seconds = queue.topPriority;
+				seconds.notNil and: { seconds <= newSeconds }
+			} {
+				beats = clock.secs2beats(seconds);
+				wakeup.(queue.pop);
+			}
+		} {
+			// First pop all the expired items and only then wake
+			// them up, in order for control to return to the caller
+			// before any tasks scheduled as a result of this call are
+			// awaken.
+
+			while {
+				seconds = queue.topPriority;
+				seconds.notNil and: { seconds <= newSeconds }
+			} {
+				expired = expired.add(seconds);
+				expired = expired.add(queue.pop);
+			};
+
+			expired.pairsDo { | time, item |
+				seconds = time;
+				beats = clock.secs2beats(time);
+				wakeup.(item);
+			};
+			expired.extend(0); // clear
 		};
+
 		seconds = newSeconds;
 		beats = clock.secs2beats(newSeconds);
-		^queue.topPriority;
 	}
 }
 
@@ -219,7 +249,7 @@ elapsed time is whatever the system clock says it is right now. elapsed time is 
 		// nodes are already freed
 		// NOTE: queue is an Array, not a PriorityQueue, but it's used as such internally. That's why each item uses 3 slots.
 		if (queue.size > 1) {
-			forBy(1, queue.size, 3) {|i|
+			forBy(1, queue.size-1, 3) {|i|
 				queue[i+1].removedFromScheduler(releaseNodes)
 			};
 		};
@@ -322,37 +352,38 @@ elapsed time is whatever the system clock says it is right now. elapsed time is 
 		this.changed(\meter);
 	}
 
-// these methods allow TempoClock to act as TempoClock.default
-   *stop { TempoClock.default.stop  }
-   *play { | task, quant | TempoClock.default.play(task, quant)  }
-   *sched { | delta, item | TempoClock.default.sched(delta, item)  }
-   *schedAbs { | beat, item | TempoClock.default.schedAbs(beat, item)  }
-   *clear { | releaseNodes | TempoClock.default.clear(releaseNodes)  }
-   *tempo_ { | newTempo | TempoClock.default.tempo_(newTempo)  }
-   *etempo_ { | newTempo | TempoClock.default.etempo_(newTempo)  }
+	// these methods allow TempoClock to act as TempoClock.default
+	*stop { TempoClock.default.stop	}
+	*play { | task, quant | TempoClock.default.play(task, quant)	 }
+	*sched { | delta, item | TempoClock.default.sched(delta, item)  }
+	*schedAbs { | beat, item | TempoClock.default.schedAbs(beat, item)  }
+	*clear { | releaseNodes | TempoClock.default.clear(releaseNodes)	 }
+	*tempo_ { | newTempo | TempoClock.default.tempo_(newTempo)  }
+	*etempo_ { | newTempo | TempoClock.default.etempo_(newTempo)	 }
 
-   *tempo { ^TempoClock.default.tempo }
-   *beats { ^TempoClock.default.beats }
-   *beats2secs { | beats | ^TempoClock.default.beats2secs(beats)  }
-   *secs2beats { | secs | ^TempoClock.default.secs2beats(secs)  }
-   *nextTimeOnGrid { | quant = 1, phase = 0 | ^TempoClock.default.nextTimeOnGrid(quant, phase)  }
-   *timeToNextBeat { | quant = 1 | ^TempoClock.default.timeToNextBeat(quant)  }
+	*tempo { ^TempoClock.default.tempo }
+	*beats { ^TempoClock.default.beats }
+	*beats2secs { | beats | ^TempoClock.default.beats2secs(beats)  }
+	*secs2beats { | secs | ^TempoClock.default.secs2beats(secs)	}
+	*nextTimeOnGrid { | quant = 1, phase = 0 | ^TempoClock.default.nextTimeOnGrid(quant, phase)	}
+	*timeToNextBeat { | quant = 1 | ^TempoClock.default.timeToNextBeat(quant)  }
 
-   *setTempoAtBeat { | newTempo, beats | TempoClock.default.setTempoAtBeat(newTempo, beats)  }
-   *setTempoAtSec { | newTempo, secs | TempoClock.default.setTempoAtSec(newTempo, secs)  }
-   *setMeterAtBeat { | newBeatsPerBar, beats | TempoClock.default.setMeterAtBeat(newBeatsPerBar, beats)  }
+	*setTempoAtBeat { | newTempo, beats | TempoClock.default.setTempoAtBeat(newTempo, beats)	 }
+	*setTempoAtSec { | newTempo, secs | TempoClock.default.setTempoAtSec(newTempo, secs)	 }
+	*setMeterAtBeat { | newBeatsPerBar, beats | TempoClock.default.setMeterAtBeat(newBeatsPerBar, beats)	 }
 
-   *beatsPerBar { ^TempoClock.default.beatsPerBar  }
-   *baseBarBeat { ^TempoClock.default.baseBarBeat  }
-   *baseBar { ^TempoClock.default.baseBar  }
-   *playNextBar { | task | ^TempoClock.default.playNextBar(task)  }
-   *beatDur { ^TempoClock.default.beatDur  }
-   *elapsedBeats { ^TempoClock.default.elapsedBeats  }
-   *beatsPerBar_ { | newBeatsPerBar | TempoClock.default.beatsPerBar_(newBeatsPerBar)  }
-   *beats2bars { | beats | ^TempoClock.default.beats2bars(beats)  }
-   *bars2beats { | bars | ^TempoClock.default.bars2beats(bars)  }
-   *bar { ^TempoClock.default.bar  }
-   *nextBar { | beat | ^TempoClock.default.nextBar(beat)  }
-   *beatInBar { ^TempoClock.default.beatInBar  }
+	*beatsPerBar { ^TempoClock.default.beatsPerBar  }
+	*baseBarBeat { ^TempoClock.default.baseBarBeat  }
+	*baseBar { ^TempoClock.default.baseBar  }
+	*playNextBar { | task | ^TempoClock.default.playNextBar(task)  }
+	*beatDur { ^TempoClock.default.beatDur  }
+	*elapsedBeats { ^TempoClock.default.elapsedBeats	 }
+	*beatsPerBar_ { | newBeatsPerBar | TempoClock.default.beatsPerBar_(newBeatsPerBar)  }
+	*beats2bars { | beats | ^TempoClock.default.beats2bars(beats)  }
+	*bars2beats { | bars | ^TempoClock.default.bars2beats(bars)	}
+	*bar { ^TempoClock.default.bar  }
+	*nextBar { | beat | ^TempoClock.default.nextBar(beat)  }
+	*beatInBar { ^TempoClock.default.beatInBar  }
 
+	archiveAsCompileString { ^true }
 }

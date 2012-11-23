@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import re, os, subprocess, time
+import re, subprocess, time
 from gi.repository import GObject, Gedit, Gtk, Pango
 
 ui_str = """<ui>
@@ -37,12 +37,8 @@ scui_str = """<ui>
         <menuitem action="ScedRecord"/>
         <separator/>
         <menuitem action="ScedServerGUI"/>
-        <menuitem action="ScedServerMeter"/>
         <menuitem action="ScedStartServer"/>
         <menuitem action="ScedStopServer"/>
-        <separator/>
-        <menuitem action="ScedStartSwingOSC"/>
-        <menuitem action="ScedStopSwingOSC"/>
         <separator/>
         <menuitem action="ScedFindHelp"/>
         <menuitem action="ScedBrowseHelp"/>
@@ -53,6 +49,8 @@ scui_str = """<ui>
         <menuitem action="ScedBrowseClass"/>
         <menuitem action="ScedInspectObject"/>
         <menuitem action="ScedOpenDevFile"/>
+        <separator/>
+        <menuitem action="ScedFrontWindows"/>
         <separator/>
         <menuitem action="ScedRestartInterpreter"/>
         <menuitem action="ScedRecompile"/>
@@ -91,7 +89,7 @@ def find_block(doc, where=None):
             break
 
         if not i1.backward_line():
-            raise RuntimeError, "Couldn't find where code block starts!"
+            raise RuntimeError("Couldn't find where code block starts!")
 
     i2 = i1.copy()
     count = 1
@@ -102,7 +100,7 @@ def find_block(doc, where=None):
     # move forward to the end of the block
     while True:
         if not i2.forward_char():
-            raise RuntimeError, "Couldn't find where code block ends!"
+            raise RuntimeError("Couldn't find where code block ends!")
 
         char = i2.get_char()
 
@@ -134,7 +132,7 @@ def find_block(doc, where=None):
     if where.in_range(i1, i2):
         return i1, i2
     else:
-        raise RuntimeError, "Couldn't find code block!"
+        raise RuntimeError("Couldn't find code block!")
 
 def class_char_predicate(c, *args):
     if re.match("[A-Za-z0-9_]", c):
@@ -147,7 +145,7 @@ def find_word(doc, where=None):
     else:
         i1 = where.copy()
 
-    scclass_regex = "[A-Za-z0-9_]"
+    #scclass_regex = "[A-Za-z0-9_]"
     
     while i1.backward_char():
         if not re.match("[A-Za-z0-9_]", i1.get_char()):
@@ -204,11 +202,11 @@ class ScLang:
 
     # FIXME: use sclang.communicate()
     def evaluate(self, code, silent=False):
-        self.stdin.write(code)
+        self.stdin.write(bytes(code))
         if silent:
-            self.stdin.write("\x1b")
+            self.stdin.write(bytes("\x1b"))
         else:
-            self.stdin.write("\x0c")
+            self.stdin.write(bytes("\x0c"))
         self.stdin.flush()
 
     def toggle_recording(self, record):
@@ -263,15 +261,15 @@ class Logger:
             return False
 
         # FIXME: A workaround for a mac character
-        self.__append_to_buffer(unicode(s, 'mac_latin2'))
+        self.__append_to_buffer(bytes(s))
 
         if condition & GObject.IO_ERR:
             s = source.read() # can safely read until EOF here
-            self.__append_to_buffer(unicode(s, 'mac_latin2'))
+            self.__append_to_buffer(bytes(s))
             return False
         elif condition & GObject.IO_HUP:
             s = source.read() # can safely read until EOF here
-            self.__append_to_buffer(unicode(s, 'mac_latin2'))
+            self.__append_to_buffer(bytes(s))
             return False
         elif condition != 1:
             return False
@@ -286,7 +284,7 @@ class Logger:
         elif text.startswith("WARNING") or text.startswith("FAILURE"):
             tags = self.__ugly_tag
 
-        elif text.startswith("StartUp done."):
+        elif text.startswith("Welcome to SuperCollider"):
             tags = self.__good_tag
         else:
             tags = self.__tag
@@ -313,6 +311,7 @@ class LogPanel(Gtk.ScrolledWindow):
 
         self.buffer = Gtk.TextBuffer()
         self.view = Gtk.TextView()
+        self.view.modify_font(Pango.FontDescription("Monospace"))
         self.view.props.buffer = self.buffer
         self.view.props.editable = False
         self.view.props.wrap_mode = Gtk.WrapMode.CHAR
@@ -384,11 +383,11 @@ class ScedWindowActivatable(GObject.Object, Gedit.WindowActivatable):
              _("Find and open help file"),
              self.on_find_help),
 
-            ("ScedBrowseHelp", None, _("Browse Help"), None,
+            ("ScedBrowseHelp", None, _("Browse Help"), "<control><alt>U",
              _("Browse help by categories"),
              self.on_browse_help),
 
-            ("ScedSearchHelp", None, _("Search Help"), "<control><alt>U",
+            ("ScedSearchHelp", None, _("Search Help"), None,
              _("Search for help"),
              self.on_search_help),
 
@@ -436,17 +435,9 @@ class ScedWindowActivatable(GObject.Object, Gedit.WindowActivatable):
              _("Show GUI for default server"),
              self.on_server_gui),
 
-            ("ScedServerMeter", None, _("Show level meters"), None,
-             _("Show level meters for default server"),
-             self.on_server_meter),
-
-            ("ScedStartSwingOSC", None, _("Start SwingOSC GUI Server"), None,
-             _("Start the SwingOSC GUI server"),
-             self.on_start_swingosc),
-
-            ("ScedStopSwingOSC", None, _("Stop SwingOSC GUI Server"), None,
-             _("Stop the SwingOSC GUI server"),
-             self.on_stop_swingosc),
+            ("ScedFrontWindows", None, _("Raise all windows"), "<alt>W",
+             _("Raise all windows"),
+             self.on_front_windows),
         ]
 
         toggle_entries = [
@@ -499,9 +490,8 @@ class ScedWindowActivatable(GObject.Object, Gedit.WindowActivatable):
                 try:
                     i1, i2 = find_block(doc, i1)
                 except RuntimeError:
-                    statusbar = self.window.get_statusbar()
-                    
-                    context = statusbar.get_context_id("supercollider")
+                    #statusbar = self.window.get_statusbar()
+                    #context = statusbar.get_context_id("supercollider")
                     # FIXME: no longer works with gir
                     #statusbar.flash_message(context,
                     #    "Code block is not properly closed")
@@ -538,11 +528,11 @@ class ScedWindowActivatable(GObject.Object, Gedit.WindowActivatable):
         self.__lang.evaluate(cmd, silent=True)
 
     def on_browse_help(self, action):
-        self.__lang.evaluate("HelpBrowser.openBrowser;")
+        self.__lang.evaluate("HelpBrowser.openBrowsePage;")
 
     def on_search_help(self, action):
         text = self.get_selection()
-        self.__lang.evaluate("HelpBrowser.openSearch(\"" + text + "\");")
+        self.__lang.evaluate("HelpBrowser.openSearchPage(\"" + text + "\");")
 
     def on_method_args(self, action):
         text = self.get_selection()
@@ -550,8 +540,7 @@ class ScedWindowActivatable(GObject.Object, Gedit.WindowActivatable):
 
     def on_find_definition(self, action, data=None):
         text = self.get_selection()
-        cmd = "(\"gedit \" + (\"" + text + "\"" + ".interpret.filenameSymbol.asString)).systemCmd;"
-        self.__lang.evaluate(cmd, silent=True)
+        self.__lang.evaluate("" + text + ".openCodeFile", silent=True)
 
     def on_browse_class(self, action):
         text = self.get_selection()
@@ -563,11 +552,14 @@ class ScedWindowActivatable(GObject.Object, Gedit.WindowActivatable):
 
     def on_open_dev_file(self, action):
         doc = self.window.get_active_document()
-        path = gio.File(doc.get_uri()).get_path() #get_location()
-        self.__lang.evaluate("(\"gedit\"+thisProcess.platform.devLoc(\""+path+"\")).systemCmd", silent=True);
+        if doc is None:
+            return None
+        location = doc.get_location()
+        if location is not None and Gedit.utils_location_has_file_scheme(location):
+            self.__lang.evaluate("thisProcess.platform.devLoc(\""+location.get_path()+"\").openTextFile", silent=True)
 
     def on_recompile(self, action):
-        self.__lang.stdin.write("\x18")
+        self.__lang.stdin.write(bytes("\x18"))
 
     def on_restart(self, action, data=None):
         if self.__lang.running():
@@ -589,13 +581,6 @@ class ScedWindowActivatable(GObject.Object, Gedit.WindowActivatable):
     def on_server_gui(self, action, data=None):
         self.__lang.evaluate("Server.default.makeGui;", silent=True)
 
-    def on_server_meter(self, action, data=None):
-        self.__lang.evaluate("Server.default.meter;", silent=True)
+    def on_front_windows(self, action, data=None):
+        self.__lang.evaluate("Window.allWindows.do(_.front);", silent=True)
 
-    def on_start_swingosc(self, action, data=None):
-        # FIXME: make these actions possible only if interpreter is running and okay
-        self.__lang.evaluate("SwingOSC.default.boot;GUI.swing;", silent=False)
-
-    def on_stop_swingosc(self, action, data=None):
-        # FIXME: make these actions possible only if interpreter is running and okay
-        self.__lang.evaluate("SwingOSC.default.quit;", silent=False)

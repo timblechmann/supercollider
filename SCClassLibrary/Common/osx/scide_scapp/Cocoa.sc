@@ -2,7 +2,7 @@ CocoaDialog {
 	classvar result, ok, cancel;
 
 	*initClass {
-		Reset.add{ this.clear };
+		OnError.add({ this.clear })
 	}
 
 	*getPaths { arg okFunc, cancelFunc, allowsMultiple=true;
@@ -15,6 +15,18 @@ CocoaDialog {
 		ok = okFunc;
 		cancel = cancelFunc;
 		this.prGetPathsDialog(allowsMultiple);
+	}
+
+	*openPanel { arg okFunc, cancelFunc, multipleSelection=false;
+		if(result.notNil,{
+			"A CocoaDialog is already in progress.  do: [CocoaDialog.clear]".warn;
+			^nil
+		});
+
+		//result = Array.new(maxSize);
+		ok = if(multipleSelection){okFunc}{ {|res| okFunc.value(res[0])} };
+		cancel = cancelFunc;
+		this.prGetPathsDialog(multipleSelection);
 	}
 
 	*prGetPathsDialog { arg allowsMultiple;

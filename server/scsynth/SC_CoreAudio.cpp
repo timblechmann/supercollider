@@ -20,7 +20,6 @@
 
 #include "SC_CoreAudio.h"
 #include "SC_Sem.h"
-#include "SC_ComPort.h"
 #include <stdarg.h>
 #include "SC_SequencedCommand.h"
 #include "SC_Prototypes.h"
@@ -46,9 +45,7 @@
 #include "SC_Win32Utils.h"
 #endif
 
-#ifndef SC_INNERSC
 int64 gStartupOSCTime = -1;
-#endif //ifndef SC_INNERSC
 
 void sc_SetDenormalFlags();
 
@@ -80,8 +77,7 @@ int64 oscTimeNow()
 	return CoreAudioHostTimeToOSC(AudioGetCurrentHostTime());
 }
 
-void syncOSCOffsetWithTimeOfDay();
-void syncOSCOffsetWithTimeOfDay()
+static void syncOSCOffsetWithTimeOfDay()
 {
 	// generate a value gOSCoffset such that
 	// (gOSCOffset + systemTimeInOSCunits)
@@ -282,7 +278,7 @@ int PerformOSCMessage(World *inWorld, int inSize, char *inData, ReplyAddress *in
 	}
 	if (!cmdObj) {
 		CallSendFailureCommand(inWorld, inData, "Command not found", inReply);
-		scprintf("FAILURE %s Command not found\n", inData);
+		scprintf("FAILURE IN SERVER: %s Command not found\n", inData);
 		return kSCErr_NoSuchCommand;
 	}
 
@@ -544,9 +540,8 @@ bool SC_AudioDriver::Start()
 	mPrevSampleTime = 0.;
 
 	World_Start(mWorld);
-#ifndef SC_INNERSC
+
 	gStartupOSCTime = oscTimeNow();
-#endif //SC_INNERSC
 
 	return DriverStart();
 }
@@ -938,18 +933,18 @@ bool SC_CoreAudioDriver::DriverSetup(int* outNumSamplesPerCallback, double* outS
 	if(mWorld->mVerbosity >= 1){
 		scprintf("<-SC_CoreAudioDriver::Setup world %p\n", mWorld);
 	}
-	
-	
-	
-	//check if using built-in output, and thus whether there could be headphone plug/un-plug issues 
-	//our assumption otherwise is that we don't respond, and SC will stay with the pre-arranged or default device, and not restart just because headphones switched 
-	
+
+
+
+	//check if using built-in output, and thus whether there could be headphone plug/un-plug issues
+	//our assumption otherwise is that we don't respond, and SC will stay with the pre-arranged or default device, and not restart just because headphones switched
+
 	err = AudioDeviceGetPropertyInfo(mOutputDevice, 0, false, kAudioDevicePropertyDeviceName, &count, 0);
 	if (err != kAudioHardwareNoError) {
 		scprintf("info kAudioDevicePropertyDeviceName error %4.4s %p\n", (char*)&err, mOutputDevice);
-		return false; 
+		return false;
 	}
-	
+
 	char *outputname = (char*)malloc(count);
 	const char *testname = "Built-in Output";
 	err = AudioDeviceGetProperty(mOutputDevice, 0, false, kAudioDevicePropertyDeviceName, &count, outputname);
@@ -957,22 +952,22 @@ bool SC_CoreAudioDriver::DriverSetup(int* outNumSamplesPerCallback, double* outS
 		scprintf("get kAudioDevicePropertyDeviceName error %4.4s %p\n", (char*)&err, mOutputDevice);
 		return false;
 	}
-	builtinoutputflag_ = 0; 
-	
+	builtinoutputflag_ = 0;
+
 	if (strcmp(testname, outputname) == 0) {
 		builtinoutputflag_ = 1;
 	}
 // else {
-//	
+//
 //		//check for an Aggregate Devices with a subdevice which is Built-in Output
 //		//http://lists.apple.com/archives/coreaudio-api/2009/Oct/msg00182.html
-//		
-//		
+//
+//
 //	}
 
 	free(outputname);
-	
-	
+
+
 	return true;
 }
 
@@ -1233,7 +1228,7 @@ OSStatus	hardwareListenerProc (	AudioHardwarePropertyID	inPropertyID,
     UInt32				outSize;
     Boolean				outWritable;
     AudioDeviceID		deviceID;
-	
+
     switch(inPropertyID)
     {
         case kAudioHardwarePropertyDefaultOutputDevice:
@@ -1246,11 +1241,11 @@ OSStatus	hardwareListenerProc (	AudioHardwarePropertyID	inPropertyID,
 			if (err) break;
 			err = AudioDeviceGetProperty(deviceID, 0, false, kAudioDevicePropertyDeviceName, &outSize, cStr);
 			if (err) break;
-			
+
 			// do something
-			
+
             break;
-			
+
         case kAudioHardwarePropertyDefaultInputDevice:
             scprintf("%s\n", "***** HARDWARE NOTIFICATION - kAudioHardwarePropertyDefaultInputDevice\r");
             err =  AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDefaultInputDevice,  &outSize, &outWritable);
@@ -1261,11 +1256,11 @@ OSStatus	hardwareListenerProc (	AudioHardwarePropertyID	inPropertyID,
 			if (err) break;
 			err = AudioDeviceGetProperty(deviceID, 0, false, kAudioDevicePropertyDeviceName, &outSize, cStr);
 			if (err) break;
-			
+
 			// do something
-			
+
             break;
-			
+
         case kAudioHardwarePropertyDefaultSystemOutputDevice:
             scprintf("%s\n", "***** HARDWARE NOTIFICATION - kAudioHardwarePropertyDefaultSystemOutputDevice\r");
             err =  AudioHardwareGetPropertyInfo(kAudioHardwarePropertyDefaultSystemOutputDevice,  &outSize, &outWritable);
@@ -1276,11 +1271,11 @@ OSStatus	hardwareListenerProc (	AudioHardwarePropertyID	inPropertyID,
 			if (err) break;
 			err = AudioDeviceGetProperty(deviceID, 0, false, kAudioDevicePropertyDeviceName, &outSize, cStr);
 			if (err) break;
-			
+
 			// do something
-			
+
             break;
-			
+
         case kAudioHardwarePropertyDevices:
         {
             scprintf("%s\n", "***** HARDWARE NOTIFICATION - kAudioHardwarePropertyDevices\r");
@@ -1289,7 +1284,7 @@ OSStatus	hardwareListenerProc (	AudioHardwarePropertyID	inPropertyID,
 		default:
 			scprintf("%s\n", "***** HARDWARE NOTIFICATION - %4.4s\r", &inPropertyID);
 	}
-	
+
     fflush(stdout);
     return (noErr);
 }
@@ -1305,22 +1300,22 @@ OSStatus AddHardwareListeners(void* inClientData)
 {
     OSStatus			err = noErr;
 
-	//non deprecated but requires AudiObject, bleargh 
-	//err= AudioObjectAddPropertyListener(AudioObject, kAudioHardwarePropertyDefaultOutputDevice, hardwareListenerProc, inClientData); 
+	//non deprecated but requires AudiObject, bleargh
+	//err= AudioObjectAddPropertyListener(AudioObject, kAudioHardwarePropertyDefaultOutputDevice, hardwareListenerProc, inClientData);
 
     err = AudioHardwareAddPropertyListener(kAudioHardwarePropertyDefaultOutputDevice, hardwareListenerProc, inClientData);
     if (err) return err;
-	
+
     err = AudioHardwareAddPropertyListener(kAudioHardwarePropertyDefaultInputDevice, hardwareListenerProc, inClientData);
     if (err) return err;
-	
-	//doesn't matter? Only default looked at by SC? 
+
+	//doesn't matter? Only default looked at by SC?
 	err = AudioHardwareAddPropertyListener(kAudioHardwarePropertyDefaultSystemOutputDevice, hardwareListenerProc, inClientData);
     if (err) return err;
-	
+
     err = AudioHardwareAddPropertyListener(kAudioHardwarePropertyDevices, hardwareListenerProc, inClientData);
     if (err) return err;
-	
+
     return (err);
 }
 
@@ -1432,29 +1427,29 @@ bool SC_CoreAudioDriver::DriverStart()
 	if(mWorld->mVerbosity >= 1){
 		scprintf("<-SC_CoreAudioDriver::DriverStart\n");
 	}
-	
-	
+
+
 	//http://lists.apple.com/archives/coreaudio-api/2010/Aug/msg00114.html
 	CFRunLoopRef theRunLoop =  NULL;
 	AudioObjectPropertyAddress theAddress = { kAudioHardwarePropertyRunLoop, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMaster };
 	AudioObjectSetPropertyData(kAudioObjectSystemObject, &theAddress, 0, NULL, sizeof(CFRunLoopRef), &theRunLoop);
-	
+
 	//for now no spotting of hardware changes, assumption is that ServerOptions inviolate. However, if a device was unplugged, could react to loss of that device
-	//by switching to system default? 
-	//AddHardwareListeners(NULL); 
+	//by switching to system default?
+	//AddHardwareListeners(NULL);
 	//note that the number of listeners is stripped down to only one for now, to react to headphone swaps in the case of Built-in Output
-	AddDeviceListeners(mOutputDevice, this); 
-	
+	AddDeviceListeners(mOutputDevice, this);
+
 	return true;
 }
 
 
 bool SC_CoreAudioDriver::StopStart() {
-	
-	bool test = DriverStop(); 
-	
+
+	bool test = DriverStop();
+
 	bool test2 = DriverStart();
-	return test && test2; 
+	return test && test2;
 }
 
 
@@ -1524,9 +1519,9 @@ OSStatus	deviceListenerProc (	AudioDeviceID			inDevice,
     UInt32				tLong;
 	Float32				vol;
 
-	
-	SC_CoreAudioDriver* coredriver = (SC_CoreAudioDriver*) inClientData; 
-	
+
+	SC_CoreAudioDriver* coredriver = (SC_CoreAudioDriver*) inClientData;
+
     switch(inPropertyID)
     {
  //       case kAudioDevicePropertyBufferSize:
@@ -1564,9 +1559,9 @@ OSStatus	deviceListenerProc (	AudioDeviceID			inDevice,
 //
 //			//when change device get up to four messages:
 //			//isInput ==NO or YES  theUIntData= 0 or 1 from old and possibly new device (ieheadphone swap)
-//		
-//		
-//			
+//
+//
+//
 //             break;
 //
 //        case kAudioDevicePropertyVolumeScalar:
@@ -1601,14 +1596,14 @@ OSStatus	deviceListenerProc (	AudioDeviceID			inDevice,
             // get the source
             // match the source to one of the available sources and return the index of that source
             //SetControlValue(control, (chan->vol) * 100);
-			
-			//will get this message anyway even if don't have built-in output seleected. 
+
+			//will get this message anyway even if don't have built-in output seleected.
 			//so need to react based on whether current output IS built-in output. Annoyingly, headphone unplugging/plugging also sends default and system output + default input change hardware messages
 			//swapping to new driver
 			if (coredriver->builtinoutputflag_==1)
-				coredriver->StopStart(); 
-			
-			
+				coredriver->StopStart();
+
+
             break;
 
 		//default:
@@ -1653,10 +1648,10 @@ OSStatus    AddDeviceListeners(AudioDeviceID inDevice, void *inClientData)
 {
     OSStatus		err = noErr;
 
-//ONLY REACTING TO HEADPHONE SWAPS FOR NOW	
-//	
+//ONLY REACTING TO HEADPHONE SWAPS FOR NOW
 //
-//	
+//
+//
 //    // kAudioDevicePropertyBufferSize
 //    err = AudioDeviceAddPropertyListener(inDevice, 0, false, kAudioDevicePropertyBufferSize, deviceListenerProc, inClientData);
 //    if (err) return err;
@@ -2643,182 +2638,3 @@ bool SC_PortAudioDriver::DriverStop()
 }
 
 #endif // SC_AUDIO_API_PORTAUDIO
-
-
-#if SC_AUDIO_API == SC_AUDIO_API_INNERSC_VST
-
-// =====================================================================
-// SC_VSTAudioDriver (VST)
-
-
-SC_VSTAudioDriver::SC_VSTAudioDriver(struct World *inWorld)
-		: SC_AudioDriver(inWorld)
-{
-  mIsStreaming = false;
-  // init big rsrc
-}
-
-SC_VSTAudioDriver::~SC_VSTAudioDriver()
-{
-  // close small rsrc (stream)
-  // close big rsrc
-}
-
-void SC_VSTAudioDriver::Callback( const void *input, void *output,
-            unsigned long frameCount, const VstTimeInfo* timeInfo )
-{
-    World *world = mWorld;
-
-//    (void) frameCount, timeInfo, statusFlags; // suppress unused parameter warnings
-
-	try {
-    int64 oscTime = 0; // $$$todo FIXME -> PortAudioTimeToHostTime( mStream, timeInfo.outputBufferDacTime );
-		mOSCbuftime = oscTime;
-
-		mFromEngine.Free();
-		mToEngine.Perform();
-		mOscPacketsToEngine.Perform();
-
-		int numInputs = mInputChannelCount;
-		int numOutputs = mOutputChannelCount;
-		const float **inBuffers = (const float**)input;
-		float **outBuffers = (float**)output;
-
-		int numSamples = NumSamplesPerCallback();
-		int bufFrames = mWorld->mBufLength;
-		int numBufs = numSamples / bufFrames;
-
-		float *inBuses = mWorld->mAudioBus + mWorld->mNumOutputs * bufFrames;
-		float *outBuses = mWorld->mAudioBus;
-		int32 *inTouched = mWorld->mAudioBusTouched + mWorld->mNumOutputs;
-		int32 *outTouched = mWorld->mAudioBusTouched;
-
-		int minInputs = std::min<size_t>(numInputs, mWorld->mNumInputs);
-		int minOutputs = std::min<size_t>(numOutputs, mWorld->mNumOutputs);
-
-		int bufFramePos = 0;
-
-		int64 oscInc = mOSCincrement;
-		double oscToSamples = mOSCtoSamples;
-
-		// main loop
-		for (int i = 0; i < numBufs; ++i, mWorld->mBufCounter++, bufFramePos += bufFrames) {
-			int32 bufCounter = mWorld->mBufCounter;
-			int32 *tch;
-			// copy+touch inputs
-			tch = inTouched;
-			for (int k = 0; k < minInputs; ++k) {
-				const float *src = inBuffers[k] + bufFramePos;
-				float *dst = inBuses + k * bufFrames;
-				for (int n = 0; n < bufFrames; ++n)
-          *dst++ = *src++;
-				*tch++ = bufCounter;
-			}
-			// run engine
-			//int64 schedTime;
-			//int64 nextTime = oscTime + oscInc;
-			//while ((schedTime = mScheduler.NextTime()) <= nextTime) {
-			//	world->mSampleOffset = (int)((double)(schedTime - oscTime) * oscToSamples);
-			//	SC_ScheduledEvent event = mScheduler.Remove();
-			//	event.Perform();
-			//	world->mSampleOffset = 0;
-			//}
-      // hack for now, schedule events as soon as they arrive
-
-      int64 schedTime;
-      int64 nextTime = oscTime + oscInc;
-      while ((schedTime = mScheduler.NextTime()) != kMaxInt64) {
-        world->mSampleOffset = 0;
-				SC_ScheduledEvent event = mScheduler.Remove();
-				event.Perform();
-				world->mSampleOffset = 0;
-			}
-			World_Run(world);
-			// copy touched outputs
-			tch = outTouched;
-			for (int k = 0; k < minOutputs; ++k) {
-				float *dst = outBuffers[k] + bufFramePos;
-				if (*tch++ == bufCounter) {
-					float *src = outBuses + k * bufFrames;
-					for (int n = 0; n < bufFrames; ++n)
-            *dst++ = *src++;
-  			}
-        else {
-					for (int n = 0; n < bufFrames; ++n)
-            *dst++ = 0.0f;
-				}
-			}
-			// update buffer time
-			mOSCbuftime = nextTime;
-		}
-	} catch (std::exception& exc) {
-		scprintf("SC_PortAudioDriver: exception in real time: %s\n", exc.what());
-	} catch (...) {
-		scprintf("SC_PortAudioDriver: unknown exception in real time\n");
-	}
-
-	//double cpuUsage = (double)Pa_GetStreamCpuLoad(mStream);
-  double cpuUsage = 0.0; // $$$todo fix fix. user will check load in host
-	mAvgCPU = mAvgCPU + 0.1 * (cpuUsage - mAvgCPU);
-	if (cpuUsage > mPeakCPU || --mPeakCounter <= 0)
-	{
-		mPeakCPU = cpuUsage;
-		mPeakCounter = mMaxPeakCounter;
-	}
-	mAudioSync.Signal();
-  //return paContinue;
-}
-
-
-// ====================================================================
-// NOTE: for now, in lieu of a mechanism that passes generic options to
-// the platform driver, we rely on the PortAudio default device environment variables
-bool SC_VSTAudioDriver::DriverSetup(int* outNumSamples, double* outSampleRate)
-{
-  // should init the driver and write the num of samples per callback
-  // and the sample rate in the supplied addresses
-
-  // this should open the resources (and return true if successful), but not
-  // really start the streaming... (this is the resp of DriverStart())
-  return true;
-}
-
-bool SC_VSTAudioDriver::DriverStart()
-{
-  return true;
-}
-
-bool SC_VSTAudioDriver::DriverStop()
-{
-  mIsStreaming = false;
-  return true;
-}
-
-int32 server_timeseed()
-{
-	static int32 count = 0;
-	struct timeval tv;
-  double us = timeGetTime( )*1000;
-  int sec = us/1000000;
-  int usec = us-sec*1000000;
-	return (int32)sec ^ (int32)usec ^ count--;
-}
-
-static inline int64 GetCurrentOSCTime()
-{
-  #pragma message("check where GetCurrentOSCTime( ) is called and try to defer that somewhere where VstTimeInfo is available")
-  //$$$todo fixme
-  return 0;
-}
-
-
-int64 oscTimeNow()
-{
-	return GetCurrentOSCTime();
-}
-
-void initializeScheduler()
-{
-}
-
-#endif // SC_AUDIO_API_INNERSC_VST

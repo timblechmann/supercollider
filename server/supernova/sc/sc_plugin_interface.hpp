@@ -30,14 +30,12 @@
 #include "SC_World.h"
 
 #include <boost/scoped_array.hpp>
-#include <boost/thread/pthread/mutex.hpp>
+#include <boost/thread/mutex.hpp>
+
+#include "../../common/SC_SndFileHelpers.hpp"
 
 namespace nova
 {
-
-int headerFormatFromString(const char *name);
-int sampleFormatFromString(const char* name);
-
 
 class sc_done_action_handler
 {
@@ -188,7 +186,7 @@ public:
             count = world.mNumAudioBusChannels - bus;
 
         for (size_t i = 0; i != count; ++i)
-            controlbus_set_unchecked(i, value);
+            controlbus_set_unchecked(bus + i, value);
     }
 
     sample controlbus_get(uint32_t bus)

@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2010 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2010-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -44,19 +44,35 @@ namespace QtCollider {
 class QcAbstractFactory
 {
 public:
-  QcAbstractFactory( const char *className ) {
-    qcDebugMsg( 2, QString("Declaring class '%1'").arg(className) );
-    QtCollider::factories().insert( className, this );
-  }
   virtual const QMetaObject *metaObject() = 0;
   virtual QObjectProxy *newInstance( PyrObject *, QtCollider::Variant arg[10] ) = 0;
 };
 
+static void qcNoConstructorMsg( const QMetaObject *metaObject, int argc, QtCollider::Variant *argv )
+{
+  QString str = QString("No appropriate constructor found for %1 (")
+    .arg( metaObject->className() );
+
+  for (int i = 0; i < argc; ++i) {
+    int t_id = argv[i].type();
+
+    if (t_id != QMetaType::Void)
+    {
+      if (i > 0) str += ", ";
+      str += QMetaType::typeName(t_id);
+    }
+    else
+      break;
+  }
+
+  str += ")";
+
+  qcErrorMsg( str );
+}
 
 template <class QOBJECT> class QcObjectFactory : public QcAbstractFactory
 {
 public:
-  QcObjectFactory() : QcAbstractFactory( QOBJECT::staticMetaObject.className() ) {}
 
   const QMetaObject *metaObject() {
     return &QOBJECT::staticMetaObject;
@@ -84,8 +100,7 @@ public:
 
       qObject = qobject_cast<QOBJECT*>(obj);
       if( !qObject ) {
-        qcErrorMsg( QString("No appropriate constructor found for '%1'.")
-          .arg( QOBJECT::staticMetaObject.className() ) );
+        qcNoConstructorMsg( metaObject(), 10, arg );
         return 0;
       }
     }
@@ -103,6 +118,20 @@ protected:
 
   virtual void initialize( QObjectProxy *proxy, QOBJECT *obj ) {};
 };
+
+#define QC_DECLARE_FACTORY( QOBJECT, FACTORY ) \
+  namespace QtCollider { \
+    void add_factory_##QOBJECT () { \
+      QcAbstractFactory *factory = new FACTORY; \
+      factories().insert( factory->metaObject()->className(), factory ); \
+    } \
+  }
+
+#define QC_DECLARE_QOBJECT_FACTORY( QOBJECT ) QC_DECLARE_FACTORY( QOBJECT, QcObjectFactory<QOBJECT> )
+
+#define QC_ADD_FACTORY( QOBJECT ) \
+  void add_factory_##QOBJECT(); \
+  add_factory_##QOBJECT()
 
 
 

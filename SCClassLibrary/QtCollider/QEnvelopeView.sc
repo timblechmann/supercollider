@@ -1,11 +1,11 @@
 QEnvelopeView : QView
 {
   var <editable, <step, <grid, <gridOn = false;
-  var <gridColor, <strokeColor, <fillColor, <selectionColor;
+  var <fillColor;
   var <drawLines = true, <drawRects = true;
   var <metaAction;
 
-  *qtClass {^"QcGraph"}
+  *qtClass {^'QcGraph'}
 
   editable_ { arg aBool;
     editable = aBool;
@@ -58,9 +58,7 @@ QEnvelopeView : QView
     ^this.setProperty( \index, index );
   }
 
-  lastIndex {
-    ^this.index;
-  }
+  lastIndex { ^this.getProperty( \lastIndex ); }
 
   selectIndex { arg index;
     if( index < 0 ){
@@ -109,8 +107,9 @@ QEnvelopeView : QView
 
   curves_ { arg curves;
     this.invokeMethod( \setCurves,
-                       if(curves.isKindOf( ArrayedCollection ) )
-                        {[curves]}{[[curves]]} ); }
+      if(curves.size > 0) { [curves.collect{|c| QCurve(c)}] } { QCurve(curves) }
+    );
+  }
 
   setEnv { arg env;
     var times = [0] ++ env.times.integrate;
@@ -129,19 +128,18 @@ QEnvelopeView : QView
     this.setProperty( \gridOn, aBool );
   }
 
-  gridColor_ { arg aColor;
-    gridColor = aColor;
-    this.setProperty( \gridColor, aColor );
-  }
-
   connect { arg source, targets;
     this.invokeMethod( \connectElements, [source, targets] );
   }
 
-  strokeColor_ { arg aColor;
-    strokeColor = aColor;
-    this.setProperty( \strokeColor, aColor );
-  }
+  gridColor { ^this.getProperty(\gridColor) }
+  gridColor_ { arg color; this.setProperty( \gridColor, color ) }
+
+  selectionColor { ^this.getProperty(\selectionColor) }
+  selectionColor_ { arg color; this.setProperty(\selectionColor, color) }
+
+  strokeColor { ^this.getProperty(\strokeColor) }
+  strokeColor_ { arg color; this.setProperty( \strokeColor, color ) }
 
   fillColor_ { arg aColor;
     fillColor = aColor;
@@ -157,11 +155,6 @@ QEnvelopeView : QView
     this.fillColor_( fillColor );
   }
 
-  selectionColor_ { arg aColor;
-    selectionColor = aColor;
-    this.setProperty( \selectionColor, aColor );
-  }
-
   drawLines_ { arg aBool;
     drawLines = aBool;
     this.setProperty( \drawLines, aBool );
@@ -172,23 +165,43 @@ QEnvelopeView : QView
     this.setProperty( \drawRects, aBool );
   }
 
-  thumbWidth_ { arg aFloat;
-    this.setProperty( \thumbWidth, aFloat; );
+  style { ^this.getProperty(\style) }
+
+  style_ { arg style;
+    if (style.isNumber.not) {
+      style = style.switch (
+        \dots, 0,
+        \rects, 1,
+        0
+      );
+    };
+    style = style.clip(0,1).asInteger;
+    this.setProperty(\style, style)
   }
 
-  thumbHeight_ { arg aFloat;
-    this.setProperty( \thumbHeight, aFloat; );
+  thumbWidth_ { arg width;
+    this.setProperty( \thumbWidth, width.asInteger; );
   }
 
-  thumbSize_ { arg aFloat;
-    this.setProperty( \thumbSize, aFloat; );
+  thumbHeight_ { arg height;
+    this.setProperty( \thumbHeight, height.asInteger; );
   }
 
-  setThumbWidth { this.nonimpl("setThumbWidth"); }
+  thumbSize_ { arg size;
+    this.setProperty( \thumbSize, size.asInteger; );
+  }
 
-  setThumbHeight { this.nonimpl("setThumbHeight"); }
+  setThumbWidth { arg index, width;
+    this.invokeMethod(\setThumbWidthAt, [index, width.asInteger])
+  }
 
-  setThumbSize { this.nonimpl("setThumbSize"); }
+  setThumbHeight { arg index, height;
+    this.invokeMethod(\setThumbHeightAt, [index, height.asInteger])
+  }
+
+  setThumbSize { arg index, size;
+    this.invokeMethod(\setThumbSizeAt, [index, size.asInteger])
+  }
 
   metaAction_ { arg function;
     this.manageMethodConnection( metaAction, function, 'metaAction()', \doMetaAction );

@@ -33,10 +33,14 @@ Primitives for File i/o.
 #include "ReadWriteMacros.h"
 #include "SCBase.h"
 #include "SC_DirUtils.h"
+#include "sc_popen.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
 #include <cerrno>
+
+#include "../../common/SC_SndFileHelpers.hpp"
 
 #ifdef NOCLASSIC
 #include <TextUtils.h>
@@ -632,9 +636,9 @@ int prFilePutInt32(struct VMGlobals *g, int numArgsPushed)
 	file = (FILE*)slotRawPtr(&pfile->fileptr);
 	if (file == NULL) return errFailed;
 
-        int val;
-        int err = slotIntVal(b, &val);
-        if (err) return err;
+	int val;
+	int err = slotIntVal(b, &val);
+	if (err) return err;
 
 	SC_IOStream<FILE*> scio(file);
 	scio.writeInt32_be(val);
@@ -680,9 +684,9 @@ int prFilePutInt32LE(struct VMGlobals *g, int numArgsPushed)
 	file = (FILE*)slotRawPtr(&pfile->fileptr);
 	if (file == NULL) return errFailed;
 
-        int val;
-        int err = slotIntVal(b, &val);
-        if (err) return err;
+	int val;
+	int err = slotIntVal(b, &val);
+	if (err) return err;
 
 	SC_IOStream<FILE*> scio(file);
 	scio.writeInt32_le(val);
@@ -753,7 +757,7 @@ int prFilePutChar(struct VMGlobals *g, int numArgsPushed)
 	if (file == NULL) return errFailed;
 	if (NotChar(b)) return errWrongType;
 
-	z = slotRawInt(b);
+	z = slotRawChar(b);
 
 	SC_IOStream<FILE*> scio(file);
 	scio.writeInt8(z);
@@ -988,7 +992,7 @@ int prFileGetInt8(struct VMGlobals *g, int numArgsPushed)
 	PyrSlot *a;
 	PyrFile *pfile;
 	FILE *file;
-	char z;
+	int8 z;
 
 	a = g->sp;
 
@@ -996,7 +1000,7 @@ int prFileGetInt8(struct VMGlobals *g, int numArgsPushed)
 	file = (FILE*)slotRawPtr(&pfile->fileptr);
 	if (file == NULL) return errFailed;
 
-	int count = fread(&z, sizeof(char), 1, file);
+	int count = fread(&z, sizeof(int8), 1, file);
 	if (count==0) SetNil(a);
 	else SetInt(a, z);
 	return errNone;
@@ -1265,7 +1269,6 @@ int prFileGetcwd(struct VMGlobals *g, int numArgsPushed)
 
 ////////
 
-#ifndef SC_WIN32
 int prPipeOpen(struct VMGlobals *g, int numArgsPushed)
 {
 	PyrSlot *a, *b, *c;
@@ -1290,14 +1293,14 @@ int prPipeOpen(struct VMGlobals *g, int numArgsPushed)
 	memcpy(mode, slotRawString(c)->s, slotRawObject(c)->size);
 	mode[slotRawString(c)->size] = 0;
 
-	file = popen(commandLine, mode);
+	pid_t pid;
+	file = sc_popen(commandLine, &pid, mode);
 	free(commandLine);
 	if (file) {
 		SetPtr(&pfile->fileptr, file);
-		SetTrue(a);
+		SetInt(a, pid);
 	} else {
 		SetNil(a);
-		SetFalse(a);
 	}
 	return errNone;
 }
@@ -1305,21 +1308,25 @@ int prPipeOpen(struct VMGlobals *g, int numArgsPushed)
 int prPipeClose(struct VMGlobals *g, int numArgsPushed)
 {
 	PyrSlot *a;
+	PyrSlot *b;
 	PyrFile *pfile;
 	FILE *file;
+	pid_t pid;
 
-	a = g->sp;
+	a = g->sp - 1;
+	b = g->sp;
 	pfile = (PyrFile*)slotRawObject(a);
 	file = (FILE*)slotRawPtr(&pfile->fileptr);
 	if (file == NULL) return errNone;
+	pid = (pid_t) slotRawInt(b);
+
 	SetPtr(&pfile->fileptr, NULL);
-	int perr = pclose(file);
+	int perr = sc_pclose(file, pid);
 	SetInt(a, perr);
 	if (perr == -1)
 		return errFailed;
 	return errNone;
 }
-#endif
 
 ////////
 
@@ -1504,87 +1511,6 @@ int prSFOpenRead(struct VMGlobals *g, int numArgsPushed)
 	}
 	return errNone;
 }
-/// copied from SC_World.cpp:
-
-int sampleFormatFromString(const char* name);
-int sampleFormatFromString(const char* name)
-{
-	if (!name) return SF_FORMAT_PCM_16;
-
-	size_t len = strlen(name);
-	if (len < 1) return 0;
-
-	if (name[0] == 'u') {
-		if (len < 5) return 0;
-		if (name[4] == '8') return SF_FORMAT_PCM_U8; // uint8
-		return 0;
-	} else if (name[0] == 'i') {
-		if (len < 4) return 0;
-		if (name[3] == '8') return SF_FORMAT_PCM_S8;      // int8
-		else if (name[3] == '1') return SF_FORMAT_PCM_16; // int16
-		else if (name[3] == '2') return SF_FORMAT_PCM_24; // int24
-		else if (name[3] == '3') return SF_FORMAT_PCM_32; // int32
-	} else if (name[0] == 'f') {
-		return SF_FORMAT_FLOAT; // float
-	} else if (name[0] == 'd') {
-		return SF_FORMAT_DOUBLE; // double
-	} else if (name[0] == 'm' || name[0] == 'u') {
-		return SF_FORMAT_ULAW; // mulaw ulaw
-	} else if (name[0] == 'a') {
-		return SF_FORMAT_ALAW; // alaw
-	}
-	return 0;
-}
-
-int headerFormatFromString(const char *name);
-int headerFormatFromString(const char *name)
-{
-	if (!name) return SF_FORMAT_AIFF;
-	if (strcasecmp(name, "AIFF")==0) return SF_FORMAT_AIFF;
-	if (strcasecmp(name, "AIFC")==0) return SF_FORMAT_AIFF;
-	if (strcasecmp(name, "RIFF")==0) return SF_FORMAT_WAV;
-	if (strcasecmp(name, "WAVEX")==0) return SF_FORMAT_WAVEX;
-	if (strcasecmp(name, "WAVE")==0) return SF_FORMAT_WAV;
-	if (strcasecmp(name, "WAV" )==0) return SF_FORMAT_WAV;
-	if (strcasecmp(name, "Sun" )==0) return SF_FORMAT_AU;
-	if (strcasecmp(name, "IRCAM")==0) return SF_FORMAT_IRCAM;
-	if (strcasecmp(name, "NeXT")==0) return SF_FORMAT_AU;
-	if (strcasecmp(name, "raw")==0) return SF_FORMAT_RAW;
-	if (strcasecmp(name, "MAT4")==0) return SF_FORMAT_MAT4;
-	if (strcasecmp(name, "MAT5")==0) return SF_FORMAT_MAT5;
-	if (strcasecmp(name, "PAF")==0) return SF_FORMAT_PAF;
-	if (strcasecmp(name, "SVX")==0) return SF_FORMAT_SVX;
-	if (strcasecmp(name, "NIST")==0) return SF_FORMAT_NIST;
-	if (strcasecmp(name, "VOC")==0) return SF_FORMAT_VOC;
-	if (strcasecmp(name, "W64")==0) return SF_FORMAT_W64;
-	if (strcasecmp(name, "PVF")==0) return SF_FORMAT_PVF;
-	if (strcasecmp(name, "XI")==0) return SF_FORMAT_XI;
-	if (strcasecmp(name, "HTK")==0) return SF_FORMAT_HTK;
-	if (strcasecmp(name, "SDS")==0) return SF_FORMAT_SDS;
-	if (strcasecmp(name, "AVR")==0) return SF_FORMAT_AVR;
-	if (strcasecmp(name, "SD2")==0) return SF_FORMAT_SD2;
-	if (strcasecmp(name, "FLAC")==0) return SF_FORMAT_FLAC;
-	if (strcasecmp(name, "CAF")==0) return SF_FORMAT_CAF;
-// TODO allow other platforms to know vorbis once libsndfile 1.0.18 is established
-#if SC_DARWIN || SC_WIN32
-	if (strcasecmp(name, "VORBIS")==0) return SF_FORMAT_VORBIS;
-#endif
-	return 0;
-}
-
-
-int sndfileFormatInfoFromStrings(struct SF_INFO *info, const char *headerFormatString, const char *sampleFormatString)
-{
-	int headerFormat = headerFormatFromString(headerFormatString);
-	if (!headerFormat) return errWrongType;
-
-	int sampleFormat = sampleFormatFromString(sampleFormatString);
-	if (!sampleFormat) return errWrongType;
-
-	info->format = (unsigned int)(headerFormat | sampleFormat);
-	return errNone;
-}
-// end copy
 
 int prSFOpenWrite(struct VMGlobals *g, int numArgsPushed);
 int prSFOpenWrite(struct VMGlobals *g, int numArgsPushed)
@@ -2024,10 +1950,8 @@ void initFilePrimitives()
 	definePrimitive(base, index++, "_SFSeek", prSFSeek, 3, 0);
 	definePrimitive(base, index++, "_SFHeaderInfoString", prSFHeaderInfoString, 1, 0);
 
-#ifndef SC_WIN32
 	definePrimitive(base, index++, "_PipeOpen", prPipeOpen, 3, 0);
-	definePrimitive(base, index++, "_PipeClose", prPipeClose, 1, 0);
-#endif
+	definePrimitive(base, index++, "_PipeClose", prPipeClose, 2, 0);
 
 	definePrimitive(base, index++, "_FileDelete", prFileDelete, 2, 0);
 	definePrimitive(base, index++, "_FileMTime", prFileMTime, 2, 0);

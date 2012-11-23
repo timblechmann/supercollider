@@ -1,7 +1,6 @@
 title:: Writing Unit Generators
 summary:: Get started with writing unit generators
 categories:: Internals
-related::
 
 section:: How Unit Generator plug-ins work.
 
@@ -200,7 +199,7 @@ SuperCollider requires an SCLang class in order to build SynthDefs.
 The arguments to the MySaw UGen are code::freq:: and code::iphase::.  The code::multiNew:: method handles multi channel
 expansion.  The code::madd:: method provides support for the mul and add arguments. It will create a MulAdd UGen if
 necessary. You could write the class without mul and add arguments, but providing them makes it more convenient for the
-user. See link::WritingClasses:: for details on writing sclang classes.
+user. See link::Guides/WritingClasses:: for details on writing sclang classes.
 
 code::
 // without mul and add.
@@ -229,7 +228,7 @@ include_directories(${SC_PATH}/external_libraries/libsndfile/)
 
 set(CMAKE_SHARED_MODULE_PREFIX "")
 if(APPLE OR WIN32)
-    set(CMAKE_SHARED_MODULE_SUFFIX ".scx")
+set(CMAKE_SHARED_MODULE_SUFFIX ".scx")
 endif()
 
 add_library(MySaw MODULE MySaw.cpp)

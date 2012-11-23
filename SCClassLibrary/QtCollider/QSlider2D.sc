@@ -1,9 +1,9 @@
 QSlider2D : QAbstractStepValue {
-  *qtClass { ^"QcSlider2D" }
+  *qtClass { ^'QcSlider2D' }
 
   *new { arg parent, bounds;
     var me = super.new( parent, bounds );
-    me.connectMethod( "randomize()", \randomize );
+    me.connectMethod( 'randomize()', \randomize );
     ^me;
   }
 
@@ -62,21 +62,11 @@ QSlider2D : QAbstractStepValue {
     this.setXYActive( 1.0.rand, 1.0.rand );
   }
 
-  knobColor {
-    ^this.palette.baseTextColor;
-  }
+  knobColor { ^this.getProperty(\knobColor) }
+  knobColor_ { arg color; this.setProperty(\knobColor, color) }
 
-  knobColor_ { arg color;
-    this.setProperty( \palette, this.palette.baseTextColor_(color) );
-  }
-
-  background {
-    ^this.palette.baseColor;
-  }
-
-  background_ { arg color;
-    this.setProperty( \palette, this.palette.baseColor_(color) );
-  }
+  background { ^this.getProperty(\grooveColor) }
+  background_ { arg color; this.setProperty(\grooveColor, color) }
 
   defaultGetDrag { ^Point(this.x,this.y); }
   defaultCanReceiveDrag { ^(QView.currentDrag.class === Point); }

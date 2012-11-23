@@ -50,7 +50,7 @@ d.put("abc", 10);
 ::
 argument::key
 key to associate with object. This can be any objects, but is often a link::Classes/Symbol::.
-argument::obj
+argument::value
 an object
 
 method::removeAt
@@ -66,7 +66,7 @@ code::
 d = ();
 d.putAll(Dictionary[\hello -> 9, \whello -> "world"], Dictionary["abd" -> 6]);
 ::
-argument::dictionaries
+argument:: ... dictionaries
 any Object that responds to keysValuesDo (usually a Dictionary).
 
 method::putPairs
@@ -89,7 +89,6 @@ d.at(\monkey);	// Key doesn't exist: return Nil
 
 method::atFail
 Access the value associated with the key. If the key does not exist, return the result of teletype::function::.
-::
 
 method::keys
 Return a link::Classes/Set:: of all keys.

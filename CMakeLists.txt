@@ -1,14 +1,18 @@
 cmake_minimum_required (VERSION 2.8)
 project (SuperCollider)
 
+include("SCVersion.txt")
+set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}${PROJECT_VERSION_PATCH}")
+message(STATUS "SuperCollider Version: ${PROJECT_VERSION}")
+
 include(CTest)
 enable_testing()
 
 include (cmake_modules/FinalFile.cmake)
 
 if (NOT CMAKE_BUILD_TYPE)
-	message(STATUS "Build type defaulting to \"Release\"")
-	set(CMAKE_BUILD_TYPE "Release")
+	message(STATUS "Build type defaulting to \"RelWithDebInfo\"")
+	set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
 if (${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
@@ -26,14 +30,6 @@ CONFIGURE_FILE(
 
 ADD_CUSTOM_TARGET(uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
-
-if(NOT WIN32)
-	ADD_CUSTOM_TARGET(setMainVersion ALL
-		sh ${CMAKE_CURRENT_SOURCE_DIR}/setMainVersion.sh
-		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-		VERBATIM
-		)
-endif()
 
 if(APPLE)
 	STRING(REGEX REPLACE "^.*MacOSX10.([0-9]+).*$" "\\1" MAC_OSX_SDK_VERSION  "${CMAKE_OSX_SYSROOT}")
@@ -121,14 +117,84 @@ endif()
 if(WIN32)
     set_property(DIRECTORY
                  APPEND
-                 PROPERTY COMPILE_DEFINITIONS SC_WIN32 NOMINMAX _WINSOCKAPI_)
+                 PROPERTY COMPILE_DEFINITIONS SC_WIN32 NOMINMAX _WIN32_WINNT=0x0500)
+
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
 
     if(MSVC)
         SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_RELEASE} /MTd")
         SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} /MT")
     endif()
+
+    # correctly link the static Boost Thread library:
+    add_definitions(-DBOOST_THREAD_USE_LIB)
 endif()
 
+
+#############################################
+# Options
+option(NOVA_SIMD "Build with nova-simd support." ON)
+option(FINAL_BUILD "Build as single source file." OFF)
+
+option(CURL "Build with curl for remote file download." ON)
+
+option(FFT_GREEN "Use internal 'Green' FFT lib rather than FFTW. (Not recommended.)" OFF)
+
+option(SSE "Compile with support for SSE instructions.")
+option(SSE41 "Compile with support for SSE4.1 instructions.")
+option(SSE42 "Compile with support for SSE4.2 instructions.")
+
+set(AUDIOAPI "default" CACHE STRING "Audio API to use (one of {default,coreaudio,jack,portaudio})")
+option(LIBSCSYNTH "Compile libscsynth as shared library" OFF)
+
+option(INSTALL_HELP "Install help docs and examples along with the software" ON)
+option(INSTALL_OLD_HELP "Install old and deprecated help files" ON)
+option(SC_DOC_RENDER "Pre-render SCDoc documentation. (For putting online, etc)" OFF)
+option(SC_IDE "Build Qt IDE." ON)
+
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    option(SUPERNOVA "Build with supernova as optional audio synthesis server" ON)
+elseif()
+    option(SUPERNOVA "Build with supernova as optional audio synthesis server" OFF)
+endif()
+
+option(SN_MEMORY_DEBUGGING "Build supernova for memory debugging (disable memory pools).")
+option(SC_MEMORY_DEBUGGING "Build sclang&scsynth for memory debugging (disable memory pools).")
+option(GC_SANITYCHECK "Enable sanity checks in the sclang garbage collector.")
+
+option(NO_LIBSNDFILE "Disable soundfile functionality. (Not recommended.)" OFF)
+
+option(NO_AVAHI "Disable Avahi support. (Not recommended.)" OFF)
+
+option(SCLANG_SERVER "Build with internal server." ON)
+
+if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+	option(SC_WII "Build sclang with WII support" ON)
+endif()
+
+option(SC_QT "Build SuperCollider with Qt GUI" ON)
+if (SC_QT)
+  message( STATUS "Compiling with Qt GUI" )
+endif (SC_QT)
+
+if(WIN32)
+	option(SC_PSYCOLLIDER "Build PsyCollider" ON)
+else()
+	option(SC_PSYCOLLIDER "Build PsyCollider" OFF)
+endif()
+
+if(WIN32)
+    option(SC_WIN_DEP_DIRS
+        "A list of directories where dependencies will be searched for when packaging.")
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX)
+    option(NATIVE "Optimize binary for this architecture (binaries may not run on other machines, requires gcc-4.3 or higher).")
+    option(LTO "Use GCC's link time optimizer' (experimental).")
+endif()
+
+option(SC_SYMLINK_CLASSLIB "Place a symlink of SCCLassLibrary instead of copying" OFF)
+option(SC_OX "Try to compile with support for C++0x (experimental, mainly related to supernova)" OFF)
 
 #############################################
 # some default libraries
@@ -154,64 +220,20 @@ if(CURL)
 	endif()
 endif()
 
-#############################################
-# Options
-option(NOVA_SIMD "Build with nova-simd support." ON)
-option(FINAL_BUILD "Build as single source file." OFF)
+set(Boost_USE_MULTITHREADED      ON)
+find_package( Boost 1.48.0 COMPONENTS thread system filesystem program_options regex test )
 
-option(CURL "Build with curl for remote file download." ON)
-
-option(FFT_GREEN "Use internal 'Green' FFT lib rather than FFTW. (Not recommended.)" OFF)
-
-option(SSE "Compile with support for SSE instructions.")
-option(SSE41 "Compile with support for SSE4.1 instructions.")
-option(SSE42 "Compile with support for SSE4.2 instructions.")
-
-
-option(INSTALL_HELP "Install help docs and examples along with the software" ON)
-option(INSTALL_OLD_HELP "Install old and deprecated help files" ON)
-option(SC_DOC_RENDER "Pre-render SCDoc documentation. (For putting online, etc)" OFF)
-
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    option(SUPERNOVA "Build with supernova as optional audio synthesis server" ON)
-elseif()
-    option(SUPERNOVA "Build with supernova as optional audio synthesis server" OFF)
+if (SC_OX)
+	set(Boost_FOUND OFF) # boost 1.48 does not like c++11
 endif()
 
-option(SN_MEMORY_DEBUGGING "Build supernova for memory debugging (disable memory pools).")
-option(SC_MEMORY_DEBUGGING "Build sclang&scsynth for memory debugging (disable memory pools).")
-option(GC_SANITYCHECK "Enable sanity checks in the sclang garbage collector.")
-
-option(NO_LIBSNDFILE "Disable soundfile functionality. (Not recommended.)" OFF)
-
-option(NO_AVAHI "Disable Avahi support. (Not recommended.)" OFF)
-
-if(NOT WIN32)
-	option(SCLANG_SERVER "Build with internal server." ON)
-endif()
-
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	option(SC_WII "Build sclang with WII support" ON)
-endif()
-
-option(SC_QT "Build SuperCollider with Qt GUI" ON)
-if (SC_QT)
-  message( STATUS "Compiling with Qt GUI" )
-endif (SC_QT)
-
-if(WIN32)
-	option(SC_PSYCOLLIDER "Build PsyCollider" ON)
+if (Boost_FOUND)
+	link_directories(${Boost_LIBRARY_DIRS})
 else()
-	option(SC_PSYCOLLIDER "Build PsyCollider" OFF)
+	message("building boost libraries manually")
 endif()
 
-if(CMAKE_COMPILER_IS_GNUCXX)
-    option(NATIVE "Optimize binary for this architecture (binaries may not run on other machines, requires gcc-4.3 or higher).")
-    option(LTO "Use GCC's link time optimizer' (experimental).")
-endif()
 
-option(SC_SYMLINK_CLASSLIB "Place a symlink of SCCLassLibrary instead of copying" OFF)
-option(SC_OX "Try to compile with support for C++0x (experimental, mainly related to supernova)" OFF)
 
 #############################################
 # some preprocessor flags
@@ -265,9 +287,8 @@ endif()
 add_subdirectory(external_libraries)
 add_subdirectory(server)
 add_subdirectory(lang)
-add_subdirectory(bindings)
-add_subdirectory(platform)
 add_subdirectory(editors)
+add_subdirectory(platform)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     install(DIRECTORY include/common include/plugin_interface include/server include/lang
@@ -283,11 +304,8 @@ if(APPLE)
 	set(auxresourcesdir ${scappauxresourcesdir})
 
 	# Some aux files which go in the app's folder
-	install(FILES README.txt ChangeLog
-		DESTINATION ${auxresourcesdir}
-	)
-	install(FILES COPYING AUTHORS
-		DESTINATION ${scappdir}
+	install(FILES README.txt ChangeLog COPYING AUTHORS platform/mac/MOVED_STUFF.txt
+		DESTINATION ${scappbundlename}
 	)
 elseif (WIN32)
 	set(auxresourcesdir "SuperCollider")
@@ -295,47 +313,56 @@ else()
 	set(auxresourcesdir "share/SuperCollider")
 endif()
 
+set(SCCLASSLIB_EXCLUDE_REGEX "IGNOREME")
+
 if(NOT SC_QT)
-	set(SCCLASSLIB_EXCLUDE_REGEX "QtCollider")
-else()
-	set(SCCLASSLIB_EXCLUDE_REGEX "IGNOREME")
+	set(SCCLASSLIB_EXCLUDE_REGEX "${SCCLASSLIB_EXCLUDE_REGEX}|QtCollider")
 endif()
 
+if(WIN32)
+	set(SCCLASSLIB_EXCLUDE_REGEX "${SCCLASSLIB_EXCLUDE_REGEX}|PsycolliderDocument")
+endif()
+
+
 if(APPLE)
-	#if directory contains symlinks, unlink them.
-	if(EXISTS "${auxresourcesdir}/SCClassLibrary")
-		file(GLOB classlibraryfolders "${auxresourcesdir}/SCClassLibrary/[^.]*")
-		foreach(onedirectory ${classlibraryfolders})
-			if(IS_SYMLINK "${onedirectory}")
-				install( CODE "EXECUTE_PROCESS(COMMAND unlink ${onedirectory} )" )
-			endif()
-		endforeach(onedirectory)
-	endif()
 
 	if(SC_SYMLINK_CLASSLIB)
 
 		#if there are folders inside SCCLassLibrary abort cmake.
-		file(GLOB classlibraryfolders "${auxresourcesdir}/SCClassLibrary/[^.]*")
+		file(GLOB classlibraryfolders "${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary/[^.]*")
 		foreach(onedirectory ${classlibraryfolders})
+			message( "${onedirectory}" )
 			if(NOT IS_SYMLINK "${onedirectory}")
 				message(FATAL_ERROR "Symlinking will fail ! SCClassLibrary folder already exists and has directories inside, please delete it first." )
 			endif()
 		endforeach(onedirectory)
 
-		message(STATUS "Will create symlink of SCClassLibrary to ${auxresourcesdir}/SCClassLibrary" )
-		if(NOT EXISTS "${auxresourcesdir}/SCClassLibrary")
-			install( CODE "EXECUTE_PROCESS(COMMAND mkdir ${auxresourcesdir}/SCClassLibrary)" )
+		message(STATUS "Will create symlink of SCClassLibrary to ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary" )
+		if(NOT EXISTS "{CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary")
+			install( CODE "EXECUTE_PROCESS(COMMAND mkdir ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary)" )
 		endif()
 		#symlink the folders inside SCCLassLibrary. Check if QtCollider folder should be symlinked or not.
 		file(GLOB classlibraryfolders RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary" "SCClassLibrary/[^.]*")
 		foreach(onedirectory ${classlibraryfolders})
 			if(NOT "${onedirectory}" MATCHES "${SCCLASSLIB_EXCLUDE_REGEX}")
 				install( CODE
-					"EXECUTE_PROCESS(COMMAND ln -s ${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary/${onedirectory} ${auxresourcesdir}/SCClassLibrary/${onedirectory} )" )
+					"EXECUTE_PROCESS(COMMAND ln -shF ${CMAKE_CURRENT_SOURCE_DIR}/SCClassLibrary/${onedirectory} ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary/${onedirectory} )" )
 			endif()
 		endforeach(onedirectory)
 	else()
-		message(STATUS "Will copy SCCLassLibrary to ${auxresourcesdir}")
+		message(STATUS "Will copy SCCLassLibrary to ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}")
+
+		#if directory contains symlinks, unlink them.
+		if(EXISTS "${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary")
+			file(GLOB classlibraryfolders "${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary/[^.]*")
+			foreach(onedirectory ${classlibraryfolders})
+				if(IS_SYMLINK "${onedirectory}")
+					message(STATUS "Unlinking ${onedirectory}")
+					install( CODE "EXECUTE_PROCESS(COMMAND unlink ${onedirectory} )" )
+				endif()
+			endforeach(onedirectory)
+		endif()
+
 		install(DIRECTORY SCClassLibrary
 			DESTINATION ${auxresourcesdir}
 			REGEX ${SCCLASSLIB_EXCLUDE_REGEX} EXCLUDE
@@ -350,9 +377,23 @@ else()
 	)
 endif()
 
+configure_file(platform/SCVersion.sc.in SCVersion/SCVersion.sc)
+install(DIRECTORY "${CMAKE_BINARY_DIR}/SCVersion" DESTINATION "${auxresourcesdir}/SCClassLibrary")
 
 install(DIRECTORY sounds
 	DESTINATION ${auxresourcesdir}
+)
+
+if(APPLE AND ("${standalone}" STREQUAL ""))
+	set(exampledir "${scappbundlename}")
+else()
+	set(exampledir "${auxresourcesdir}")
+endif()
+
+install(DIRECTORY examples
+	DESTINATION ${exampledir}
+	PATTERN "*~" EXCLUDE
+	PATTERN "*#" EXCLUDE
 )
 
 if(INSTALL_OLD_HELP)
@@ -362,11 +403,29 @@ if(INSTALL_OLD_HELP)
 endif()
 
 if(INSTALL_HELP)
-	install(DIRECTORY examples HelpSource
-		DESTINATION ${auxresourcesdir}
-		PATTERN "*~" EXCLUDE
-		PATTERN "*#" EXCLUDE
-	)
+	if(SC_SYMLINK_CLASSLIB AND APPLE)
+		message(STATUS "Will create symlink of HelpSource to ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource")
+		if(EXISTS "${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource")
+			message(FATAL_ERROR "Symlinking will fail ! HelpSource folder already exists, please delete it first." )
+		endif()
+		install( CODE
+					"EXECUTE_PROCESS(COMMAND ln -shF ${CMAKE_CURRENT_SOURCE_DIR}/HelpSource ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource )" )
+	else()
+		message(STATUS "Will copy HelpSource to ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}")
+		if(APPLE)
+			if(EXISTS "${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource")
+				if(IS_SYMLINK "${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource")
+					message(STATUS "Unlinking ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource")
+					install( CODE "EXECUTE_PROCESS(COMMAND unlink ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource )" )
+				endif()
+			endif()
+		endif()
+		install(DIRECTORY HelpSource
+			DESTINATION ${auxresourcesdir}
+			PATTERN "*~" EXCLUDE
+			PATTERN "*#" EXCLUDE
+		)
+	endif()
 endif()
 
 #############################################
@@ -413,23 +472,25 @@ set_directory_properties(
 add_subdirectory(testsuite)
 
 #############################################
-# win32 install support
-
-if(WIN32)
-	install(FILES ${FFTW3F_LIBRARY} ${SNDFILE_LIBRARY} ${PTHREADS_LIBRARY} ${PORTAUDIO_LIBRARIES}
-		DESTINATION "SuperCollider"
-		PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-endif()
-
-#############################################
 # CPack support
 
-set(CPACK_PACKAGE_VERSION_MAJOR 3)
-set(CPACK_PACKAGE_VERSION_MINOR 5)
-set(CPACK_PACKAGE_VERSION_PATCH dev)
-include(CPack)
-if(WIN32)
-	set(CPACK_MONOLITHIC_INSTALL 1)
+set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
+
+if(APPLE)
+	set(CPACK_GENERATOR "DragNDrop")
+	set(CPACK_DMG_FORMAT "UDBZ")
+	set(CPACK_DMG_VOLUME_NAME "${scappbundlename}")
+	set(CPACK_SYSTEM_NAME "OSX")
+#	set(CPACK_PACKAGE_FILE_NAME "${scappbundlename}-${PROJECT_VERSION}")
+	set(CPACK_DMG_DS_STORE "${CMAKE_SOURCE_DIR}/package/ds_store")
+	set(CPACK_DMG_BACKGROUND_IMAGE "${CMAKE_SOURCE_DIR}/package/background.png")
+	set(CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}/platform/mac/Resources/SCcube.icns")
+endif()
+
+if(NOT WIN32) # We define a custom 'package' target in platform/windows/CMakeLists.txt
+    include(CPack)
 endif()
 
 #############################################
@@ -442,4 +503,3 @@ mark_as_advanced(JACK JACK_INCLUDE_DIR JACK_LIBRARY)
 mark_as_advanced(MATH_LIBRARY)
 mark_as_advanced(QT_QMAKE_EXECUTABLE)
 mark_as_advanced(SNDFILE)
-

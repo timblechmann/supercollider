@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2010 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2010-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -21,19 +21,21 @@
 
 #include "QcSlider2D.h"
 #include "../QcWidgetFactory.h"
+#include "../style/routines.hpp"
 
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QApplication>
 #include <QPainter>
 
-static QcWidgetFactory<QcSlider2D> factory;
+QC_DECLARE_QWIDGET_FACTORY(QcSlider2D);
 
 QcSlider2D::QcSlider2D() :
-  _x( 0.f ),
-  _y( 0.f ),
-  _thumbSize( QSize( 12, 12 ) ),
-  _step( 0.01f )
+  QtCollider::Style::Client(this),
+  _x( 0.0 ),
+  _y( 0.0 ),
+  _thumbSize( QSize( 20, 20 ) ),
+  _step( 0.01 )
 {
   setFocusPolicy( Qt::StrongFocus );
   setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding );
@@ -61,31 +63,14 @@ void QcSlider2D::decrementY( double factor )
 
 QRect QcSlider2D::thumbRect()
 {
-  QRect r;
-
-  int xPos = _x * (width() - _thumbSize.width());
-  int yPos = (1.f - _y) * (height() - _thumbSize.height());
-
-  r.setX( xPos );
-  r.setY( yPos );
-  r.setSize( _thumbSize );
-
-  return r;
-}
-
-QPointF QcSlider2D::valueFromPos( const QPoint pos )
-{
-  float x = (float) (pos.x() - (_thumbSize.width() * 0.5f) ) /
-            (width() - _thumbSize.width());
-  float y = (float) (height() - pos.y() - (_thumbSize.width() * 0.5f) ) /
-            ( height() - _thumbSize.height() );
-  return QPointF( x, y );
+  using namespace QtCollider::Style;
+  return QtCollider::Style::rect( QPointF(_x,_y), sunkenContentsRect(rect()), _thumbSize );
 }
 
 void QcSlider2D::setValue( const QPointF val, bool doAction )
 {
-  float x = qMax( 0.f, qMin( 1.f, (float)val.x() ) );
-  float y= qMax( 0.f, qMin( 1.f, (float)val.y() ) );
+  double x = qMax( 0.0, qMin( 1.0, (double)val.x() ) );
+  double y= qMax( 0.0, qMin( 1.0, (double)val.y() ) );
   if( x != _x || y != _y ) {
     _x = x;
     _y = y;
@@ -96,17 +81,24 @@ void QcSlider2D::setValue( const QPointF val, bool doAction )
 
 void QcSlider2D::mouseMoveEvent ( QMouseEvent * ev )
 {
-  setValue( valueFromPos( ev->pos() ) );
+  using namespace QtCollider::Style;
+
+  if( !ev->buttons() ) return;
+
+  QPointF val = QtCollider::Style::value( QPointF(ev->pos()), sunkenContentsRect(rect()), _thumbSize );
+  setValue(val);
 }
 
 void QcSlider2D::mousePressEvent ( QMouseEvent * ev )
 {
-  setValue( valueFromPos( ev->pos() ) );
+  using namespace QtCollider::Style;
+  QPointF val = QtCollider::Style::value( QPointF(ev->pos()), sunkenContentsRect(rect()), _thumbSize );
+  setValue(val);
 }
 
 void QcSlider2D::keyPressEvent ( QKeyEvent *e )
 {
-  float step = _step;
+  double step = _step;
   switch( e->key() ) {
     case Qt::Key_Up:
       modifyStep( &step );
@@ -121,11 +113,11 @@ void QcSlider2D::keyPressEvent ( QKeyEvent *e )
       modifyStep( &step );
       setValue( QPointF( _x - step, _y ) ); break;
     case Qt::Key_N:
-      setValue( QPointF( 0.f, 0.f ) ); break;
+      setValue( QPointF( 0.0, 0.0 ) ); break;
     case Qt::Key_X:
-      setValue( QPointF( 1.f, 1.f ) ); break;
+      setValue( QPointF( 1.0, 1.0 ) ); break;
     case Qt::Key_C:
-      setValue( QPointF( 0.5f, 0.5f ) ); break;
+      setValue( QPointF( 0.5, 0.5 ) ); break;
     case Qt::Key_R:
       Q_EMIT( randomize() );
       break;
@@ -135,16 +127,27 @@ void QcSlider2D::keyPressEvent ( QKeyEvent *e )
 
 void QcSlider2D::paintEvent ( QPaintEvent *e )
 {
+  using namespace QtCollider::Style;
+  using QtCollider::Style::Ellipse;
+  using QtCollider::Style::RoundRect;
+
   Q_UNUSED(e);
-  QPainter p;
-  p.begin(this);
+
+  QPainter p(this);
+  p.setRenderHint( QPainter::Antialiasing, true );
 
   QPalette plt = palette();
 
-  p.setBrush( plt.color( QPalette::Base ) );
-  p.setPen( plt.color( QPalette::Mid ) );
-  p.drawRect( rect().adjusted(0,0,-1,-1) );
+  RoundRect frame(rect(), 2);
+  drawSunken( &p, plt, frame, grooveColor(), hasFocus() ? focusColor() : QColor() );
 
-  p.fillRect( thumbRect(), plt.color( QPalette::Text ) );
-  p.end();
+  Ellipse thumb(thumbRect());
+  drawRaised( &p, plt, thumb, plt.color(QPalette::Button).lighter(105) );
+
+  QRectF r( thumb._rect );
+  qreal wdif = r.width() * 0.3;
+  qreal hdif = r.height() * 0.3;
+  p.setPen( Qt::NoPen );
+  p.setBrush( knobColor() );
+  p.drawEllipse( r.adjusted( wdif, hdif, -wdif, -hdif ) );
 }

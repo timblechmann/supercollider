@@ -22,8 +22,13 @@
 #include "LanguageClient.h"
 #include "QcApplication.h"
 #include "QtCollider.h"
+#include "QObjectProxy.h"
+
+#include <PyrKernel.h>
+#include <PyrLexer.h>
 
 #include <qmath.h>
+#include <QWidget>
 
 extern double elapsedTime();
 
@@ -86,14 +91,24 @@ void LangClient::daemonLoop()
   commandLoop();
 }
 
-void LangClient::onScheduleChanged()
+void LangClient::sendSignal( Signal sig )
 {
-  QApplication::postEvent( this, new SCRequestEvent( Event_SCRequest_Sched ) );
-}
+  QtCollider::EventType type;
+  switch( sig )
+  {
+    case sig_input:
+      type = Event_SCRequest_Input; break;
+    case sig_sched:
+      type = Event_SCRequest_Sched; break;
+    case sig_recompile:
+      type = Event_SCRequest_Recompile; break;
+    case sig_stop:
+      type = Event_SCRequest_Stop; break;
+    default:
+      return;
+  }
 
-void LangClient::onInput()
-{
-  QApplication::postEvent( this, new SCRequestEvent( Event_SCRequest_Input ) );
+  QApplication::postEvent( this, new SCRequestEvent(type) );
 }
 
 void LangClient::onQuit( int exitCode )
@@ -102,9 +117,11 @@ void LangClient::onQuit( int exitCode )
     new SCRequestEvent( Event_SCRequest_Quit, exitCode ) );
 }
 
-void LangClient::onRecompileLibrary()
+void LangClient::onLibraryShutdown()
 {
-  QApplication::postEvent( this, new SCRequestEvent( Event_SCRequest_Recompile ) );
+  QWidgetList windows = QApplication::topLevelWidgets();
+  Q_FOREACH( QWidget *w, windows )
+    w->hide();
 }
 
 void LangClient::customEvent( QEvent *e )
@@ -116,6 +133,9 @@ void LangClient::customEvent( QEvent *e )
       break;
     case Event_SCRequest_Sched:
       doSchedule();
+      break;
+    case Event_SCRequest_Stop:
+      stopMain();
       break;
     case Event_SCRequest_Quit:
     {

@@ -22,6 +22,7 @@
 #include <vector>
 #include <algorithm>
 
+#include <boost/enable_shared_from_this.hpp>
 #include <boost/date_time/microsec_time_clock.hpp>
 #include <boost/intrusive/treap_set.hpp>
 
@@ -115,6 +116,8 @@ public:
     /** sending functions */
     void send(const char * data, size_t size, nova_endpoint const & endpoint)
     {
+        if (!endpoint.is_valid())
+            return;
         nova_protocol prot = endpoint.protocol();
         if (prot.family() == AF_INET && prot.type() == SOCK_DGRAM)
         {

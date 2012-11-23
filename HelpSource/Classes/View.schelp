@@ -78,7 +78,7 @@ METHOD:: parents
 	returns:: An array of all the parents, grandparents, etc., of the view.
 
 METHOD:: getParents
-	returns:: Same as link::-parents::.
+	returns:: Same as link::#-parents#parents::.
 
 METHOD:: children
 	returns:: An array of all immediate children of the view.
@@ -192,6 +192,20 @@ METHOD:: fixedSize
 
 	argument:: size
 		A Size.
+
+METHOD:: fixedWidth
+	note:: only in Qt GUI ::
+	Set both minimum and maximum allowed width of the view, thus making it non-resizable.
+
+	argument:: width
+		An Int.
+
+METHOD:: fixedHeight
+	note:: only in Qt GUI ::
+	Set both minimum and maximum allowed height of the view, thus making it non-resizable.
+
+	argument:: height
+		An Int.
 
 METHOD:: maxWidth
 	note:: only in Qt GUI ::
@@ -350,6 +364,39 @@ METHOD:: focusColor
 	argument::
 		A Color.
 
+METHOD:: palette
+	note:: Only available in Qt GUI ::
+
+	Get or set the palette to be used by the view.
+
+	When setting a palette, only those colors that have been set on the palette will take effect, other colors will be inherited from the parent view's palette, or QtGUI. See also link::Classes/QPalette#-hasColor::.
+
+	When getting a palette, it will return everytime a new copy of the view's palette. Therefore, if you wish to change the view's palette, you have to set the changed palette back on the view:
+
+code::
+	w = Window().front.layout_( HLayout( a = Slider() ) );
+	a.action = { |a|
+		a.palette = a.palette.buttonText_( if(a.value > 0.5){Color.red}{Color.green} );
+	};
+	a.valueAction = 0.0;
+::
+
+	To dynamically modify the view's palette, it is thus more efficient, if possible, to keep a palette instance to operate on. Note that this is also more efficient than using methods like link::Classes/Slider#-knobColor::, since internally they use the above approach:
+
+code::
+	w = Window().front.layout_( HLayout( a = Slider() ) );
+	p = QPalette();
+	a.action = { |a|
+		a.palette = p.buttonText_( if(a.value > 0.5){Color.red}{Color.green} );
+	};
+	a.valueAction = 0.0;
+::
+
+	See link::Classes/QPalette:: for detailed explanation of how palettes work.
+
+	argument::
+		A QPalette.
+
 METHOD:: refresh
 	Redraws the view and all its children.
 
@@ -397,7 +444,23 @@ METHOD:: hasFocus
 
 	returns:: A Boolean, stating whether the view currently has the keyboard focus.
 
+METHOD:: acceptsMouse
+    note:: Only in Qt GUI ::
 
+    Sets or gets whether the view responds to mouse interaction. If code::false::, the view will be completely transparent for mouse and interaction will be possible with any view under.
+
+    Defaults to code::true::.
+
+    argument::
+        A Boolean.
+
+METHOD:: acceptsMouseOver
+	If this is a top view, this variable defines whether the view and all its children receive mouse-over events. The default is code::false::.
+
+	See also: link::#-mouseOverAction::.
+
+	argument::
+		A Boolean.
 
 
 SUBSECTION:: Actions in general
@@ -426,14 +489,23 @@ METHOD:: removeAction
 	argument:: selector
 		A Symbol containing the name of the action variable to which 'func' will be added. In other words, 'add' method will be invoked on that variable; by default that is \action, but any other (sensible) instance or class variable of the view could work (e.g. \globalKeyDownAction or \mouseUpAction or \onClose, etc.). See the other action variables below.
 
+SUBSECTION:: Key and mouse event propagation
 
+In strong::Cocoa and SwingOSC:: GUI kits, a key event occurring on a view can propagate to the parent view, and trigger the parent's key action, if either the child's action returns code::nil::, or the child has no action assigned for that key event. This has also been referred to as "key event bubbling".
 
+In strong::Qt:: GUI, however, both mouse and key events can propagate to the parent view. Event propagation works differently: by default, after a mouse or key action is evaluated, the control returns to the C++ implementation of the view, and if no response to the particular mouse or key event is implemented there, it propagates to the parent.
+
+If you wish to control whether the event will be propagated or not, return code::true:: or code::false:: from the action. True means you have responded to the event, and the propagation will be stopped; false means you are not interested in the event, and the event will propagate. However, returning either code::true:: or code::false:: will completely bypass the view's C++ implementation, so it will not get a chance at responding to the event with its standard behavior. Use this feature with care.
 
 SUBSECTION:: Mouse actions
 
 Use the methods below to set or get the view's actions in response to mouse interaction with the view. A view must be enabled for the mouse actions to work.
 
-When the action object is evaluated, it is passed one or more arguments from the following list (in that order):
+note::
+In Qt GUI, Mouse actions are subject to emphasis::event propagation::. See link::#key_and_mouse_event_propagation:: for details.
+::
+
+When the mouse action object is evaluated, it is passed one or more arguments from the following list (in that order):
 
 list::
 ## strong::view:: - the view
@@ -445,44 +517,70 @@ list::
 ::
 
 METHOD:: mouseDownAction
-	Sets or gets the object to be evaluated when a mouse button is pressed on the view.
+    The object to be evaluated when a mouse button is pressed on the view.
 
-		It is passed the following arguments: view, x, y, modifiers, buttonNumber, clickCount.
+    The following arguments are passed at evaluation: strong::view, x, y, modifiers, buttonNumber, clickCount::.
+
+    The return value of evaluation controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
 
 METHOD:: mouseUpAction
-	Sets or gets the object to be evaluated when a mouse button is released after it was pressed on the view.
+    The object to be evaluated when a mouse button is released after it was pressed on the view.
 
-		It is passed the following arguments: view, x, y, modifiers.
+    The following arguments are passed at evaluation: strong::view, x, y, modifiers::.
+
+    The return value of evaluation controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
 
 METHOD:: mouseMoveAction
-	Sets or gets the object to be evaluated whenever the mouse pointer moves after a mouse button was pressed on the view.
+    The object to be evaluated whenever the mouse pointer moves after a mouse button was pressed on the view.
 
-		It is passed the following arguments: view, x, y, modifiers.
+    The following arguments are passed at evaluation: strong::view, x, y, modifiers::.
+
+    The return value of evaluation controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
 
 METHOD:: mouseOverAction
-	Sets or gets the object to be evaluated when the mouse pointer enters the view.
+    The object to be evaluated when the mouse pointer moves over the view with no mouse buttons pressed.
 
-		It is passed the following arguments: view, x, y.
+    The following arguments are passed at evaluation: strong::view, x, y::.
+
+    The object is evaluated only when link::Classes/Window#-acceptsMouseOver:: of the containing Window (or, in Qt, link::#-acceptsMouseOver:: of the top View) is code::true::.
+
+    The return value of evaluation controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
+
+METHOD:: mouseWheelAction
+    note:: strong:: Only in Qt GUI :: ::
+
+    The object to be evaluated when the mouse wheel is used while the mouse is pointing onto the view.
+
+    The following arguments are passed at evaluation: strong::view, x, y, modifiers, xDelta, yDelta::.
+
+    The xDelta and yDelta arguments express rotation in horizontal and vertical direction, respectively. The value is in degrees (typically, an event occurs every 15 degrees), and can be positive or negative, depending on the direction of rotation.
+
+    The return value of evaluation controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
+
+METHOD:: mouseEnterAction
+    note:: strong:: Only in Qt GUI :: ::
+
+    The object to be evaluated when the mouse pointer enters the view.
+
+    The following arguments are passed at evaluation: strong::view, x, y::.
 
 METHOD:: mouseLeaveAction
-	note:: strong:: Only in Qt GUI :: ::
+    note:: strong:: Only in Qt GUI :: ::
 
-	Sets or gets the object to be evaluated when the mouse pointer leaves the view.
+    The object to be evaluated when the mouse pointer leaves the view.
 
-		It is passed the following arguments: view, x, y.
+    The following arguments are passed at evaluation: strong::view, x, y::.
 
 
 SUBSECTION:: Key actions
 
 Use the methods below to set or get the view's actions in response to keyboard interaction when the view has the keyboard focus.
 
-If evaluating the action object returns nil, or there is no action set, keyboard event will propagate up to the parent view which may then respond and trigger its actions. On the same condition, it will continue to propagate up unless some view responds or it hits the top of the view hierarchy. You may register an action on the Window's top view to respond to all unhandled keyboard events for the window.
-
 note::
-In Qt GUI, event propagation works differently. After handling a key event within SuperCollider language, the event processing continues in the Qt implementation of the view, and if it is not handled there it propagates to the parent view. If you want to have control over key event propagation, you can return true or false from key actions (meaning that the event was handled and will not propagate, or converse), but note that this will also prevent the Qt view implementation to respond to the key event.
+Key actions are subject to emphasis::event propagation::. See link::#key_and_mouse_event_propagation:: for details.
 ::
 
-When the action object is evaluated, it is passed one or more arguments from the following list (in that order):
+When the key action object is evaluated, it is passed one or more arguments from the following list (in that order):
 
 list::
 ## strong::view:: - The view.
@@ -508,19 +606,27 @@ list::
 
 
 METHOD:: keyDownAction
-	Sets or gets the object to be evaluated when a key is pressed.
+    The object to be evaluated when a key is pressed.
 
-		It is passed the following arguments: strong::view, char, modifiers, unicode, keycode::.
+    The following arguments are passed at evaluation: strong::view, char, modifiers, unicode, keycode::.
+
+    The return value of evaluation controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
+
+    If no code::keyDownAction:: is set, link::#-defaultKeyDownAction:: is called instead, and its return value controls the event propagation.
 
 METHOD:: keyUpAction
-	Sets or gets the object to be evaluated when a key is released.
+    The object to be evaluated when a key is released.
 
-		It is passed the following arguments: strong::view, char, modifiers, unicode, keycode::.
+    The following arguments are passed at evaluation: strong::view, char, modifiers, unicode, keycode::.
+
+    The return value of evaluation controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
+
+    If no code::keyUpAction:: is set, link::#-defaultKeyUpAction:: is called instead, and its return value controls the event propagation.
 
 METHOD:: keyModifiersChangedAction
-	Sets or gets the object to be evaluated when a modifier key is pressed or released.
+    The object to be evaluated when a modifier key is pressed or released.
 
-		It is passed the following arguments: strong::view, modifiers::.
+    The following arguments are passed at evaluation: strong::view, modifiers::.
 
 
 SUBSECTION:: Drag and drop
@@ -580,6 +686,16 @@ METHOD:: endFrontAction
 
 	Sets or gets the object to be evaluated when the view becomes the active window. It is passed the view as an argument.
 
+METHOD:: onResize
+	note:: only in Qt GUI ::
+
+	Sets or gets the object to be evaluated when the view changes its size. It is passed the view as an argument.
+
+METHOD:: onMove
+	note:: only in Qt GUI ::
+
+	Sets or gets the object to be evaluated when the view changes position relatively to its parent. It is passed the view as an argument.
+
 METHOD:: onClose
 
 	Sets or gets the object to be evaluated when the view is destroyed (i.e. link::#-close#closed:: or link::#-remove#removed::). It is passed the view as an argument.
@@ -593,11 +709,11 @@ The following methods are the default handlers of key press and release events. 
 
 METHOD:: defaultKeyDownAction
 
-	The method called when a key is pressed and link::#-keyDownAction:: is nil. Subclass it to define your own functionality on key-press.
+	The method called when a key is pressed and link::#-keyDownAction:: is nil. Subclass it to define your own functionality on key presses.
 
 	See link::#key_actions#Key actions :: for explanation of arguments.
 
-	returns:: nil, if the key event is not handled by the view, which will propagated it to the parent.
+    The return value controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
 
 METHOD:: defaultKeyUpAction
 
@@ -605,7 +721,7 @@ METHOD:: defaultKeyUpAction
 
 	See link::#key_actions#Key actions :: for explanation of arguments.
 
-	returns:: nil, if the key event is not handled by the view, which will propagated it to the parent.
+	The return value controls the event propagation to parent view. See link::#key_and_mouse_event_propagation#Key and mouse event propagation:: for details.
 
 
 METHOD:: keyDown
@@ -669,21 +785,26 @@ METHOD:: mouseUp
 	See link::#mouse_actions#Mouse actions :: for explanation of arguments.
 
 METHOD:: mouseMove
-	Handles response to mouse pointer moving over the view after a mouse button has been pressed. Evaluates link::#-mouseMoveAction::.
+	Handles response to mouse pointer moving after a mouse button has been pressed on the view. Evaluates link::#-mouseMoveAction::.
 
 	See link::#mouse_actions#Mouse actions :: for explanation of arguments.
 
 METHOD:: mouseOver
-	Handles response to mouse pointer entering the view. Evaluates link::#-mouseOverAction::.
+	Handles response to mouse pointer moving over the view with no mouse buttons pressed. Evaluates link::#-mouseOverAction::.
+
+	This method is called only if link::Classes/Window#-acceptsMouseOver:: of the containing Window (or, in Qt, link::#-acceptsMouseOver:: of the top View) is code::true::.
 
 	See link::#mouse_actions#Mouse actions :: for explanation of arguments.
+
+METHOD:: mouseEnter
+	note:: strong:: Only in Qt GUI :: ::
+
+	Handles response to mouse pointer entering the view. Evaluates link::#-mouseEnterAction::.
 
 METHOD:: mouseLeave
 	note:: strong:: Only in Qt GUI :: ::
 
 	Handles response to mouse pointer leaving the view. Evaluates link::#-mouseLeaveAction::.
-
-	See link::#mouse_actions#Mouse actions :: for explanation of arguments.
 
 
 

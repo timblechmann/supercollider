@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2010 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2010-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -21,6 +21,7 @@
 
 #include "QcGraph.h"
 #include "../QcWidgetFactory.h"
+#include "../style/routines.hpp"
 
 #include <QPainter>
 #include <QMouseEvent>
@@ -28,7 +29,7 @@
 
 #include <cmath>
 
-static QcWidgetFactory<QcGraph> factory;
+QC_DECLARE_QWIDGET_FACTORY(QcGraph);
 
 void QcGraphModel::append( QcGraphElement * e ) {
   if( _elems.count() ) {
@@ -57,20 +58,21 @@ void QcGraphModel::removeAt( int i ) {
 
 
 QcGraph::QcGraph() :
-  _thumbSize( QSize( 8, 8 ) ),
-  _selColor( QColor(255,0,0) ),
+  QtCollider::Style::Client(this),
+  _defaultThumbSize( QSize(18,18) ),
+  _style(DotElements),
   _drawLines( true ),
   _drawRects( true ),
   _editable( true ),
-  _step( 0.f ),
+  _step( 0.01 ),
   _selectionForm( ElasticSelection ),
   _xOrder( NoOrder ),
   _gridOn( false ),
-  _curIndex( -1 )
+  _geometryDirty( false ),
+  _lastIndex(-1)
 {
   QPalette plt( palette() );
-  _strokeColor = plt.color( QPalette::Text );
-  _gridColor = plt.color( QPalette::Midlight );
+
   setFocusPolicy( Qt::StrongFocus );
   setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Expanding );
 
@@ -95,18 +97,27 @@ VariantList QcGraph::value() const
   return values;
 }
 
+QcGraphElement *QcGraph::currentElement() const
+{
+  return _selection.count() ? _selection.elems.first().elem : 0;
+}
+
+int QcGraph::index() const
+{
+  QcGraphElement *e = currentElement();
+  return e ? _model.elements().indexOf(e) : -1;
+}
+
 float QcGraph::currentX() const
 {
-  if( _curIndex < 0 ) return 0.f;
-  QcGraphElement *e = _model.elementAt(_curIndex);
-  return e->value.x();
+  QcGraphElement *e = currentElement();
+  return e ? e->value.x() : 0.f;
 }
 
 float QcGraph::currentY() const
 {
-  if( _curIndex < 0 ) return 0.f;
-  QcGraphElement *e = _model.elementAt(_curIndex);
-  return e->value.y();
+  QcGraphElement *e = currentElement();
+  return e ? e->value.y() : 0.f;
 }
 
 void QcGraph::setValue( const VariantList &list )
@@ -135,7 +146,7 @@ void QcGraph::setValue( const VariantList &list )
       setValue( e, val );
     }
     else {
-      QcGraphElement *e = new QcGraphElement();
+      QcGraphElement *e = new QcGraphElement(_defaultThumbSize);
       setValue( e, val );
       _model.append( e );
     }
@@ -143,7 +154,7 @@ void QcGraph::setValue( const VariantList &list )
 
   if( newc ) ensureOrder();
 
-  _curIndex = -1;
+  _geometryDirty = true;
 
   update();
 }
@@ -162,17 +173,35 @@ void QcGraph::setStrings( const VariantList &list )
 
 void QcGraph::setCurves( const VariantList & curves )
 {
-  if( curves.data.size() == 1 ) {
-    QVariant var = curves.data[0];
-    Q_FOREACH( QcGraphElement *e, _model.elements() )
-      e->setCurveType( var );
-  }
-  else if( curves.data.size() == _model.elementCount() ) {
-    for( int i=0; i<curves.data.size(); ++i ) {
-      QVariant var = curves.data[i];
-      _model.elementAt(i)->setCurveType( var );
+  for( int i = 0; i < curves.data.size() && i < _model.elementCount(); ++i ) {
+    QVariant data = curves.data[i];
+    QcGraphElement::CurveType type;
+    double curvature;
+    if( data.type() == QVariant::Int ) {
+      type = (QcGraphElement::CurveType) data.toInt();
+      curvature = 0.0;
     }
+    else {
+      type = QcGraphElement::Curvature;
+      curvature = data.value<double>();
+    }
+    _model.elementAt(i)->setCurveType( type, curvature );
   }
+  update();
+}
+
+void QcGraph::setCurves( double curvature )
+{
+  Q_FOREACH( QcGraphElement* e, _model.elements() )
+    e->setCurveType( QcGraphElement::Curvature, curvature );
+  update();
+}
+
+void QcGraph::setCurves( int typeId )
+{
+  QcGraphElement::CurveType type = (QcGraphElement::CurveType)typeId;
+  Q_FOREACH( QcGraphElement* e, _model.elements() )
+    e->setCurveType( type );
   update();
 }
 
@@ -201,10 +230,7 @@ void QcGraph::connectElements( int src, VariantList targets )
 }
 
 void QcGraph::setIndex( int i ) {
-  if( i >= -1 && i < _model.elementCount() ) {
-    _curIndex = i;
-    update();
-  }
+  select(i);
 }
 
 void QcGraph::select( int i, bool exclusive ) {
@@ -228,25 +254,113 @@ void QcGraph::deselectAll() {
 
 void QcGraph::setCurrentX( float f )
 {
-  if( _curIndex < 0 ) return;
-  QcGraphElement *e = _model.elementAt(_curIndex);
+  QcGraphElement *e = currentElement();
+  if(!e) return;
+
   QPointF val = e->value;
   val.setX( f );
   if( _xOrder != NoOrder ) orderRestrictValue(e,val,true);
   else restrictValue(val);
   e->value = val;
+
   update();
 }
 
 void QcGraph::setCurrentY( float f )
 {
-  if( _curIndex < 0 ) return;
-  QcGraphElement *e = _model.elementAt(_curIndex);
+  QcGraphElement *e = currentElement();
+  if(!e) return;
+
   QPointF val = e->value;
   val.setY( f );
   if( _xOrder != NoOrder ) orderRestrictValue(e,val,true);
   else restrictValue(val);
   e->value = val;
+
+  update();
+}
+
+void QcGraph::setThumbSize( int s )
+{
+  QSize size(s,s);
+
+  _defaultThumbSize = size;
+
+  int c = _model.elementCount();
+  for( int i=0; i<c; ++i ) {
+    QcGraphElement *e = _model.elementAt(i);
+    e->size = size;
+  }
+
+  _largestThumbSize = size;
+  _geometryDirty = false;
+
+  update();
+}
+
+void QcGraph::setThumbWidth( int w )
+{
+  _defaultThumbSize.setWidth(w);
+
+  int c = _model.elementCount();
+  for( int i=0; i<c; ++i ) {
+    QcGraphElement *e = _model.elementAt(i);
+    e->size.setWidth(w);
+  }
+
+  // For backward compatibility, switch to style that supports
+  // different thumb width and height:
+  _style = RectElements;
+  _largestThumbSize.setWidth(w);
+
+  update();
+}
+
+void QcGraph::setThumbHeight( int h )
+{
+  _defaultThumbSize.setHeight(h);
+
+  int c = _model.elementCount();
+  for( int i=0; i<c; ++i ) {
+    QcGraphElement *e = _model.elementAt(i);
+    e->size.setHeight(h);
+  }
+
+  // For backward compatibility, switch to style that supports
+  // different thumb width and height:
+  _style = RectElements;
+  _largestThumbSize.setHeight(h);
+
+  update();
+}
+
+void QcGraph::setThumbSizeAt( int i, int s )
+{
+  if( i < 0 || i >= _model.elementCount() ) return;
+  _model.elementAt(i)->size = QSize(s,s);
+  _geometryDirty = true;
+  update();
+}
+
+void QcGraph::setThumbWidthAt( int i, int w )
+{
+  if( i < 0 || i >= _model.elementCount() ) return;
+  _model.elementAt(i)->size.setWidth(w);
+  // For backward compatibility, switch to style that supports
+  // different thumb width and height:
+  _style = RectElements;
+  _geometryDirty = true;
+  update();
+}
+
+void QcGraph::setThumbHeightAt( int i, int h )
+{
+  if( i < 0 || i >= _model.elementCount() ) return;
+  _model.elementAt(i)->size.setHeight(h);
+  // For backward compatibility, switch to style that supports
+  // different thumb width and height:
+  _style = RectElements;
+  _geometryDirty = true;
   update();
 }
 
@@ -329,6 +443,7 @@ void QcGraph::setIndexSelected( int index, bool select )
       ++i;
     }
     _selection.elems.insert( si, SelectedElement(e) );
+    _lastIndex = index;
   }
   else {
     e->selected = false;
@@ -498,46 +613,6 @@ void QcGraph::moveSelected( const QPointF & dif, SelectionForm form, bool cached
   }
 }
 
-QPointF QcGraph::pos( const QPointF & value )
-{
-  float x, y, xRange, yRange;
-
-  xRange = width() - _thumbSize.width();
-  yRange = height() - _thumbSize.height();
-
-  if( xRange > 0 )
-    x = ( value.x() * xRange ) + ( _thumbSize.width() * 0.5f );
-  else
-    x = 0.f;
-
-  if( yRange > 0 )
-    y = ( value.y() * -yRange ) - ( _thumbSize.height() * 0.5f ) + height();
-  else
-    y = 0.f;
-
-  return QPointF( x, y );
-}
-
-QPointF QcGraph::value( const QPointF & pos )
-{
-  float x, y, xRange, yRange;
-
-  xRange = width() - _thumbSize.width();
-  yRange = height() - _thumbSize.height();
-
-  if( xRange > 0 )
-    x = ( pos.x() - ( _thumbSize.width() * 0.5f ) ) / xRange;
-  else
-    x = 0.f;
-
-  if( yRange > 0 )
-    y = ( pos.y() + ( _thumbSize.height() * 0.5f ) - height() ) / -yRange;
-  else
-    y = 0.f;
-
-  return QPointF( x, y );
-}
-
 void QcGraph::addCurve( QPainterPath &path, QcGraphElement *e1, QcGraphElement *e2 )
 {
   QcGraphElement::CurveType type = e1->curveType;
@@ -623,9 +698,9 @@ void QcGraph::addCurve( QPainterPath &path, QcGraphElement *e1, QcGraphElement *
     path.moveTo( pt1 );
 
     // prevent NaN
-    double curve = qBound( -100.f, e1->curvature, 100.f );
+    double curve = qBound( -100.0, e1->curvature, 100.0 );
 
-    if( abs( curve ) < 0.0001f ) {
+    if( std::abs( curve ) < 0.0001 ) {
       path.lineTo( pt2 );
     }
     else {
@@ -644,22 +719,84 @@ void QcGraph::addCurve( QPainterPath &path, QcGraphElement *e1, QcGraphElement *
   }
 }
 
+QSize QcGraph::drawnElementSize( QcGraphElement *e )
+{
+  if (_style == DotElements) {
+    int s = qMin(e->size.width(), e->size.height());
+    return QSize(s,s);
+  }
+  else
+    return e->size;
+}
+
+QRect QcGraph::valueRect()
+{
+  using namespace QtCollider::Style;
+
+  if (_geometryDirty)
+  {
+      int w = 0;
+      int h = 0;
+      int c = _model.elementCount();
+      if (_style == RectElements)
+      {
+          for (int i = 0; i < c; ++i) {
+              QSize s = _model.elementAt(i)->size;
+              w = qMax(w, s.width());
+              h = qMax(h, s.height());
+          }
+      }
+      else
+      {
+          for (int i = 0; i < c; ++i) {
+              QSize s = _model.elementAt(i)->size;
+              w = qMax(w, qMin(s.width(), s.height()));
+          }
+          h = w;
+      }
+      _largestThumbSize = QSize(w,h);
+      _geometryDirty = false;
+  }
+
+  return marginsRect( sunkenContentsRect( rect() ), _largestThumbSize ).adjusted(1,1,-1,-1);
+}
+
+QRectF QcGraph::labelRect( QcGraphElement *e, const QPointF &pt, const QRect &bounds, const QFontMetrics &fm )
+{
+  QRectF textRect( fm.boundingRect(e->text) );
+  QSize sz( drawnElementSize(e) );
+  qreal hnd_w_2 = sz.width() * 0.5;
+  qreal hnd_h_2 = sz.height() * 0.5;
+  textRect.moveBottomLeft( pt + QPointF(hnd_w_2, -hnd_h_2) );
+  if( textRect.y() < bounds.y() )
+    textRect.moveTop( pt.y() + hnd_h_2 );
+  if( textRect.right() > bounds.right() )
+    textRect.moveRight( pt.x() - hnd_w_2 );
+  return textRect;
+}
+
 void QcGraph::paintEvent( QPaintEvent * )
 {
+  using namespace QtCollider::Style;
+  using QtCollider::Style::Ellipse;
+  using QtCollider::Style::RoundRect;
+
   QPainter p( this );
-  QPalette plt( palette() );
+  const QPalette & plt = palette();
 
-  p.setPen( plt.color( QPalette::Mid ) );
-  p.setBrush( Qt::NoBrush );
-  p.drawRect( rect().adjusted(0,0,-1,-1) );
+  p.setRenderHint( QPainter::Antialiasing, true );
+  RoundRect frame(rect(), 2);
+  drawSunken( &p, plt, frame, background(), hasFocus() ? focusColor() : QColor() );
+  p.setRenderHint( QPainter::Antialiasing, false );
 
-  QRect contentsRect( _thumbSize.width() * 0.5f, _thumbSize.height() * 0.5f,
-                      width() - _thumbSize.width(), height() - _thumbSize.height() );
-  p.setPen( _gridColor );
-  p.setBrush( plt.color( QPalette::Base ) );
-  p.drawRect( contentsRect );
+  QRect contentsRect( valueRect() );
 
   //draw grid;
+
+  p.setPen( gridColor() );
+  p.setBrush( Qt::NoBrush );
+  p.drawRect( contentsRect );
+
   if( _gridOn ) {
     float dx = _gridMetrics.x();
     float dy = _gridMetrics.y();
@@ -670,19 +807,21 @@ void QcGraph::paintEvent( QPaintEvent * )
 
     if( contentsRect.width() > 0.f && dx > 0.f && dx < 1.f ) {
       dx *= contentsRect.width();
-      float x = cl;
-      while( x < cr ) {
+      int i = 1;
+      float x;
+      while( (x = i * dx + cl) < cr ) {
         p.drawLine( x, ct, x, cb );
-        x += dx;
+        ++i;
       }
     }
 
     if( contentsRect.height() > 0.f && dy > 0.f && dy < 1.f ) {
       dy *= contentsRect.height();
-      float y = cb;
-      while( y > ct ) {
+      int i = 1;
+      float y;
+      while( (y = cb - i * dy) > ct ) {
         p.drawLine( cl, y, cr, y );
-        y -= dy;
+        ++i;
       }
     }
   }
@@ -692,7 +831,9 @@ void QcGraph::paintEvent( QPaintEvent * )
   int c = elems.count();
   if( !c ) return;
 
-  p.setPen( _strokeColor );
+  const QColor & strokeClr = strokeColor();
+
+  p.setPen( strokeClr );
 
   // draw lines;
   if( _drawLines ) {
@@ -731,8 +872,14 @@ void QcGraph::paintEvent( QPaintEvent * )
   // draw rects and strings
   if( _drawRects ) {
 
-    QColor defFillColor = plt.color( QPalette::Text );
-    QRectF rect; rect.setSize( _thumbSize );
+    p.setRenderHint( QPainter::Antialiasing, true );
+
+    QFontMetrics fm( font() );
+    QColor rectColor = plt.color(QPalette::Button).lighter(105);
+    QColor circleColor = rectColor; circleColor.setAlpha(70);
+    QColor dotColor = plt.color(QPalette::Text);
+    const QColor & selectClr = selectionColor();
+    QRectF rect;
     QPointF pt;
     int i;
 
@@ -740,44 +887,110 @@ void QcGraph::paintEvent( QPaintEvent * )
 
       QcGraphElement *e = elems[i];
 
-      if( e->selected )
-        p.setBrush( _selColor );
+      rect.setSize( drawnElementSize(e) );
+
+      pt = Style::pos( e->value, contentsRect );
+      rect.moveCenter( pt.toPoint() );
+
+      if( _style == DotElements )
+          drawDotElement(e, rect, contentsRect,
+                         dotColor, circleColor, strokeClr, selectClr,
+                         plt, fm, &p);
       else
-        p.setBrush( e->fillColor.isValid() ? e->fillColor : defFillColor );
-
-      pt = pos( e->value );
-
-      rect.moveCenter( pt );
-      p.drawRect( rect.adjusted(0,0,-1,-1) );
-
-      QString text = e->text;
-      if( !text.isEmpty() ) {
-        p.drawText( rect, Qt::AlignCenter, text );
-      }
+          drawRectElement(e, rect, rectColor, strokeClr, selectClr, plt, &p  );
 
     }
 
   }
 }
 
+void QcGraph::drawDotElement
+( QcGraphElement *e, const QRectF &rect, const QRect & bounds,
+  const QColor & dotColor, const QColor & circleColor,
+  const QColor & textColor, const QColor & selectColor,
+  const QPalette &plt, const QFontMetrics &fm, QPainter *p )
+{
+  using namespace QtCollider::Style;
+  using QtCollider::Style::Ellipse;
+
+  // base
+  Ellipse thumb(rect);
+  drawRaised( p, plt, thumb, circleColor );
+
+  // marker
+  QRectF r( thumb._rect );
+  qreal wdif = r.width() * 0.3;
+  qreal hdif = r.height() * 0.3;
+  p->setPen( Qt::NoPen );
+  p->setBrush( e->fillColor.isValid() ? e->fillColor : dotColor );
+  p->drawEllipse( r.adjusted( wdif, hdif, -wdif, -hdif ) );
+
+  // selection indicator
+  if( e->selected ) {
+    p->setBrush(Qt::NoBrush);
+    p->setPen( selectColor );
+    p->drawEllipse( thumb._rect.adjusted(1,1,-1,-1) );
+  }
+
+  // label
+  p->setPen( textColor );
+  QString text = e->text;
+  if( !text.isEmpty() ) {
+    QRectF lblRect( labelRect( e, rect.center(), bounds, fm ) );
+    p->drawText( lblRect, 0, text );
+  }
+}
+
+void QcGraph::drawRectElement
+(
+  QcGraphElement *e, const QRectF &rect,
+  const QColor & fillColor,
+  const QColor & textColor,
+  const QColor & selectColor,
+  const QPalette &plt, QPainter *p )
+{
+  using namespace QtCollider::Style;
+  using QtCollider::Style::RoundRect;
+
+  // base
+  RoundRect base(rect, 5);
+  drawRaised( p, plt, base, e->fillColor.isValid() ? e->fillColor : fillColor  );
+
+  // selection indicator
+  if( e->selected ) {
+    p->setBrush(Qt::NoBrush);
+    p->setPen( selectColor );
+    p->drawRoundedRect( base._rect, 5, 5 );
+  }
+
+    // label
+  p->setPen( textColor );
+  QString text = e->text;
+  if( !text.isEmpty() ) {
+    p->drawText( rect, Qt::AlignCenter, text );
+  }
+}
+
 void QcGraph::mousePressEvent( QMouseEvent *ev )
 {
+  using namespace QtCollider::Style;
+
   QList<QcGraphElement*> elems = _model.elements();
   int c = elems.count();
   if( !c ) return;
 
   QPointF mpos = ev->pos();
+  QRectF valueRect( this->valueRect() );
 
   QRectF r;
-  r.setSize( _thumbSize );
 
   int i;
   for( i = 0; i < c; ++i ) {
     QcGraphElement *e = elems[i];
-    QPointF pt = pos( e->value );
+    r.setSize( drawnElementSize(e) );
+    QPointF pt( Style::pos( e->value, valueRect ) );
     r.moveCenter( pt );
     if( r.contains( mpos ) ) {
-      _curIndex = i;
 
       if( ev->modifiers() & Qt::ShiftModifier ) {
         setIndexSelected( i, !e->selected );
@@ -794,7 +1007,7 @@ void QcGraph::mousePressEvent( QMouseEvent *ev )
           // if the element that was hit ended up selected
           // prepare for moving
         _selection.shallMove = true;
-        _selection.moveOrigin = value(mpos);
+        _selection.moveOrigin = Style::value(mpos, valueRect);
       }
       else {
         _selection.shallMove = false;
@@ -808,7 +1021,6 @@ void QcGraph::mousePressEvent( QMouseEvent *ev )
   _selection.shallMove = false;
 
   if( !(ev->modifiers() & Qt::ShiftModifier) ) {
-    _curIndex = 0;
     setAllDeselected();
   }
 
@@ -817,6 +1029,10 @@ void QcGraph::mousePressEvent( QMouseEvent *ev )
 
 void QcGraph::mouseMoveEvent( QMouseEvent *ev )
 {
+  using namespace QtCollider::Style;
+
+  if( !ev->buttons() ) return;
+
   if( !_editable || !_selection.shallMove || !_selection.size() ) return;
 
   if( !_selection.cached ) {
@@ -828,7 +1044,8 @@ void QcGraph::mouseMoveEvent( QMouseEvent *ev )
     _selection.cached = true;
   }
 
-  QPointF dValue( value( ev->pos() ) );
+  QRectF valueRect( this->valueRect() );
+  QPointF dValue( Style::value( ev->pos(), valueRect ) );
   dValue = dValue - _selection.moveOrigin;
 
   moveSelected( dValue, _selectionForm, true );
@@ -839,14 +1056,76 @@ void QcGraph::mouseMoveEvent( QMouseEvent *ev )
 
 void QcGraph::keyPressEvent( QKeyEvent *event )
 {
-  if( _curIndex < 0 ) return;
+  int mods = event->modifiers();
+  if( mods & Qt::AltModifier || mods & Qt::ShiftModifier )
+  {
+    // selection mode
 
-  if( event->modifiers() & Qt::AltModifier ) {
+    int c = _model.elementCount();
+    if(!c) return;
+
+    switch( event->key() ) {
+      case Qt::Key_Right:
+      {
+          // select the index after the last selected one (wrapping)
+          // or extend selection to the right
+
+          int i = -1;
+          if(_selection.count()) {
+              for (i = c - 1; i >= 0; --i) {
+                  if(_model.elementAt(i)->selected)
+                      break;
+              }
+          }
+
+          if( event->modifiers() & Qt::ShiftModifier ) {
+              i = qMin(i + 1, c - 1);
+              setIndexSelected( i, true );
+          }
+          else {
+              ++i;
+              if (i >= c) i = 0;
+              setAllDeselected();
+              setIndexSelected( i, true );
+          }
+
+          break;
+      }
+      case Qt::Key_Left:
+      {
+          // select the index before the first selected one (wrapping)
+          // or extend selection to the left
+          int i = c;
+          if(_selection.count()) {
+              for(i = 0; i < c; ++i) {
+                  if(_model.elementAt(i)->selected)
+                      break;
+              }
+          }
+
+          if( event->modifiers() & Qt::ShiftModifier ) {
+              i = qMax(i - 1, 0);
+              setIndexSelected( i, true );
+          }
+          else {
+              --i;
+              if (i < 0) i = c - 1;
+              setAllDeselected();
+              setIndexSelected( i, true );
+          }
+
+          break;
+      }
+      default: break;
+    }
+  }
+  else
+  {
     // editing mode
 
     if( !_editable || !_selection.size() ) return;
 
-    QPointF dValue;;
+    QPointF dValue;
 
     switch( event->key() ) {
       case Qt::Key_Up:
@@ -869,26 +1148,6 @@ void QcGraph::keyPressEvent( QKeyEvent *event )
 
     update();
     doAction( event->modifiers() );
-
-  }
-  else {
-    // selection mode
-
-    switch( event->key() ) {
-      case Qt::Key_Right:
-        setIndex( _curIndex+1 );
-        if( !(event->modifiers() & Qt::ShiftModifier) ) setAllDeselected();
-        setIndexSelected( _curIndex, true );
-        break;
-      case Qt::Key_Left:
-        // always keep an index current:
-        if( _curIndex > 0 ) setIndex( _curIndex-1 );
-        if( !(event->modifiers() & Qt::ShiftModifier) ) setAllDeselected();
-        setIndexSelected( _curIndex, true );
-        break;
-      default: break;
-    }
-
   }
 }
 

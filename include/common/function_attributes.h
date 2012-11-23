@@ -22,8 +22,14 @@
 
 #ifdef __GNUC__
 
+#ifdef _WIN32
+#undef CONST
+#undef PURE
+#endif
+
 #define CONST __attribute__((const))
 #define PURE __attribute__((pure))
+
 #define MALLOC __attribute__((malloc))
 #define HOT __attribute__((hot))
 #define COLD __attribute__((cold))
@@ -34,26 +40,22 @@
 #ifdef __clang__
 #undef HOT
 #undef FLATTEN
-
-#define HOT /*HOT*/
-#define FLATTEN /*FLATTEN*/
 #endif
 
 #ifdef __PATHCC__
 #undef HOT
 #undef FLATTEN
-
-#define HOT /*HOT*/
-#define FLATTEN /*FLATTEN*/
 #endif
 
 
+#ifndef _WIN32
 #ifndef PURE
 #define PURE /*PURE*/
 #endif
 
 #ifndef CONST
 #define CONST /*CONST*/
+#endif
 #endif
 
 #ifndef MALLOC
@@ -68,4 +70,7 @@
 #define COLD /*COLD*/
 #endif
 
+#ifndef FLATTEN
+#define FLATTEN /*FLATTEN*/
+#endif
 #endif /* FUNCTION_ATTRIBUTES_H */

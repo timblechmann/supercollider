@@ -1,22 +1,45 @@
-install(FILES data/supercollider.xml
-		DESTINATION share/mime/packages)
+set(SC_ED_VERSIONS 2 3)
 
-# sced 2
-install(FILES data/supercollider.lang
-		DESTINATION share/gtksourceview-2.0/language-specs)
+list(FIND SC_ED_VERSIONS ${SC_ED} SC_ED_VERSION)
 
-install(FILES data/supercollider.xml
-		DESTINATION share/mime/packages)
+if(SC_ED_VERSION EQUAL -1)
+    set(SC_ED 3)
+endif()
 
-install(FILES data/sced.gedit-plugin
-		DESTINATION lib/gedit-2/plugins)
+if(NOT WIN32 AND SC_ED EQUAL 2)
 
-install(DIRECTORY sced
-		DESTINATION lib/gedit-2/plugins)
+    message(STATUS "Building with Sced for gedit 2 (UNIX)")
 
-# sced 3
-install(FILES data/supercollider.lang
-		DESTINATION share/gtksourceview-3.0/language-specs)
+    install(FILES data/supercollider.lang
+            DESTINATION share/gtksourceview-2.0/language-specs)
 
-install(FILES sced3/supercollider.plugin sced3/supercollider.py
-		DESTINATION lib/gedit/plugins)
+    install(FILES data/supercollider.xml
+            DESTINATION share/mime/packages)
+
+    install(FILES data/sced.gedit-plugin
+            DESTINATION lib/gedit-2/plugins)
+
+    install(DIRECTORY sced
+            DESTINATION lib/gedit-2/plugins)
+
+elseif(NOT WIN32 AND SC_ED EQUAL 3)
+
+    message(STATUS "Building with Sced for gedit 3 (UNIX)")
+
+    configure_file(sced3/supercollider.plugin.in sced3/supercollider.plugin)
+
+    install(FILES data/supercollider.lang
+            DESTINATION share/gtksourceview-3.0/language-specs)
+
+    install(FILES data/supercollider.xml
+            DESTINATION share/mime/packages)
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/sced3/supercollider.plugin sced3/supercollider.py
+            DESTINATION lib/gedit/plugins)
+
+elseif(WIN32)
+
+    message(STATUS "Building with Sced for gedit 2 (Windows)")
+    add_subdirectory(scedwin)
+
+endif()

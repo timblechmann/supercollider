@@ -75,6 +75,7 @@ PyrClass *class_interpreter;
 PyrClass *class_thread;
 PyrClass *class_routine;
 PyrClass *class_finalizer;
+PyrClass *class_server_shm_interface;
 
 PyrSymbol *s_none;
 PyrSymbol *s_object;
@@ -121,6 +122,7 @@ PyrSymbol *s_finalizer;
 PyrSymbol *s_awake;
 PyrSymbol *s_appclock;
 PyrSymbol *s_systemclock;
+PyrSymbol *s_server_shm_interface;
 
 PyrSymbol *s_nocomprendo;
 PyrSymbol *s_curProcess, *s_curMethod, *s_curBlock, *s_curClosure, *s_curThread;
@@ -219,6 +221,7 @@ void initSymbols()
 	s_awake = getsym("awake");
 	s_appclock = getsym("AppClock");
 	s_systemclock = getsym("SystemClock");
+	s_server_shm_interface = getsym("ServerShmInterface");
 
 	s_linear = getsym("linear");
 	s_exponential = getsym("exponential");
@@ -1734,6 +1737,10 @@ void initClasses()
 		addIntrinsicVar(class_func, "def", &o_nil);
 		addIntrinsicVar(class_func, "context", &o_nil);
 
+	class_server_shm_interface = makeIntrinsicClass(s_server_shm_interface, s_object, 2, 0);
+		addIntrinsicVar(class_server_shm_interface, "ptr", &o_nil);
+		addIntrinsicVar(class_server_shm_interface, "finalizer", &o_nil);
+
 	gTagClassTable[ 0] = NULL;
 	gTagClassTable[ 1] = NULL;
 	gTagClassTable[ 2] = class_int;
@@ -2478,20 +2485,14 @@ PyrMethod* newPyrMethod()
 
 void freePyrSlot(PyrSlot *slot)
 {
-	if (NotNil(slot)) {
-		PyrObject *obj;
-		if (IsSym(slot))
-				obj = (PyrObject*)slotRawSymbol(slot); // i don't want to know, what this means
-		else if (IsObj(slot))
-				obj = slotRawObject(slot);
-		else
-				assert(false);
+	if (IsObj(slot)) {
+		PyrObject *obj = slotRawObject(slot);
 
 		if (obj && obj->IsPermanent()) {
 			// don't deallocate these
-			if (obj != slotRawObject(&o_emptyarray) && obj != slotRawObject(&o_onenilarray) && obj != slotRawObject(&o_argnamethis)) {
+			if (obj != slotRawObject(&o_emptyarray) && obj != slotRawObject(&o_onenilarray) && obj != slotRawObject(&o_argnamethis))
 				pyr_pool_runtime->Free((void*)obj);
-			}
+
 			SetNil(slot);
 		}
 	}
@@ -2730,7 +2731,7 @@ int putIndexedFloat(PyrObject *obj, double val, int index)
 
 static int hashPtr(void* ptr)
 {
-    int32 hashed_part = int32((long)ptr&0xffffffff);
+    int32 hashed_part = int32((size_t)ptr&0xffffffff);
     return Hash(hashed_part);
 }
 

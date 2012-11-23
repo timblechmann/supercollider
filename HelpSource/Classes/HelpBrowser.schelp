@@ -1,5 +1,5 @@
 class:: HelpBrowser
-categories:: HelpSystem, GUI
+categories:: HelpSystem, GUI>Interfaces
 related:: Classes/SCDoc
 summary:: Browse the SuperCollider help documentation
 
@@ -8,6 +8,7 @@ description::
 HelpBrowser is the GUI help browser that lets you browse the documentation of SuperCollider. It is coupled with SCDoc to allow on-the-fly rendering of HTML help files.
 
 classmethods::
+private:: getOldWrapUrl, initClass
 
 method:: instance
 The singleton HelpBrowser instance.
@@ -27,11 +28,19 @@ Go to url with singleton instance or a new window, depending on the code::openNe
 method:: openHelpFor
 Open the relevant help page for given text in the singleton HelpBrowser instance.
 
-method:: openSearch
+method:: openSearchPage
 Open the help search page with given text in the singleton HelpBrowser instance.
 
-method:: openBrowser
+method:: openBrowsePage
 Open the category browser page in the singleton HelpBrowser instance.
+
+argument:: category
+An optional String to start at specified category, like "UGens>Filters"
+
+method:: openHelpForMethod
+Open help for specified method.
+argument:: method
+a link::Classes/Method::
 
 instancemethods::
 private:: init, openTextFile, startAnim, stopAnim

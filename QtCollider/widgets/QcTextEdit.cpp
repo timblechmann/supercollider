@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2010 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2010-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -23,17 +23,18 @@
 #include "../QcWidgetFactory.h"
 
 #include <QFile>
+#include <QUrl>
 #include <QKeyEvent>
 #include <QApplication>
 
 class QcTextEditFactory : public QcWidgetFactory<QcTextEdit>
 {
-  void initialize( QWidgetProxy *p, QcTextEdit *w, QList<QVariant> & ) {
+  void initialize( QWidgetProxy *p, QcTextEdit *w ) {
     p->setMouseEventWidget( w->viewport() );
   }
 };
 
-static QcTextEditFactory factory;
+QC_DECLARE_FACTORY( QcTextEdit, QcTextEditFactory );
 
 QcTextEdit::QcTextEdit() : _interpretSelection(false)
 {
@@ -84,9 +85,8 @@ void QcTextEdit::select( int start, int size )
 
 QString QcTextEdit::selectedString() const
 {
-  // NOTE QTextCuror.selectedText() contains unicode paragraph separators U+2029
-  // instead of newline \n characters
-  return textCursor().selectedText().replace( QChar( 0x2029 ), QChar( '\n' ) );
+  QString selection( textCursor().selectedText() );
+  return prepareText(selection);
 }
 
 void QcTextEdit::replaceSelectedText( const QString &string )
@@ -131,8 +131,8 @@ void QcTextEdit::setRangeColor( const VariantList &list )
   format.setForeground( c );
 
   QTextCursor cursor( document() );
-  cursor.setPosition( start );
-  cursor.setPosition( start + size, QTextCursor::KeepAnchor );
+  cursor.movePosition( QTextCursor::NextCharacter, QTextCursor::MoveAnchor, start );
+  cursor.movePosition( QTextCursor::NextCharacter, QTextCursor::KeepAnchor, size );
   cursor.setCharFormat( format );
 }
 
@@ -147,8 +147,8 @@ void QcTextEdit::setRangeFont( const VariantList & list )
   format.setFont( f );
 
   QTextCursor cursor( document() );
-  cursor.setPosition( start );
-  cursor.setPosition( start + size, QTextCursor::KeepAnchor );
+  cursor.movePosition( QTextCursor::NextCharacter, QTextCursor::MoveAnchor, start );
+  cursor.movePosition( QTextCursor::NextCharacter, QTextCursor::KeepAnchor, size );
   cursor.setCharFormat( format );
 }
 
@@ -160,8 +160,8 @@ void QcTextEdit::setRangeText( const VariantList & list )
   int size = list.data[2].toInt();
 
   QTextCursor cursor( document() );
-  cursor.setPosition( start );
-  cursor.setPosition( start + size, QTextCursor::KeepAnchor );
+  cursor.movePosition( QTextCursor::NextCharacter, QTextCursor::MoveAnchor, start );
+  cursor.movePosition( QTextCursor::NextCharacter, QTextCursor::KeepAnchor, size );
   cursor.insertText( text );
 }
 
@@ -170,12 +170,45 @@ void QcTextEdit::keyPressEvent( QKeyEvent *e )
   if( _interpretSelection && e->modifiers() & (Qt::ControlModifier|Qt::ShiftModifier)
       && ( e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter ) )
   {
-    QString selection = selectedString();
-    if( !selection.isEmpty() ) {
-      Q_EMIT( interpret( selection ) );
-      return;
+    QTextCursor c(textCursor());
+
+    if ( !c.hasSelection() ) {
+      c.movePosition( QTextCursor::StartOfLine );
+      c.movePosition( QTextCursor::EndOfLine, QTextCursor::KeepAnchor );
     }
+
+    if ( c.hasSelection() ) {
+      QString selection( c.selectedText() );
+      Q_EMIT( interpret( prepareText(selection) ) );
+    }
+
+    return;
   }
 
   QTextEdit::keyPressEvent( e );
+}
+
+void QcTextEdit::insertFromMimeData ( const QMimeData * data )
+{
+  if(data->hasUrls()) {
+    QTextCursor c( textCursor() );
+    QList<QUrl> urls = data->urls();
+    int n = urls.count();
+    for(int i = 0; i < n; ++i)
+    {
+      QUrl &url = urls[i];
+      QString text = url.scheme() == "file" ? url.toLocalFile() : url.toString();
+      c.insertText(text);
+      if(n > 1) c.insertText("\n");
+    }
+  }
+  else
+    QTextEdit::insertFromMimeData(data);
+}
+
+QString & QcTextEdit::prepareText( QString & text ) const
+{
+  // NOTE: QTextDocument contains unicode paragraph separators U+2029
+  // instead of newline \n characters
+  return text.replace( QChar( 0x2029 ), QChar( '\n' ) );
 }

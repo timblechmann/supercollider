@@ -1,7 +1,7 @@
 class:: Server
 summary:: Object representing an sc-server application
 categories:: Server>Abstractions
-related:: Classes/ServerOptions
+related:: Classes/ServerOptions, Reference/Server-Architecture, Reference/Server-Command-Reference
 
 description::
 
@@ -39,14 +39,15 @@ If a Server has been booted from the command line you must call code::initTree::
 
 subsection:: Local vs. Internal
 
-In general, when working with a single machine one will probably be using one of two Server objects which are created at startup and stored in the class variables local and internal. By default two GUI windows are created to control these.
+In general, when working with a single machine one will probably be using one of two Server objects which are created at startup and stored in the class variables link::#*local:: and link::#*internal::. In SuperCollider.app (OSX), two GUI windows are created to control these. Use link::#-makeGui:: to create a GUI window manually.
 
 The difference between the two is that the local server runs as a separate application with its own address space, and the internal server runs within the same space as the language/client app.
 
-The internal server has the advantage of being able to access shared memory, thus allowing for things like scope windows (see below) and link::Classes/SharedIn:: / link::Classes/SharedOut::.
-It also minimizes messaging latency.
+Both local and internal server supports link::#-scope#scoping:: and link::Classes/Bus#synchronous_control_bus_methods#synchronous bus access::.
 
-The local server, and any other server apps running on your local machine, have the advantage that if the language app crashes, it (and thus possibly your piece) will continue to run. It is thus an inherently more robust arrangement.
+The local server, and any other server apps running on your local machine, have the advantage that if the language app crashes, it (and thus possibly your piece) will continue to run. It is thus an inherently more robust arrangement. But note that even if the synths on the server continue to run, any language-side sequencing and control will terminate if the language app crashes.
+
+There is generally no benefit in using the internal server.
 
 subsection:: The default Server
 
@@ -148,6 +149,7 @@ method:: loadDirectory
 load all the SynthDefs in the directory dir.
 argument:: dir
 a link::Classes/String:: which is a valid path.
+argument:: completionMsg
 
 method:: nextNodeID
 get a unique nodeID.
@@ -162,17 +164,33 @@ method:: wait
 this can be used within a link::Classes/Routine:: to wait for a server reply
 
 method:: waitForBoot
-evaluate the function code::func:: as soon as the server has booted. If it is running, it is evaluated immediately. If it is not running, boot the server and evaluate the function. code::limit:: indicates the maximum times to try. (5 times/sec)
+Evaluate "onComplete" as soon as the server has booted. This method will boot the server for you if it is not already running or booting. If the server is already running, "onComplete" is executed immediately.
+argument:: onComplete
+A function to evaluate after the server has booted successfully.
+argument:: limit
+The number of times to check for a successful boot. (5 times/sec)
+argument:: onFailure
+A function to evaluate after the server fails to boot. If onFailure is not given, an error message is posted. Providing a function suppresses the error message. If you want to supply a function and print the normal error message, make sure that your function returns "false," e.g. code::s.waitForBoot(onFailure: { ... custom action...; false })::.
 
 method:: doWhenBooted
-evaluate the function as soon as the server has booted. If it is running, it is evaluated immediately. code::limit:: is the maximum number of times to try. (5 times/sec)
+Evaluate "onComplete" as soon as the server has booted. This method assumes the server is being booted explicitly through a separate code::boot:: call. If the server is already running, "onComplete" is executed immediately.
+argument:: onComplete
+A function to evaluate after the server has booted successfully.
+argument:: limit
+The number of times to check for a successful boot.
+argument:: onFailure
+A function to evaluate after the server fails to boot. If onFailure is not given, an error message is posted. Providing a function suppresses the error message. If you want to supply a function and print the normal error message, make sure that your function returns "false," e.g. code::s.waitForBoot(onFailure: { ... custom action...; false })::.
 
 method:: boot
 boot the remote server, create new allocators.
 argument:: startAliveThread
-if set to false, the server is not queried to give information for the window.
+If true, start a Routine to send a /status message to the server every so often. The interval between the messages is set by code::theServer.aliveThreadPeriod = (seconds)::. The default period is 0.7. If false, /status will not be sent and the server's window will not update.
+argument:: recover
+If true, create a new node ID allocator for the server, but use the old buffer and bus allocators. This is useful if the server process did not actually stop. In normal use, the default value "false" should be used.
+argument:: onFailure
+In this method, the onFailure argument is for internal use only. If you wish to take specific actions when the server boots or fails to boot, it is recommended to use link::#-waitForBoot:: or link::#-doWhenBooted::.
 discussion::
-N.B. You cannot locally boot a server app on a remote machine.
+N.B. You cannot boot a server app on a remote machine.
 
 method:: quit
 quit the server application
@@ -266,7 +284,10 @@ Get number of loaded link::Classes/SynthDef::initions.
 method:: pid
 Get process ID of running server (if not internal).
 
-
+method:: hasShmInterface
+Returns true if a link::Classes/ServerShmInterface:: is available. See also link::Classes/Bus#synchronous_control_bus_methods#Synchronous Control Bus Methods::.
+discussion::
+The shared memory interface is initialized after first server boot.
 
 subsection:: Automatic Message Bundling
 
@@ -274,13 +295,13 @@ Server provides support for automatically bundling messages. This is quite conve
 
 method:: makeBundle
 The Function code::func:: is evaluated, and all OSC messages generated by it are deferred and added to a bundle.
-returns:: The bundle so that it can be further used if needed.
 argument:: time
 If set to nil or a number the bundle will be automatically sent and executed after the corresponding delay in seconds. If code::time:: is set to false the bundle will not be sent.
 argument:: func
 The function to evaluate.
 argument:: bundle
 allows you to pass in a preexisting bundle and continue adding to it.
+returns:: The bundle so that it can be further used if needed.
 discussion::
 Calling code::sync:: inside func will split the bundle and wait for asynchronous actions to complete before continuing.
 
@@ -335,7 +356,7 @@ x.free;
 // use sync
 (
 s.makeBundle(nil, {
-	b = Buffer.read(s, Help.dir +/+ "sounds/a11wlk01.wav");
+	b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
 	s.sync; // wait until load is done and then send the rest of the bundle
 	x = { PlayBuf.ar(1, b) * 0.5 }.play;
 });
@@ -390,11 +411,24 @@ link::Classes/ServerBoot:: and link::Classes/ServerQuit:: provide similar functi
 subsection:: GUI methods
 
 method:: makeGui
-Create and show the server window
+Create and show the server window. The window responds to a number of keyboard shortcuts:
+table::
+## strong::key:: || strong::action::
+## teletype::n:: || Post a representation of this Server's current node tree to the post window. (See link::#-queryAllNodes::)
+## teletype::N:: || As 'n' above but include controls.
+## teletype::l:: || Show input/output level meters. (See link::#-meter::)
+## teletype::p:: || Show graphical view of the node tree. (See link::#-plotTree::)
+## (space) || Boot server if not already booted. (See link::#-boot::)
+## teletype::s:: || Show scope window. (See link::#-scope::)
+## teletype::f:: || Show frequency analyzer window. (See link::#-freqscope::)
+## teletype::d:: || Toggle dumping of OSC messages.
+## teletype::m:: || Toggle mute.
+## teletype::0:: || Reset volume to 0 db.
+::
+
 
 method:: scope
 Open a scope window showing the output of the Server.
-This only works with the internal server.
 see link::Classes/Stethoscope:: for further details.
 
 argument:: numChannels
@@ -409,7 +443,7 @@ argument:: rate
 whether to display audio or control rate buses (either \audio or \control)
 
 method:: freqscope
-Show frequency analyzer window. This only works with the internal server.
+Show frequency analyzer window.
 
 method:: meter
 Show input/output level meters.
@@ -478,14 +512,14 @@ Allocates the necessary buffer, etc. for recording the server's output. (See cod
 argument:: path
 a link::Classes/String:: representing the path and name of the output file.
 discussion::
-If you do not specify a path than a file will be created in your recordings folder (see the note above on this) called SC_thisDateAndTime. Changes to the header or sample format, or to the number of channels must be made BEFORE calling this.
+If you do not specify a path than a file will be created in your recordings folder (see the note above on this) called SC_thisDateAndTime. Changes to the header or sample format, or to the number of channels must be made strong::before:: calling this.
 
 method:: record
 Starts or resumes recording the output.
-discussion::
-If you have not called prepareForRecord first (see above) then it will be invoked for you (but that adds a slight delay before recording starts for real).
 argument:: path
 this is optional, and is passed to code::prepareForRecord:: (above).
+discussion::
+If you have not called prepareForRecord first (see above) then it will be invoked for you (but that adds a slight delay before recording starts for real).
 
 method:: pauseRecording
 Pauses recording. Can be resumed by executing record again.
@@ -499,13 +533,13 @@ method:: recordNode
 Returns:: the current recording synth so that it can be used as a target. This should only be necessary for nodes which are not created in the default group.
 
 method:: recChannels
-Get/set the number of channels (int) to record. The default is two. Must be called BEFORE prepareForRecord.
+Get/set the number of channels (int) to record. The default is two. Must be called strong::before:: prepareForRecord.
 
 method:: recHeaderFormat
-Get/set the header format (string) of the output file. The default is "aiff". Must be called BEFORE prepareForRecord.
+Get/set the header format (string) of the output file. The default is "aiff". Must be called strong::before:: prepareForRecord.
 
 method:: recSampleFormat
-Get/set the sample format (string) of the output file. The default is "float". Must be called BEFORE prepareForRecord.
+Get/set the sample format (string) of the output file. The default is "float". Must be called strong::before:: prepareForRecord.
 
 subsection:: Asynchronous Commands
 
@@ -520,7 +554,7 @@ method:: sendMsgSync
 Send the following message to the wait until it has completed before resuming the thread.
 argument:: condition
 an optional instance of link::Classes/Condition:: used for evaluating this.
-argument:: args
+argument:: ... args
 one or more valid OSC messages.
 
 method:: sync

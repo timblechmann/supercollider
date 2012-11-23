@@ -1,7 +1,7 @@
 class:: FreqScope
-summary:: A nice wrapper for FreqScope
-categories:: GUI
-related:: Classes/FreqScope
+summary:: Frequency spectrum visualizer
+categories:: GUI>Interfaces
+related:: Classes/FreqScopeView
 
 description::
 FreqScope shows the frequency spectrum of the specified audio bus. The scope will remain active after a command-period. To turn it off you must either click off the 'Power' button or close the window.
@@ -30,8 +30,7 @@ An instance of link::Classes/Color::. The background color of the scope.
 discussion::
 Example:
 code::
-// must use internal server
-s = Server.internal.boot;
+s = FreqScope.server.boot;
 
 // create a new analyzer
 FreqScope.new(400, 200, 0);
@@ -48,7 +47,6 @@ FreqScope.new(400, 200, 0);
 // all harmonics
 { Blip.ar(200, Line.kr(1, 100, 10), 0.2) }.play(s);
 ::
-::
 
 subsection:: Subclassing and Internal Methods
 
@@ -64,7 +62,7 @@ subsection:: Subclassing and Internal Methods
 The following methods are usually not used directly or are called by a primitive. Programmers can still call or override these as needed.
 
 method::window
-Returns the window in which the FreqScope view is placed.
+Returns the window in which the link::Classes/FreqScopeView:: is placed.
 
 method:: scope
-Returns the FreqScope.
+Returns the link::Classes/FreqScopeView::.

@@ -42,7 +42,6 @@ QScrollTopView : QScrollView {
 
 QTopView : QView {
   var >window;
-  var <background;
 
   *qtClass {^'QcWindow'}
 
@@ -65,11 +64,6 @@ QTopView : QView {
     this.setProperty( \geometry, rOld.resizeTo( rNew.width, rNew.height ) );
   }
 
-  background_ { arg aColor;
-    background = aColor;
-    this.setProperty( \background, aColor, true );
-  }
-
   drawingEnabled_ { arg bool; this.setProperty( \drawingEnabled, bool ); }
 
   findWindow { ^window; }
@@ -81,16 +75,14 @@ QWindow
 {
   classvar <allWindows, <>initAction;
 
-  var resizable, <drawFunc, <onClose;
+  var resizable, <drawFunc;
   var <view;
 
   //TODO
-  var <>acceptsClickThrough=false, <>acceptsMouseOver=false;
+  var <>acceptsClickThrough=false;
   var <currentSheet;
 
-  *initClass {
-    ShutDown.add( { QWindow.closeAll } );
-  }
+  *implementsClass {^'Window'}
 
   *screenBounds {
     _QWindow_ScreenBounds
@@ -161,7 +153,7 @@ QWindow
     view.setProperty(\geometry, r.resizeTo( w, h ); )
   }
 
-  background { ^view.backgroud; }
+  background { ^view.background; }
 
   background_ { arg aColor; view.background = aColor; }
 
@@ -174,10 +166,8 @@ QWindow
     view.setProperty( \geometry, rect.moveBy( 0, menuSpacer ) );
   }
 
-  onClose_ { arg func;
-    view.manageFunctionConnection( onClose, func, 'destroyed()', false );
-    onClose = func;
-  }
+  onClose { ^view.onClose }
+  onClose_ { arg func; view.onClose_(func) }
 
   // TODO
   addToOnClose{ arg function; }
@@ -211,6 +201,8 @@ QWindow
   toFrontAction { ^view.toFrontAction }
   endFrontAction_ { arg action; view.endFrontAction_(action) }
   endFrontAction { ^view.endFrontAction }
+  acceptsMouseOver { ^view.acceptsMouseOver }
+  acceptsMouseOver_ { arg flag; view.acceptsMouseOver_(flag) }
 
   // ---------------------- private ------------------------------------
 

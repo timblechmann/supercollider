@@ -1,8 +1,12 @@
 QtGUI {
 
+  classvar <style;
+
   *initClass {
     Class.initClassTree( GUI );
     GUI.add( this );
+    this.style = "Plastique";
+    this.palette = QPalette.light;
   }
 
   *id { ^\qt }
@@ -47,7 +51,8 @@ QtGUI {
   *freqScope     { ^PlusFreqScopeWindow }
   *freqScopeView { ^PlusFreqScope }
   *scopeView { ^QScope }
-  *stethoscope { ^QStethoscope }
+  *stethoscope1 { ^QStethoscope }
+  *stethoscope { ^QStethoscope2 }
   *soundFileView { ^QSoundFileView }
   *envelopeView { ^QEnvelopeView }
   *tabletView { ^this.notImplemented( "TabletView"); }
@@ -70,13 +75,18 @@ QtGUI {
   *ezNumber { ^EZNumber}
   *ezRanger { ^EZRanger }
 
+  *hLayout { ^QHLayout }
+  *vLayout { ^QVLayout }
+  *gridLayout { ^QGridLayout }
+  *stackLayout { ^QStackLayout }
+
   *pen { ^QPen }
 
   *font { ^QFont }
   *image { ^this.notImplemented( "Image" ) }
 
   *notImplemented { arg class;
-    ("QtGUI: " ++ class.asString ++ " is not implemented yet").postln;
+    //("QtGUI: " ++ class.asString ++ " is not implemented yet").postln;
     ^nil;
   }
 
@@ -88,8 +98,7 @@ QtGUI {
   }
 
   *style_ { arg styleName;
-    _Qt_SetStyle
-    ^this.primitiveFailed;
+    protect { this.prSetStyle(styleName) } { |err| if(err.isNil){style = styleName} };
   }
 
   *stringBounds { arg aString, aFont;
@@ -128,5 +137,10 @@ QtGUI {
   *prStringBounds { arg aString, aFont;
     _Qt_StringBounds
     ^this.primitiveFailed
+  }
+
+  *prSetStyle { arg name;
+    _Qt_SetStyle
+    ^this.primitiveFailed;
   }
 }

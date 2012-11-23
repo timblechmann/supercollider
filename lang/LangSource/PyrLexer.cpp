@@ -57,7 +57,6 @@
 #include "PyrPrimitiveProto.h"
 #include "PyrKernelProto.h"
 #include "InitAlloc.h"
-#include "bullet.h"
 #include "PredefinedSymbols.h"
 #ifdef SC_WIN32
 #else
@@ -1336,7 +1335,7 @@ void yyerror(const char *s)
 {
 	parseFailed = 1;
 	yytext[yylen] = 0;
-	error("Parse error\n");
+	error("%s\n",s);
 	postErrorLine(lineno, linepos, charno);
 	//Debugger();
 }
@@ -1385,8 +1384,8 @@ void postErrorLine(int linenum, int start, int charpos)
 	//parseFailed = true;
     char extPath[MAXPATHLEN];
     asRelativePath(curfilename, extPath);
-	post("   in file '%s'\n", extPath);
-	post("   line %d char %d:\n", linenum+errLineOffset, charpos);
+	post("  in file '%s'\n", extPath);
+	post("  line %d char %d:\n\n", linenum+errLineOffset, charpos);
 	// nice: postfl previous line for context
 
 	//postfl("text '%s' %d\n", text, text);
@@ -1398,12 +1397,13 @@ void postErrorLine(int linenum, int start, int charpos)
 	}
 	end=i;
 	for (i=start, j=0; i<end && j<255; ++i) {
-		if (i == pos) str[j++] = BULLET_CHAR;
 		str[j++] = text[i];
 	}
-	if (pos == end) str[j++] = BULLET_CHAR;
 	str[j] = 0;
-	post("  %s\n", str);
+	post("  %s\n  ", str);
+	for (i=0; i<charpos-yylen; i++) post(" ");
+	for (i=0; i<yylen; i++) post("^");
+	post("\n");
 
 	i=end+1;
 	if (i<textlen) {
@@ -2167,10 +2167,15 @@ void aboutToCompileLibrary()
 	//printf("->aboutToCompileLibrary\n");
 	pthread_mutex_lock (&gLangMutex);
 	if (compiledOK) {
-		++gMainVMGlobals->sp;
-		SetObject(gMainVMGlobals->sp, gMainVMGlobals->process);
-		runInterpreter(gMainVMGlobals, s_shutdown, 1);
-		gVMGlobals.gc->ScanFinalizers(); // run finalizers
+		VMGlobals *g = gMainVMGlobals;
+
+		g->canCallOS = true;
+
+		++g->sp;
+		SetObject(g->sp, g->process);
+		runInterpreter(g, s_shutdown, 1);
+
+		g->canCallOS = false;
 	}
 	pthread_mutex_unlock (&gLangMutex);
 	//printf("<-aboutToCompileLibrary\n");
@@ -2183,16 +2188,28 @@ void closeAllCustomPorts();
 void shutdownLibrary()
 {
 	closeAllGUIScreens();
+
 	schedStop();
+
 	aboutToCompileLibrary();
 
 	TempoClock_stopAll();
 
 	pthread_mutex_lock (&gLangMutex);
+
 	closeAllCustomPorts();
 
+	if (compiledOK) {
+		VMGlobals *g = gMainVMGlobals;
+		g->canCallOS = true;
+		g->gc->RunAllFinalizers();
+		g->canCallOS = false;
+	}
+
 	pyr_pool_runtime->FreeAll();
+
 	compiledOK = false;
+
 	pthread_mutex_unlock (&gLangMutex);
 }
 
@@ -2275,7 +2292,7 @@ SC_DLLEXPORT_C void runLibrary(PyrSymbol* selector)
 		}
 		error(ex.what());
 	} catch (...) {
-		postfl(BULLET"DANGER: OUT of MEMORY. Operation failed.\n");
+		postfl("DANGER: OUT of MEMORY. Operation failed.\n");
 	}
         g->canCallOS = false;
 }

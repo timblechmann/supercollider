@@ -4,13 +4,9 @@
 		zoom = zoom ? 1.0;
 
 		if(scopeWindow.isNil) {
-			if ((GUI.id == \qt) and: (this.isLocal)) {
-				scopeWindow = \QStethoscope2.asClass.new(this, numChannels, index, bufsize, 1024 * zoom.asFloat.reciprocal, rate);
-			} {
-				scopeWindow = Stethoscope(this, numChannels, index, bufsize, zoom, rate, nil,
-					this.options.numBuffers);
+			scopeWindow = Stethoscope(this, numChannels, index, bufsize, zoom, rate, nil,
+				this.options.numBuffers);
 				// prevent buffer conflicts by using reserved bufnum
-			};
 			scopeWindow.window.onClose = scopeWindow.window.onClose.addFunc({ scopeWindow = nil });
 			ServerTree.add(this, this);
 		} {
@@ -22,7 +18,9 @@
 	}
 
 	freqscope {
-		GUI.freqScope.new;
+		GUI.current.freqScopeView.tryPerform('server_', this);
+		// FIXME: Can not change server in SwingOSC GUI.
+		^GUI.freqScope.new;
 	}
 }
 
@@ -37,15 +35,12 @@
 	scope { arg numChannels, outbus = 0, fadeTime = 0.05, bufsize = 4096, zoom;
 		var synth, synthDef, bytes, synthMsg, outUGen, server;
 
-		if (GUI.id == \qt) {
-			server = Server.default;
-		} {
-			server = GUI.stethoscope.defaultServer;
-			if(server.serverRunning.not) {
-				(server.name.asString ++ " server not running!").postln;
-				^nil
-			}
+		server = GUI.stethoscope.defaultServer;
+		if(server.serverRunning.not) {
+			(server.name.asString ++ " server not running!").postln;
+			^nil
 		};
+
 		synthDef = this.asSynthDef(name: SystemSynthDefs.generateTempName, fadeTime:fadeTime);
 		outUGen = synthDef.children.detect { |ugen| ugen.class === Out };
 
@@ -59,7 +54,8 @@
 	}
 
 	freqscope {
-		var server = if (GUI.id == \qt) { Server.default } { GUI.stethoscope.defaultServer };
+		var server = if (GUI.id === \swing)
+			{ GUI.freqScopeView.audioServer } { GUI.freqScopeView.server };
 		this.play(server);
 		^GUI.freqScope.new
 	}

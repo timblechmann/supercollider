@@ -44,14 +44,20 @@ Free : UGen {
 
 EnvGen : UGen { // envelope generator
 	*ar { arg envelope, gate = 1.0, levelScale = 1.0, levelBias = 0.0, timeScale = 1.0, doneAction = 0;
-		^this.multiNewList(['audio', gate, levelScale, levelBias, timeScale, doneAction, `envelope])
+		envelope = this.convertEnv(envelope);
+		^this.multiNewList(['audio', gate, levelScale, levelBias, timeScale, doneAction, envelope])
 	}
 	*kr { arg envelope, gate = 1.0, levelScale = 1.0, levelBias = 0.0, timeScale = 1.0, doneAction = 0;
-		^this.multiNewList(['control', gate, levelScale, levelBias, timeScale, doneAction, `envelope])
+		envelope = this.convertEnv(envelope);
+		^this.multiNewList(['control', gate, levelScale, levelBias, timeScale, doneAction, envelope])
 	}
-	*new1 { arg rate, gate, levelScale, levelBias, timeScale, doneAction, envelope;
+	*convertEnv { arg env;
+		if(env.isSequenceableCollection) { ^env.reference }; // raw envelope data
+		^env.asMultichannelArray.collect(_.reference).unbubble
+	}
+	*new1 { arg rate, gate, levelScale, levelBias, timeScale, doneAction, envArray;
 		^super.new.rate_(rate).addToSynth.init([gate, levelScale, levelBias, timeScale, doneAction]
-			++ envelope.dereference.asUGenInput.asArray);
+			++ envArray.dereference);
 	}
  	init { arg theInputs;
  		// store the inputs as an array

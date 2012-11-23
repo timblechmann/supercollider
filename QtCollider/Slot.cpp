@@ -22,6 +22,7 @@
 #include "Slot.h"
 #include "QObjectProxy.h"
 #include "Common.h"
+#include "primitives/prim_QPalette.hpp"
 
 #include <PyrObject.h>
 #include <PyrKernel.h>
@@ -30,6 +31,7 @@
 
 #include <QPalette>
 #include <QWidget>
+#include <QVector>
 
 #include <qmath.h>
 
@@ -48,7 +50,7 @@ static QPalette::ColorRole paletteColorRoles[] = {
 
 void Slot::setRect( PyrSlot *slot, const QRectF &r )
 {
-  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, class_Rect, 0, true, true );
+  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, SC_CLASS(Rect), 0, true, true );
   SetObject( slot, obj );
 
   PyrSlot *slots = obj->slots;
@@ -60,7 +62,7 @@ void Slot::setRect( PyrSlot *slot, const QRectF &r )
 
 void Slot::setPoint( PyrSlot *slot, const QPointF &pt )
 {
-  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, class_Point, 0, true, true );
+  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, SC_CLASS(Point), 0, true, true );
   SetObject( slot, obj );
 
   PyrSlot *slots = obj->slots;
@@ -70,7 +72,7 @@ void Slot::setPoint( PyrSlot *slot, const QPointF &pt )
 
 void Slot::setSize( PyrSlot *slot, const QSizeF &sz )
 {
-  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, class_Size, 0, true, true );
+  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, SC_CLASS(Size), 0, true, true );
   SetObject( slot, obj );
 
   PyrSlot *slots = obj->slots;
@@ -81,13 +83,18 @@ void Slot::setSize( PyrSlot *slot, const QSizeF &sz )
 void Slot::setString( PyrSlot *slot, const QString& arg )
 {
   PyrString *str = newPyrString( gMainVMGlobals->gc,
-                                 arg.toStdString().c_str(), 0, true );
+                                 arg.toUtf8().constData(), 0, true );
   SetObject( slot, str );
 }
 
 void Slot::setColor( PyrSlot *slot, const QColor &c )
 {
-  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, class_Color, 0, true, true );
+  if(!c.isValid()) {
+    SetNil(slot);
+    return;
+  }
+
+  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, SC_CLASS(Color), 0, true, true );
   SetObject( slot, obj );
 
   PyrSlot *slots = obj->slots;
@@ -100,15 +107,10 @@ void Slot::setColor( PyrSlot *slot, const QColor &c )
 void Slot::setPalette( PyrSlot *slot, const QPalette &plt )
 {
   PyrGC *gc = gMainVMGlobals->gc;
-  PyrObject *obj = instantiateObject( gc, class_QPalette, 0, true, true );
+  PyrObject *obj = instantiateObject( gc, SC_CLASS(QPalette), 0, true, true );
   SetObject( slot, obj );
 
-  PyrSlot *s = obj->slots;
-
-  for( int i=0; i<8; ++i, ++s ) {
-    setColor( s, plt.color( paletteColorRoles[i] ) );
-    gc->GCWrite( obj, s );
-  }
+  QPalette_Init( gMainVMGlobals, obj, plt );
 }
 
 void Slot::setQObject( PyrSlot *s, QObject *o )
@@ -127,7 +129,7 @@ void Slot::setQObject( PyrSlot *s, QObject *o )
 
 void Slot::setTreeWidgetItem( PyrSlot *s, const SafePtr<QcTreeWidget::Item> & itemPtr )
 {
-  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, class_QTreeViewItem, 0, true, true );
+  PyrObject *obj = instantiateObject( gMainVMGlobals->gc, SC_CLASS(QTreeViewItem), 0, true, true );
   QcTreeWidget::Item::initialize( gMainVMGlobals, obj, itemPtr );
   SetObject( s, obj );
 }
@@ -149,6 +151,40 @@ void Slot::setVariantList( PyrSlot *slot, const VariantList& varList )
     }
     array->size++;
     g->gc->GCWrite( array, s );
+  }
+}
+
+template<typename numeric_type>
+static void setNumeric( PyrSlot *, numeric_type );
+
+
+template<> inline
+void setNumeric<double>( PyrSlot *s, double val )
+{
+  SetFloat( s, val );
+}
+
+template<> inline
+void setNumeric<int>( PyrSlot *s, int val )
+{
+  SetInt( s, val );
+}
+
+template<typename numeric_type>
+static void setNumericVector( PyrSlot *slot, const QVector<numeric_type> & vec )
+{
+  VMGlobals *g = gMainVMGlobals;
+
+  int count = vec.count();
+
+  PyrObject *array = newPyrArray( g->gc, count, 0, true );
+  SetObject( slot, array );
+
+  PyrSlot *s = array->slots;
+  Q_FOREACH( numeric_type val, vec ) {
+    setNumeric<numeric_type>( s, val );
+    ++array->size;
+    ++s;
   }
 }
 
@@ -177,6 +213,10 @@ bool Slot::setVariant( PyrSlot *slot, const QVariant &val )
     case QMetaType::QRect:
     case QMetaType::QRectF:
         Slot::setRect( slot, val.toRectF() );
+        break;
+
+    case QMetaType::QChar:
+        SetChar( slot, val.toChar().toLatin1() );
         break;
 
     case QMetaType::QString:
@@ -219,6 +259,12 @@ bool Slot::setVariant( PyrSlot *slot, const QVariant &val )
         else if( type == qMetaTypeId<VariantList>() ) {
           Slot::setVariantList( slot, val.value<VariantList>() );
         }
+        else if( type == qMetaTypeId< QVector<double> >() ) {
+          setNumericVector( slot, val.value< QVector<double> >() );
+        }
+        else if( type == qMetaTypeId< QVector<int> >() ) {
+          setNumericVector( slot, val.value< QVector<int> >() );
+        }
         else if( type == qMetaTypeId<QcTreeWidget::ItemPtr>() ) {
           Slot::setTreeWidgetItem( slot, val.value< QtCollider::SafePtr<QcTreeWidget::Item> >() );
         }
@@ -260,18 +306,18 @@ double Slot::toDouble( PyrSlot *slot )
 QString Slot::toString( PyrSlot *slot )
 {
   if( IsSym(slot) ) {
-    return QString( slotRawSymbol(slot)->name );
+    return QString::fromUtf8( slotRawSymbol(slot)->name );
   }
-  else if( isKindOfSlot( slot, class_String ) ) {
+  else if( isKindOfSlot( slot, class_string ) ) {
     int len = slotRawObject( slot )->size;
-    return QString::fromAscii( slotRawString(slot)->s, len );
+    return QString::fromUtf8( slotRawString(slot)->s, len );
   }
   return QString();
 }
 
 QPointF Slot::toPoint( PyrSlot *slot )
 {
-  if( !isKindOfSlot( slot, class_Point ) ) {
+  if( !isKindOfSlot( slot, SC_CLASS(Point) ) ) {
     return QPointF();
   }
   PyrSlot *slots = slotRawObject( slot )->slots;
@@ -284,7 +330,7 @@ QPointF Slot::toPoint( PyrSlot *slot )
 
 QRectF Slot::toRect( PyrSlot *slot )
 {
-  if( !isKindOfSlot( slot, class_Rect ) ) {
+  if( !isKindOfSlot( slot, SC_CLASS(Rect) ) ) {
     return QRectF();
   }
 
@@ -301,7 +347,7 @@ QRectF Slot::toRect( PyrSlot *slot )
 
 QSizeF Slot::toSize( PyrSlot *slot )
 {
-  if( !isKindOfSlot( slot, class_Size ) ) {
+  if( !isKindOfSlot( slot, SC_CLASS(Size) ) ) {
     return QSizeF();
   }
 
@@ -313,30 +359,59 @@ QSizeF Slot::toSize( PyrSlot *slot )
   return QSizeF( w, h );
 }
 
-QColor Slot::toColor( PyrSlot *slot )
-{
-  if( !isKindOfSlot( slot, class_Color) )
-    return QColor();
+namespace QtCollider {
+namespace Slot {
 
-  PyrSlot *slots = slotRawObject(slot)->slots;
+QColor asColor( PyrObject *obj )
+{
+  PyrSlot *slots = obj->slots;
 
   float r,g,b,a;
   r = g = b = a = 0.f;
   int err;
   err = slotFloatVal(slots+0, &r);
-  if (err) return err;
+  if (err) return QColor();
   err = slotFloatVal(slots+1, &g);
-  if (err) return err;
+  if (err) return QColor();
   err = slotFloatVal(slots+2, &b);
-  if (err) return err;
+  if (err) return QColor();
   err = slotFloatVal(slots+3, &a);
-  if (err) return err;
+  if (err) return QColor();
   return QColor( r*255, g*255, b*255, a*255 );
+}
+
+}
+}
+
+QColor Slot::toColor( PyrSlot *slot )
+{
+  if( NotObj(slot) ) return QColor();
+
+  PyrObject *obj = slotRawObject(slot);
+  PyrClass *klass = obj->classptr;
+
+  if( klass == SC_CLASS(Color) )
+    return asColor(obj);
+
+  if( klass == SC_CLASS(Gradient) || klass == SC_CLASS(HiliteGradient) )
+  {
+    qcWarningMsg("WARNING: Gradient and HiliteGradient are not supported yet."
+      " Using the average gradient color instead.");
+
+    QColor c1( toColor(obj->slots+0) );
+    QColor c2( toColor(obj->slots+1) );
+    QColor mix( (c1.red() + c2.red()) / 2,
+                (c1.green() + c2.green()) / 2,
+                (c1.blue() + c2.blue()) / 2 );
+    return mix;
+  }
+
+  return QColor();
 }
 
 QFont Slot::toFont( PyrSlot *slot )
 {
-  if( !isKindOfSlot( slot, class_QFont ) )
+  if( !isKindOfSlot( slot, SC_CLASS(QFont) ) )
     return QFont();
 
   PyrSlot *slots = slotRawObject(slot)->slots;
@@ -370,24 +445,16 @@ QFont Slot::toFont( PyrSlot *slot )
 
 QPalette Slot::toPalette( PyrSlot *slot )
 {
-  if( !isKindOfSlot( slot, class_QPalette ) )
+  if( !isKindOfSlot( slot, SC_CLASS(QPalette) ) )
     return QPalette();
 
-  PyrSlot *slots = slotRawObject( slot )->slots;
-  QPalette palette;
-
-  for( int i=0; i<8; ++i, ++slots ) {
-    QColor c = Slot::toColor(slots);
-    if( !c.isValid() ) continue;
-    palette.setColor( paletteColorRoles[i], c );
-  }
-
-  return palette;
+  QPalette *p = QPALETTE_FROM_OBJECT(slotRawObject(slot));
+  return *p;
 }
 
 VariantList Slot::toVariantList( PyrSlot *slot )
 {
-  if( isKindOfSlot( slot, class_Array ) ) {
+  if( isKindOfSlot( slot, class_array ) ) {
     PyrObject *obj = slotRawObject( slot );
     PyrSlot *slots = obj->slots;
     int size = obj->size;
@@ -396,7 +463,7 @@ VariantList Slot::toVariantList( PyrSlot *slot )
       list.data << Slot::toVariant( slots );
     return list;
   }
-  else if( isKindOfSlot( slot, class_SymbolArray ) ) {
+  else if( isKindOfSlot( slot, class_symbolarray ) ) {
     PyrSymbolArray *symarray = slotRawSymbolArray( slot );
     PyrSymbol **symbols = symarray->symbols;
     int size = symarray->size;
@@ -409,9 +476,46 @@ VariantList Slot::toVariantList( PyrSlot *slot )
   return VariantList();
 }
 
+#define WRONG_OBJECT_FORMAT false
+
+template<typename DEST, typename ORIG>
+inline static void copy( QVector<DEST> & dest, PyrSlot *orig, int size )
+{
+  ORIG *array = (ORIG*) orig;
+  for( int i = 0; i < size; ++i )
+    dest << DEST(array[i]);
+}
+
+template<typename numeric_type>
+static QVector<numeric_type> toNumericVector( PyrObject *obj )
+{
+  int size = obj->size;
+  PyrSlot *slots = obj->slots;
+
+  QVector<numeric_type> vector;
+  vector.reserve(size);
+
+  switch (obj->obj_format) {
+    case obj_double:
+      copy<numeric_type, double>( vector, slots, size ); break;
+    case obj_float:
+      copy<numeric_type, float>( vector, slots, size ); break;
+    case obj_int32:
+      copy<numeric_type, int32>( vector, slots, size ); break;
+    case obj_int16:
+      copy<numeric_type, int16>( vector, slots, size ); break;
+    case obj_int8:
+      copy<numeric_type, int8>( vector, slots, size ); break;
+    default:
+      Q_ASSERT( WRONG_OBJECT_FORMAT );
+  }
+
+  return vector;
+}
+
 QObjectProxy* Slot::toObjectProxy( PyrSlot *slot )
 {
-  if( !isKindOfSlot( slot, class_QObject ) ) return 0;
+  if( !isKindOfSlot( slot, SC_CLASS(QObject) ) ) return 0;
   QObjectProxy *proxy = 0;
   PyrSlot *proxySlot = slotRawObject( slot )->slots;
   if( IsPtr( proxySlot ) ) proxy = (QObjectProxy*) slotRawPtr( proxySlot );
@@ -420,7 +524,7 @@ QObjectProxy* Slot::toObjectProxy( PyrSlot *slot )
 
 QcTreeWidget::ItemPtr Slot::toTreeWidgetItem( PyrSlot *slot )
 {
-  if( !isKindOfSlot( slot, class_QTreeViewItem ) ) return QcTreeWidget::ItemPtr();
+  if( !isKindOfSlot( slot, SC_CLASS(QTreeViewItem) ) ) return QcTreeWidget::ItemPtr();
   PyrSlot *ptrSlot = slotRawObject(slot)->slots+0;
   if( IsPtr( ptrSlot ) ) {
     QcTreeWidget::ItemPtr *safePtr = static_cast<QcTreeWidget::ItemPtr*>( slotRawPtr(ptrSlot) );
@@ -435,52 +539,67 @@ QVariant Slot::toVariant( PyrSlot *slot )
 {
   QObjectProxy *proxy;
   switch (GetTag(slot)) {
-    case tagChar :
     case tagNil :
       return QVariant();
     case tagInt :
       return QVariant( toInt(slot) );
     case tagSym :
       return QVariant( toString(slot) );
+    case tagChar :
+      return QVariant( QChar(slotRawChar(slot)) );
     case tagFalse :
       return QVariant( false );
     case tagTrue :
       return QVariant( true );
     case tagObj :
     {
-      if( isKindOfSlot( slot, class_String ) ) {
+      PyrObject *obj = slotRawObject(slot);
+      PyrClass *klass = obj->classptr;
+      unsigned char format = obj->obj_format;
+
+      if( format == obj_double || format == obj_float )
+        return QVariant::fromValue< QVector<double> >( toNumericVector<double>(obj) );
+
+      else if( format == obj_int32 || format == obj_int16 || format == obj_int8 )
+        return QVariant::fromValue< QVector<int> >( toNumericVector<int>(obj) );
+
+      else if( isKindOfSlot( slot, class_string ) ) {
         return QVariant( toString(slot) );
       }
-      else if( isKindOfSlot( slot, class_Point ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(Point) ) ) {
         return QVariant( toPoint( slot ) );
       }
-      else if( isKindOfSlot( slot, class_Rect ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(Rect) ) ) {
         return QVariant( toRect(slot) );
       }
-      else if( isKindOfSlot( slot, class_Size ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(Size) ) ) {
         return QVariant( toSize(slot) );
       }
-      else if( isKindOfSlot( slot, class_Color) ) {
+      else if( klass == SC_CLASS(Color) ||
+        klass == SC_CLASS(Gradient) ||
+        klass == SC_CLASS(HiliteGradient) )
+      {
         return QVariant::fromValue<QColor>( toColor(slot) );
       }
-      else if( isKindOfSlot( slot, class_QFont ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(QFont) ) ) {
         return QVariant::fromValue<QFont>( toFont(slot) );
       }
-      else if( isKindOfSlot( slot, class_QPalette ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(QPalette) ) ) {
         return QVariant::fromValue<QPalette>( toPalette(slot) );
       }
-      else if( isKindOfSlot( slot, class_QObject ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(QObject) ) ) {
         proxy = toObjectProxy(slot);
         return QVariant::fromValue<QObjectProxy*>( proxy );
       }
-      else if( isKindOfSlot( slot, class_Array ) || isKindOfSlot( slot, class_SymbolArray ) ) {
+      else if( isKindOfSlot( slot, class_array ) || isKindOfSlot( slot, class_symbolarray ) ) {
         return QVariant::fromValue<VariantList>( toVariantList(slot) );
       }
-      else if( isKindOfSlot( slot, class_QTreeViewItem ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(QTreeViewItem) ) ) {
         return QVariant::fromValue<QcTreeWidget::ItemPtr>( toTreeWidgetItem(slot) );
       }
       else {
-        qcErrorMsg("Could not interpret slot!");
+        QString className = Slot::toString( &slotRawObject(slot)->classptr->name );
+        qcWarningMsg(QString("WARNING: Do not know how to use an instance of class '%1'").arg(className));
         return QVariant();
       }
     }
@@ -495,7 +614,6 @@ void QtCollider::Variant::setData( PyrSlot *slot )
 {
   QObjectProxy *proxy;
   switch (GetTag(slot)) {
-    case tagChar :
     case tagNil :
       _type = QMetaType::Void;
       _ptr = 0;
@@ -508,6 +626,10 @@ void QtCollider::Variant::setData( PyrSlot *slot )
       _type = QMetaType::QString;
       _ptr = new QString( toString(slot) );
       break;
+    case tagChar :
+      _type = QMetaType::QChar;
+      _ptr = new QChar( slotRawChar(slot) );
+      break;
     case tagFalse :
       _type = QMetaType::Bool;
       _ptr = new bool( false );
@@ -518,31 +640,46 @@ void QtCollider::Variant::setData( PyrSlot *slot )
       break;
     case tagObj :
     {
-      if( isKindOfSlot( slot, class_String ) ) {
+      PyrObject *obj = slotRawObject(slot);
+      PyrClass *klass = obj->classptr;
+      unsigned char format = obj->obj_format;
+
+      if( format == obj_double || format == obj_float ) {
+        _type = qMetaTypeId< QVector<double> >();
+        _ptr = new QVector<double>( toNumericVector<double>(obj) );
+      }
+      else if( format == obj_int32 || format == obj_int16 || format == obj_int8 ) {
+        _type = qMetaTypeId< QVector<int> >();
+        _ptr = new QVector<int>( toNumericVector<int>(obj) );
+      }
+      else if( isKindOfSlot( slot, class_string ) ) {
         _type = QMetaType::QString;
         _ptr = new QString( toString(slot) );
       }
-      else if( isKindOfSlot( slot, class_Point ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(Point) ) ) {
         _type = QMetaType::QPointF;
         _ptr = new QPointF( toPoint(slot) );
       }
-      else if( isKindOfSlot( slot, class_Rect ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(Rect) ) ) {
         _type = QMetaType::QRectF;
         _ptr = new QRectF( toRect(slot) );
       }
-      else if( isKindOfSlot( slot, class_Size ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(Size) ) ) {
         _type = QMetaType::QSizeF;
         _ptr = new QSizeF( toSize(slot) );
       }
-      else if( isKindOfSlot( slot, class_Color) ) {
+      else if( klass == SC_CLASS(Color) ||
+        klass == SC_CLASS(Gradient) ||
+        klass == SC_CLASS(HiliteGradient) )
+      {
         _type = QMetaType::QColor;
         _ptr = new QColor( toColor(slot) );
       }
-      else if( isKindOfSlot( slot, class_Array ) || isKindOfSlot( slot, class_SymbolArray ) ) {
+      else if( isKindOfSlot( slot, class_array ) || isKindOfSlot( slot, class_symbolarray ) ) {
         _type = qMetaTypeId<VariantList>();
         _ptr = new VariantList( toVariantList(slot) );
       }
-      else if( isKindOfSlot( slot, class_QObject ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(QObject) ) ) {
         proxy = toObjectProxy(slot);
         if( !proxy ) {
           _type = QMetaType::Void;
@@ -553,12 +690,13 @@ void QtCollider::Variant::setData( PyrSlot *slot )
           _ptr = new QObjectProxy*( proxy );
         }
       }
-      else if( isKindOfSlot( slot, class_QTreeViewItem ) ) {
+      else if( isKindOfSlot( slot, SC_CLASS(QTreeViewItem) ) ) {
         _type = qMetaTypeId<QcTreeWidget::ItemPtr>();
         _ptr = new QcTreeWidget::ItemPtr( toTreeWidgetItem(slot) );
       }
       else {
-        qcErrorMsg("Could not interpret slot!");
+        QString className = Slot::toString( &slotRawObject(slot)->classptr->name );
+        qcWarningMsg(QString("WARNING: Do not know how to use an instance of class '%1'").arg(className));
         _type = QMetaType::Void;
         _ptr = 0;
       }

@@ -67,22 +67,17 @@ String[char] : RawArray {
 		^this.primitiveFailed
 	}
 
-	getSCDir {
-		_String_GetResourceDirPath
-		^this.primitiveFailed
-	}
-
 	*scDir {
-		^"".getSCDir
+		^Platform.resourceDir
 	}
 
 	compare { arg aString, ignoreCase=false; _StringCompare }
-	< { arg aString; ^this.compare(aString, true) < 0 }
-	> { arg aString; ^this.compare(aString, true) > 0 }
-	<= { arg aString; ^this.compare(aString, true) <= 0 }
-	>= { arg aString; ^this.compare(aString, true) >= 0 }
-	== { arg aString; ^this.compare(aString, true) == 0 }
-	!= { arg aString; ^this.compare(aString, true) != 0 }
+	< { arg aString; ^this.compare(aString, false) < 0 }
+	> { arg aString; ^this.compare(aString, false) > 0 }
+	<= { arg aString; ^this.compare(aString, false) <= 0 }
+	>= { arg aString; ^this.compare(aString, false) >= 0 }
+	== { arg aString; ^this.compare(aString, false) == 0 }
+	!= { arg aString; ^this.compare(aString, false) != 0 }
 	hash { _StringHash }
 
 	// no sense doing collect as per superclass collection
@@ -138,8 +133,8 @@ String[char] : RawArray {
 		});
 		Error(this).throw;
 	}
-	error { "ERROR:\n".post; this.postln; }
-	warn { "WARNING:\n".post; this.postln }
+	error { "ERROR: ".post; this.postln; }
+	warn { "WARNING: ".post; this.postln }
 	inform { ^this.postln }
 	++ { arg anObject; ^this prCat: anObject.asString; }
 	+ { arg anObject; ^this prCat: " " prCat: anObject.asString; }
@@ -167,21 +162,6 @@ String[char] : RawArray {
 			string = string prCat: ", " ++ item;
 		});
 		^string
-	}
-	split { arg separator=$/;
-		var word="";
-		var array=[];
-		separator=separator.ascii;
-
-		this.do({arg let,i;
-			if(let.ascii != separator ,{
-				word=word++let;
-			},{
-				array=array.add(word);
-				word="";
-			});
-		});
-		^array.add(word);
 	}
 
 	containsStringAt { arg index, string;
@@ -250,7 +230,9 @@ String[char] : RawArray {
 	escapeChar { arg charToEscape; // $"
 		_String_EscapeChar
 	}
-
+	shellQuote {
+		^"'"++this.replace("'","'\\''")++"'"
+	}
 	quote {
 		^"\"" ++ this ++ "\""
 	}
@@ -265,7 +247,7 @@ String[char] : RawArray {
 	}
 
 	wrapExtend { arg size;
-		^this.dup(size div: this.size).join
+		^this.dup(size div: this.size).join ++ this.keep(size % this.size)
 	}
 
 	zeroPad {
@@ -366,10 +348,10 @@ String[char] : RawArray {
 	resolveRelative {
 		var path, caller;
 		caller = thisMethod.getBackTrace.caller.functionDef;
-		if(caller == Interpreter.findMethod(\interpretPrintCmdLine), {
-			path = thisProcess.nowExecutingPath;
-		}, {
+		if(caller.isKindOf(Method) && (caller != Interpreter.findMethod(\interpretPrintCmdLine)), {
 			path = caller.filenameSymbol.asString;
+		}, {
+			path = thisProcess.nowExecutingPath;
 		});
 		if(this[0] == thisProcess.platform.pathSeparator, {^this});
 		if(path.isNil) { Error("can't resolve relative to an unsaved file").throw};
@@ -500,4 +482,15 @@ String[char] : RawArray {
 	mkdir {
 		File.mkdir(this);
 	}
+
+	parseYAML {
+		_String_ParseYAML
+		^this.primitiveFailed
+	}
+
+	parseYAMLFile {
+		_String_ParseYAMLFile
+		^this.primitiveFailed
+	}
+
 }

@@ -224,7 +224,6 @@ struct Pluck : public FeedbackDelay, CubicInterpolationUnit
 
 struct LocalBuf : public Unit
 {
-	float m_fbufnum;
 	SndBuf *m_buf;
 };
 
@@ -233,16 +232,10 @@ struct MaxLocalBufs : public Unit
 };
 
 struct SetBuf : public Unit
-{
-	float m_fbufnum;
-	SndBuf *m_buf;
-};
+{};
 
 struct ClearBuf : public Unit
-{
-	float m_fbufnum;
-	SndBuf *m_buf;
-};
+{};
 
 struct DelTapWr : public Unit
 {
@@ -329,14 +322,11 @@ extern "C"
 
 	void LocalBuf_Ctor(LocalBuf *unit);
 	void LocalBuf_Dtor(LocalBuf *unit);
-	void LocalBuf_next(LocalBuf *unit, int inNumSamples);
 
 	void MaxLocalBufs_Ctor(MaxLocalBufs *unit);
 
 	void SetBuf_Ctor(SetBuf *unit);
-	void SetBuf_next(SetBuf *unit, int inNumSamples);
 	void ClearBuf_Ctor(ClearBuf *unit);
-	void ClearBuf_next(ClearBuf *unit, int inNumSamples);
 
 	void BufDelayN_Ctor(BufDelayN *unit);
 	void BufDelayN_next(BufDelayN *unit, int inNumSamples);
@@ -552,6 +542,26 @@ void NumRunningSynths_next(Unit *unit, int inNumSamples)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+#define CTOR_GET_BUF \
+	float fbufnum  = ZIN0(0); \
+	fbufnum = sc_max(0.f, fbufnum); \
+	uint32 bufnum = (int)fbufnum; \
+	World *world = unit->mWorld; \
+	SndBuf *buf; \
+	if (bufnum >= world->mNumSndBufs) { \
+		int localBufNum = bufnum - world->mNumSndBufs; \
+		Graph *parent = unit->mParent; \
+		if(localBufNum <= parent->localBufNum) { \
+			buf = parent->mLocalSndBufs + localBufNum; \
+		} else { \
+			bufnum = 0; \
+			buf = world->mSndBufs + bufnum; \
+		} \
+	} else { \
+		buf = world->mSndBufs + bufnum; \
+	}
+
 void BufSampleRate_next(BufInfoUnit *unit, int inNumSamples)
 {
 	SIMPLE_GET_BUF_SHARED
@@ -561,8 +571,9 @@ void BufSampleRate_next(BufInfoUnit *unit, int inNumSamples)
 void BufSampleRate_Ctor(BufInfoUnit *unit, int inNumSamples)
 {
 	SETCALC(BufSampleRate_next);
-	unit->m_fbufnum = -1e9f;
-	SIMPLE_GET_BUF_SHARED
+	CTOR_GET_BUF
+	unit->m_fbufnum = fbufnum;
+	unit->m_buf = buf;
 	ZOUT0(0) = buf->samplerate;
 }
 
@@ -576,23 +587,25 @@ void BufFrames_next(BufInfoUnit *unit, int inNumSamples)
 void BufFrames_Ctor(BufInfoUnit *unit, int inNumSamples)
 {
 	SETCALC(BufFrames_next);
-	unit->m_fbufnum = -1.f;
-	SIMPLE_GET_BUF_SHARED
+	CTOR_GET_BUF
+	unit->m_fbufnum = fbufnum;
+	unit->m_buf = buf;
 	ZOUT0(0) = buf->frames;
 }
 
 
 void BufDur_next(BufInfoUnit *unit, int inNumSamples)
 {
-	SIMPLE_GET_BUF
+	SIMPLE_GET_BUF_SHARED
 	ZOUT0(0) = buf->frames * buf->sampledur;
 }
 
 void BufDur_Ctor(BufInfoUnit *unit, int inNumSamples)
 {
 	SETCALC(BufDur_next);
-	unit->m_fbufnum = -1e9f;
-	SIMPLE_GET_BUF_SHARED
+	CTOR_GET_BUF
+	unit->m_fbufnum = fbufnum;
+	unit->m_buf = buf;
 	ZOUT0(0) = buf->frames * buf->sampledur;
 }
 
@@ -606,8 +619,9 @@ void BufChannels_next(BufInfoUnit *unit, int inNumSamples)
 void BufChannels_Ctor(BufInfoUnit *unit, int inNumSamples)
 {
 	SETCALC(BufChannels_next);
-	unit->m_fbufnum = -1e9f;
-	SIMPLE_GET_BUF_SHARED
+	CTOR_GET_BUF
+	unit->m_fbufnum = fbufnum;
+	unit->m_buf = buf;
 	ZOUT0(0) = buf->channels;
 }
 
@@ -621,8 +635,9 @@ void BufSamples_next(BufInfoUnit *unit, int inNumSamples)
 void BufSamples_Ctor(BufInfoUnit *unit, int inNumSamples)
 {
 	SETCALC(BufSamples_next);
-	unit->m_fbufnum = -1e9f;
-	SIMPLE_GET_BUF_SHARED
+	CTOR_GET_BUF
+	unit->m_fbufnum = fbufnum;
+	unit->m_buf = buf;
 	ZOUT0(0) = buf->samples;
 }
 
@@ -636,8 +651,9 @@ void BufRateScale_next(BufInfoUnit *unit, int inNumSamples)
 void BufRateScale_Ctor(BufInfoUnit *unit, int inNumSamples)
 {
 	SETCALC(BufRateScale_next);
-	unit->m_fbufnum = -1e9f;
-	SIMPLE_GET_BUF_SHARED
+	CTOR_GET_BUF
+	unit->m_fbufnum = fbufnum;
+	unit->m_buf = buf;
 	ZOUT0(0) = buf->samplerate * unit->mWorld->mFullRate.mSampleDur;
 }
 
@@ -669,6 +685,9 @@ static void LocalBuf_allocBuffer(LocalBuf *unit, SndBuf *buf, int numChannels, i
 	buf->mask1    = buf->mask - 1;	// for oscillators
 	buf->samplerate = unit->mWorld->mSampleRate;
 	buf->sampledur = 1. / buf->samplerate;
+#if SUPERNOVA
+	buf->isLocal  = true;
+#endif
 }
 
 
@@ -680,24 +699,21 @@ void LocalBuf_Ctor(LocalBuf *unit)
 
 	int offset =  unit->mWorld->mNumSndBufs;
 	int bufnum =  parent->localBufNum;
+	float fbufnum;
 
 	if (parent->localBufNum >= parent->localMaxBufNum) {
-		unit->m_fbufnum = -1.f;
-		if(unit->mWorld->mVerbosity > -2){
+		fbufnum = -1.f;
+		if(unit->mWorld->mVerbosity > -2)
 			printf("warning: LocalBuf tried to allocate too many local buffers.\n");
-		}
-
 	} else {
-
-		unit->m_fbufnum = (float) (bufnum + offset);
+		fbufnum = (float) (bufnum + offset);
 		unit->m_buf =  parent->mLocalSndBufs + bufnum;
 		parent->localBufNum = parent->localBufNum + 1;
 
 		LocalBuf_allocBuffer(unit, unit->m_buf, (int)IN0(0), (int)IN0(1));
 	}
 
-	OUT0(0) = unit->m_fbufnum;
-
+	OUT0(0) = fbufnum;
 }
 
 void LocalBuf_Dtor(LocalBuf *unit)
@@ -709,12 +725,9 @@ void LocalBuf_Dtor(LocalBuf *unit)
 		RTFree(unit->mWorld, unit->mParent->mLocalSndBufs);
 		unit->mParent->localMaxBufNum = 0;
 	} else {
-		unit->mParent->localBufNum =  unit->mParent->localBufNum - 1;
+		unit->mParent->localBufNum = unit->mParent->localBufNum - 1;
 	}
 }
-
-// dummy for unit size.
-void LocalBuf_next(LocalBuf *unit, int inNumSamples) {}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -741,11 +754,11 @@ void MaxLocalBufs_Ctor(MaxLocalBufs *unit)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-void SetBuf_next(SetBuf *unit, int inNumSamples)
+void SetBuf_Ctor(SetBuf *unit)
 {
-	GET_BUF
-	if (!bufData) {
+	OUT0(0) = 0.f;
+	CTOR_GET_BUF
+	if (!buf || !buf->data) {
 		if(unit->mWorld->mVerbosity > -2){
 			Print("SetBuf: no valid buffer\n");
 		}
@@ -758,46 +771,26 @@ void SetBuf_next(SetBuf *unit, int inNumSamples)
 
 	int j = 3;
 	for(int i=offset; i<end; ++j, ++i) {
-		bufData[i] = (float)IN0(j);
+		buf->data[i] = IN0(j);
 	}
-
-}
-
-void SetBuf_Ctor(SetBuf *unit)
-{
-	unit->m_fbufnum = -1.f;
-	SETCALC(SetBuf_next);
-	OUT0(0) = 0.f;
-	SetBuf_next(unit, 0);
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-
-void ClearBuf_next(ClearBuf *unit, int inNumSamples)
+void ClearBuf_Ctor(ClearBuf *unit)
 {
-	GET_BUF
-	if (!bufData) {
+	OUT0(0) = 0.f;
+	CTOR_GET_BUF
+
+	if (!buf || !buf->data) {
 		if(unit->mWorld->mVerbosity > -2){
 			Print("ClearBuf: no valid buffer\n");
 		}
 		return;
 	}
-	int n = unit->m_buf->samples;
 
-	//bzero(unit->m_buf->data, unit->m_buf->samples * sizeof(float));
-	for (int i=0; i<n; ++i) {
-		bufData[i] = 0.f;
-	}
-}
-
-void ClearBuf_Ctor(ClearBuf *unit)
-{
-	unit->m_fbufnum = -1.f;
-	SETCALC(ClearBuf_next);
-	OUT0(0) = 0.f;
-	ClearBuf_next(unit, 0);
+	Clear(buf->samples, buf->data);
 }
 
 
@@ -7225,7 +7218,8 @@ static void DelTapWr_first(DelTapWr *unit, int inNumSamples)
 
 		uint32 remain = bufSamples - unroll;
 		Clear(remain, bufData + unroll);
-	}
+	} else
+		Clear(bufSamples, bufData);
 #else
 	Clear(bufSamples, bufData);
 #endif

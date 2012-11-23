@@ -33,6 +33,7 @@
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
+#include <boost/atomic.hpp>
 
 #include <stdexcept>
 #include <sstream>
@@ -125,12 +126,12 @@ private:
 	// language interface
 	PyrObject*		m_obj;
 
-	volatile bool		m_dodone;
+	boost::atomic<bool>	m_dodone;
 
 	// serial interface
 	Options			m_options;
 	int			m_fd;
-	volatile bool		m_open;
+	boost::atomic<bool>	m_open;
 	struct termios		m_termio;
 	struct termios		m_oldtermio;
 
@@ -140,8 +141,8 @@ private:
 	uint8_t			m_rxbuffer[kBufferSize];
 
 	// rx thread
-	volatile bool		m_running;
-	pthread_t		m_thread;
+	boost::atomic<bool>	m_running;
+	pthread_t			m_thread;
 };
 
 PyrSymbol* SerialPort::s_dataAvailable = 0;
@@ -349,7 +350,6 @@ SerialPort::~SerialPort()
 {
 	m_running = false;
 //	m_open = false;
-	pthread_mutex_unlock (&gLangMutex);
 	if ( m_open ){
 		tcflush(m_fd, TCIOFLUSH);
 		tcsetattr(m_fd, TCSANOW, &m_oldtermio);
@@ -357,7 +357,6 @@ SerialPort::~SerialPort()
 		m_open = false;
 	};
 	pthread_join(m_thread, 0);
-	pthread_mutex_lock (&gLangMutex);
 }
 
 void SerialPort::stop(){
@@ -405,11 +404,14 @@ void* SerialPort::threadFunc(void* self)
 
 void SerialPort::dataAvailable()
 {
-	pthread_mutex_lock (&gLangMutex);
-	if (!m_running) {
-		pthread_mutex_unlock (&gLangMutex);
+	int status = lockLanguageOrQuit(m_running);
+	if (status == EINTR)
+		return;
+	if (status) {
+		postfl("error when locking language (%d)\n", status);
 		return;
 	}
+
 	PyrSymbol *method = s_dataAvailable;
 	if (m_obj) {
 		VMGlobals *g = gMainVMGlobals;
@@ -423,7 +425,14 @@ void SerialPort::dataAvailable()
 
 void SerialPort::doneAction()
 {
-	pthread_mutex_lock (&gLangMutex);
+	int status = lockLanguageOrQuit(m_running);
+	if (status == EINTR)
+		return;
+	if (status) {
+		postfl("error when locking language (%d)\n", status);
+		return;
+	}
+
 	PyrSymbol *method = s_doneAction;
 	if (m_obj) {
 		VMGlobals *g = gMainVMGlobals;
@@ -439,16 +448,16 @@ void SerialPort::threadLoop()
 {
   const int fd = m_fd;
   const int max_fd = fd+1;
-  
+
   m_running = true;
   m_rxErrors[1] = 0;
-	
+
   while (true) {
     fd_set rfds;
-    
+
     FD_ZERO(   &rfds);
     FD_SET(fd, &rfds);
-    
+
     struct timeval timeout;
     timeout.tv_sec = kReadTimeoutMs/1000;
     timeout.tv_usec = (kReadTimeoutMs%1000)*1000;

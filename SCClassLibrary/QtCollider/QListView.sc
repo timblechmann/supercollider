@@ -2,7 +2,7 @@ QListView : QItemViewBase {
   var <colors;
   var <enterKeyAction;
 
-  *qtClass { ^"QcListWidget" }
+  *qtClass { ^'QcListWidget' }
 
   mouseDownEvent { arg x, y, modifiers, buttonNumber, clickCount;
     // Override QView:mouseDownEvent:
@@ -48,28 +48,31 @@ QListView : QItemViewBase {
     this.setProperty( \currentRow, val ? -1 );
   }
 
+  background { ^this.palette.base; }
+  background_ { arg color; this.palette = this.palette.base_(color); }
+
   stringColor {
-    ^this.palette.baseTextColor;
+    ^this.palette.baseText;
   }
 
   stringColor_ { arg color;
-    this.setProperty( \palette, this.palette.baseTextColor_(color) );
+    this.palette = this.palette.baseText_(color);
   }
 
   selectedStringColor {
-    ^this.palette.highlightedTextColor;
+    ^this.palette.highlightText;
   }
 
   selectedStringColor_ { arg color;
-    this.setProperty( \palette, this.palette.highlightedTextColor_(color) );
+    this.palette = this.palette.highlightText_(color);
   }
 
   hiliteColor {
-    ^this.palette.highlightColor;
+    ^this.palette.highlight;
   }
 
   hiliteColor_ { arg color;
-    this.setProperty( \palette, this.palette.highlightColor_(color) );
+    this.palette = this.palette.highlight_(color);
   }
 
   enterKeyAction_ { arg func;

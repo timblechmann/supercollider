@@ -10,17 +10,25 @@ A view which can graphically display nodes at x/y coordinates, connection lines,
 
 You can make the view display an link::Classes/Env:: using link::#-setEnv::. Note however that the view will work on a copy of the data of the Env object, therefore moving the nodes through the view will have no effect on the Env.
 
-Multiple nodes can be selected and moved using mouse or keyboard. See link::#-defaultKeyDownAction:: for details.
+You can also define nodes with arrays of x and y values using link::#-value::, and the connections using link::#-connect::.
 
-The last selected node is considered to be the current, and can be moved programmatically using link::#-x:: and link::#-y::. It is also possible to change the selection and switch the current node programmatically using link::#-selectIndex::, link::#-deselectIndex:: and link::#-index::, as well as move the current node .
+SUBSECTION:: Appearance
 
-In strong::Qt GUI::, link::#-keepHorizontalOrder:: allows you to enforce the order of nodes in horizontal direction to match their index order. In that case, node movement to the left and to the right will be restricted by the positions of their immediate neighbours. This is especially useful when EnvelopeView is used to display an link::Classes/Env::.
+In strong::Qt GUI::, the view supports two strong::display styles::: the default one draws nodes as small dots, with labels next to them, while another style draws nodes as rounded rectangles with labels drawn inside. See link::#-style::.
 
-In strong::Qt GUI::, link::#-elasticSelection:: determines whether moving multiple nodes will be blocked altogether if any of the nodes meet an obstacle (the view bounds or a neighbour node), or only those individual nodes will be blocked.
+A strong::label:: for each of the nodes can be set using link::#-strings:: and link::#-setString::.
 
-note:: The variable link::#-step:: must be explicitly set to allow moving nodes using keyboard. ::
+SUBSECTION:: Interaction
 
+Nodes can be selected and moved using mouse. Shift-clicking a node will add it to the selection.
 
+You can also move selected nodes and change selection using keyboard. In strong::Qt::, pressing the arrow keys will move selected nodes (as long as link::#-step:: is larger than 0). Pressing the left or right arrow keys while holding down Alt will select previous or next node, and holding down Shift will extend selection to the left or to the right. Other GUI kits may differ.
+
+In strong::Qt::, link::#-keepHorizontalOrder:: allows you to enforce the order of nodes in horizontal direction to match their index order. In that case, node movement to the left and to the right will be restricted by the positions of their immediate neighbours. This is especially useful when EnvelopeView is used to display an link::Classes/Env::.
+
+In strong::Qt::, link::#-elasticSelection:: determines whether moving multiple nodes will be blocked altogether if any of the nodes meet an obstacle (the view bounds or a neighbour node), or only those individual nodes will be blocked.
+
+Node selection can also be changed programmatically using link::#-index::, link::#-selectIndex::, and link::#-deselectIndex::. The link::#-index#current:: node can be moved programmatically using link::#-x:: and link::#-y::.
 
 INSTANCEMETHODS::
 
@@ -83,7 +91,7 @@ METHOD:: strings
 METHOD:: setString
 	Sets the label of the node at the given index.
 
-	note:: In order for the label to be visible, you might need to ensure that the link::#-strokeColor:: contrasts the link::#-fillColor:: (depending on how the view draws the nodes and the labels).
+	note:: In order for the label to be visible, you might need to ensure that the link::#-strokeColor:: contrasts the link::#-fillColor:: (depending on how the view draws the nodes and the labels).::
 
 	argument::
 		A String.
@@ -99,6 +107,8 @@ METHOD:: setFillColor
 METHOD:: setThumbWidth
 	Sets the width of the node at the given index.
 
+    NOTE:: For compatibility with existing code, this will set the link::#-style:: to strong::'rects'::. ::
+
 	argument:: index
 		An Integer.
 	argument:: width
@@ -106,6 +116,8 @@ METHOD:: setThumbWidth
 
 METHOD:: setThumbHeight
 	Sets the height of the node at the given index.
+
+    NOTE:: For compatibility with existing code, this will set the link::#-style:: to strong::'rects'::. ::
 
 	argument:: index
 		An Integer.
@@ -133,6 +145,26 @@ METHOD:: connect
 
 SUBSECTION:: Appearance
 
+METHOD:: style
+    NOTE:: Only available in Qt GUI ::
+
+    One of the following drawing styles:
+
+    list::
+
+    ## strong::'dots':: - nodes are drawn as small dots within a larger circle indicating the area of mouse sensitivity. Labels are drawn next to the dots (see link::#-setString::). This style always draws nodes with emphasis::equal width and height::, and will use the smaller of the node's sizes, if different (it never draws ellipses).
+
+    ## strong::'rects':: - nodes are drawn as rounded rectangles. Labels are drawn within the bounds of the rectangles.
+    ::
+
+    NOTE:: For compatibility with existing code, calling any of link::#-thumbWidth::, link::#-thumbHeight::, link::#-setThumbWidth::, or link::#-setThumbHeight:: will automatically switch style to strong::'rects'::. You can still set a different style afterwards.
+    ::
+
+    argument::
+        One of the symbols: code::\dots:: or code::\rects::. Alternatively, an integer 0 or 1, for each style respectively.
+
+    returns:: An integer 0 or 1.
+
 METHOD:: drawLines
 	Whether to draw the connections between the nodes.
 
@@ -159,13 +191,17 @@ METHOD:: grid
 		A Point of which x and y correspond to grid spacing on the horizontal and the vertical axis, respectively. If one of the two is 0, the grid on that axis will not be drawn.
 
 METHOD:: thumbWidth
-	The default width of the nodes. If the width of a specific node has been set using link::#-setThumbWidth::, it will take precedence.
+    Sets the width of all nodes.
+
+    NOTE:: For compatibility with existing code, this will set the link::#-style:: to strong::'rects'::. ::
 
 	argument::
 		An Integer.
 
 METHOD:: thumbHeight
-	The default height of the nodes. If the height of a specific node has been set using link::#-setThumbHeight::, it will take precedence.
+    Sets the height of all nodes.
+
+    NOTE:: For compatibility with existing code, this will set the link::#-style:: to strong::'rects'::. ::
 
 	argument::
 		An Integer.
@@ -206,13 +242,19 @@ METHOD:: colors
 SUBSECTION:: Interaction
 
 METHOD:: index
-	The index of the emphasis::current:: node.
+	The index of the emphasis::current:: node, i.e. the node affected by link::#-x:: and link::#-y:: methods.
+
+    In strong::Qt::, this is the selected node with lowest index, or -1 if no selection.
+
+    In strong::Cocoa::, this is the last node selected, or -1 if no selection.
+
+    In strong::SwingOSC::, this is the last node clicked, regardless of selection.
 
 	argument::
 		An Integer.
 
 METHOD:: lastIndex
-	Synonym for link::#-index::.
+    The last node selected, regardless of the current state of selection.
 
 
 METHOD:: selectIndex
@@ -281,25 +323,9 @@ METHOD:: metaAction
 
 METHOD:: defaultKeyDownAction
 
-	Implements the default effects of key presses as follows:
+    Implements the default behavior on key presses.
 
-	table::
-	## strong::Key::           || strong::Effect::
-	## Shift/Alt + right arrow || increment x by step
-	## Shift/Alt + left arrow  || decrement x by step
-	## right arrow             || select next node
-	## left arrow              || select previous node
-	## up arrow                || increment y by step
-	## down arrow              || decrement y by step
-	::
-
-	note:: strong:: Differences between GUI kits ::
-
-		strong::Cocoa:: uses the Shift modifier to move nodes horizontally, while strong::SwingOSC:: uses Alt for the same purpose. strong::Qt:: however will only move nodes at all if Alt is pressed, and holding down Shift will select each node at the current index, as it is changed.
-
-		In strong::Qt::, the default effects of key presses are defined in the view implementation instead of in this method. If you want to override them, you need to return code::true:: from this method, or from link::Classes/View#-keyDownAction::. See link::Classes/View#key_actions#Key actions:: for explanation.
-
-	::
+    In Qt, the default behavior is defined in the C++ implementation of the view instead of this method. See link::Classes/View#Key and mouse event propagation:: for explanation of how to override the behavior.
 
 
 

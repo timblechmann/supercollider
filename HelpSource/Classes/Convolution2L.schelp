@@ -29,6 +29,9 @@ size of FFT frame, must be a power of two. Convolution uses twice this number in
 argument::crossfade
 The number of periods over which a crossfade is made. The default is 1. This must be an integer.
 
+argument::mul
+
+argument::add
 
 Examples::
 
@@ -113,7 +116,7 @@ x.free;
 code::
 // next example
 
-b = Buffer.read(s, Help.dir +/+ "sounds/a11wlk01.wav");
+b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
 
 (
 	{ var input, kernel;

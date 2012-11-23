@@ -52,6 +52,7 @@ public:
     static SafePtr<Item> safePtr( QTreeWidgetItem* );
     static void initialize( VMGlobals *, PyrObject *, const SafePtr<Item> & );
     static int finalize( VMGlobals *, PyrObject * );
+    bool operator< ( const QTreeWidgetItem & other ) const;
   private:
     SafePtr<Item> _safePtr;
   };
@@ -102,6 +103,10 @@ public:
 
   VariantList columns() const;
   void setColumns( const VariantList & );
+
+protected:
+
+  virtual void keyPressEvent( QKeyEvent * );
 
 private:
 

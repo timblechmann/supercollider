@@ -151,7 +151,7 @@ AbstractServerAction : AbstractSystemAction {
 
 	*add { arg object, server;
 		var list;
-		if (server.isNil)  { server = \default };
+		if (server.isNil)  { server = \all };
 		if (this.objects.isNil) { this.init };
 		list = this.objects.at(server);
 		if (list.isNil) { list = List.new; this.objects.put(server, list) };
@@ -159,12 +159,12 @@ AbstractServerAction : AbstractSystemAction {
 	}
 
 	*addToAll { arg object;
-		Server.set.do({ arg s; this.add(object, s) });
+		Server.all.do({ arg s; this.add(object, s) });
 	}
 
 	*remove { arg object, server;
 		if(server.isNil) { server = \default };
-		this.objects.at(server).remove(object);
+		this.objects !? { this.objects.at(server).remove(object) };
 	}
 
 	*removeServer { arg server;

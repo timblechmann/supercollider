@@ -24,26 +24,33 @@
 
 #include "QcAbstractStepValue.h"
 #include "../QcHelper.h"
+#include "../style/style.hpp"
 
 #include <QWidget>
 
-class QcSlider2D : public QWidget, public QcHelper, public QcAbstractStepValue
+class QcSlider2D : public QWidget, QcHelper, QcAbstractStepValue, QtCollider::Style::Client
 {
   Q_OBJECT
-  Q_PROPERTY( float xValue READ xValue WRITE setXValue )
-  Q_PROPERTY( float yValue READ yValue WRITE setYValue )
-  Q_PROPERTY( float shiftScale READ dummyFloat WRITE setShiftScale );
-  Q_PROPERTY( float ctrlScale READ dummyFloat WRITE setCtrlScale );
-  Q_PROPERTY( float altScale READ dummyFloat WRITE setAltScale );
-  Q_PROPERTY( float step READ dummyFloat WRITE setStep )
+  Q_PROPERTY( double xValue READ xValue WRITE setXValue )
+  Q_PROPERTY( double yValue READ yValue WRITE setYValue )
+  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale );
+  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale );
+  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale );
+  Q_PROPERTY( double step READ dummyFloat WRITE setStep )
+  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor );
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
+  Q_PROPERTY( QColor knobColor READ knobColor WRITE setKnobColor );
 
   public:
     QcSlider2D();
-    float xValue() const { return _x; }
-    float yValue() const { return _y; }
-    void setXValue( float x ) { setValue( QPointF( x, _y ), false ); }
-    void setYValue( float y ) { setValue( QPointF( _x, y ), false ); }
-    void setStep( float f ) { _step = f;}
+    double xValue() const { return _x; }
+    double yValue() const { return _y; }
+    void setXValue( double x ) { setValue( QPointF( x, _y ), false ); }
+    void setYValue( double y ) { setValue( QPointF( _x, y ), false ); }
+    void setStep( double f ) { _step = f;}
+    const QColor & knobColor() const
+      { return _knobColor.isValid() ? _knobColor : palette().color(QPalette::ButtonText); }
+    void setKnobColor(const QColor &c) { _knobColor = c; update(); }
     QSize sizeHint() const { return QSize(150,150); }
     QSize minimumSizeHint() const { return QSize(30,30); }
   public Q_SLOTS:
@@ -56,17 +63,18 @@ class QcSlider2D : public QWidget, public QcHelper, public QcAbstractStepValue
     void randomize();
   private:
     QRect thumbRect();
-    QPointF valueFromPos( const QPoint pos );
     void setValue( const QPointF val, bool doAction = true );
     void mouseMoveEvent ( QMouseEvent * );
     void mousePressEvent ( QMouseEvent * );
     void keyPressEvent ( QKeyEvent * );
     void paintEvent ( QPaintEvent * );
 
-    float _x;
-    float _y;
+    double _x;
+    double _y;
     QSize _thumbSize;
-    float _step;
+    double _step;
+
+    QColor _knobColor;
 };
 
 #endif

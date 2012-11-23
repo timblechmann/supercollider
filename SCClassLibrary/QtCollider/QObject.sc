@@ -27,7 +27,7 @@ QObject {
     < mouseUpEvent = 3,
     < mouseDblClickEvent = 4,
     < mouseMoveEvent = 5,
-    < mouseOverEvent = 10,
+    < mouseEnterEvent = 10,
     < mouseLeaveEvent = 11,
     < mouseWheelEvent = 31,
     < keyDownEvent = 6,
@@ -38,7 +38,7 @@ QObject {
 
   *qtClass { ^nil }
 
-  *meta { ^QMetaObject(this.qtClass); }
+  *meta { ^QMetaObject(this.qtClass) }
 
   *new { arg argumentArray;
     var className = this.qtClass;
@@ -50,16 +50,9 @@ QObject {
 
   *heap { ^heap.copy }
 
-  *initClass {
-      ShutDown.add {
-          heap.do { |x| x.prFinalize; };
-      };
-  }
-
   initQObject{ arg className, argumentArray;
     this.prConstruct( className, argumentArray );
     heap = heap.add( this );
-    this.connectFunction( 'destroyed()', { heap.remove(this) }, false );
   }
 
   destroy {
@@ -172,10 +165,7 @@ QObject {
     ^this.primitiveFailed
   }
 
-  prFinalize {
-    _QObject_ManuallyFinalize
-    ^this.primitiveFailed
-  }
+  prRelease { heap.remove(this); }
 
   doFunction { arg f ... args; f.performList(\value, this, args); }
 }

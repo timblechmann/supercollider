@@ -1,6 +1,11 @@
 File : UnixFILE {
 
-	classvar <openDialogs;
+	classvar <openDialogs, <systemIsCaseSensitive;
+
+	*initClass {
+		var f = this.filenameSymbol.asString;
+		systemIsCaseSensitive = not(File.exists(f.toLower) and: {File.exists(f.toUpper)});
+	}
 
 	*new { arg pathName, mode;
 		^super.new.open(pathName, mode);
@@ -24,6 +29,13 @@ File : UnixFILE {
 	*exists { arg pathName;
 		_FileExists
 		^this.primitiveFailed
+	}
+	*existsCaseSensitive { arg pathName;
+		^if(systemIsCaseSensitive) {
+			this.exists(pathName)
+		} {
+			(pathName.dirname+/+"*").pathMatch.detect{|x|x.compare(pathName)==0}.notNil
+		}
 	}
 	*realpath { arg pathName;
 		_FileRealPath
@@ -135,6 +147,8 @@ File : UnixFILE {
 
 
 Pipe : UnixFILE {
+	var pid;
+
 	// pipe stdin to, or stdout from, a unix shell command.
 	*new { arg commandLine, mode;
 		^super.new.open(commandLine, mode);
@@ -144,19 +158,21 @@ Pipe : UnixFILE {
 			to popen, so should be one of:
 			"r","w"
 		*/
-		if (this.prOpen(commandLine, mode), {
+		if ((pid = this.prOpen(commandLine, mode)).notNil) {
 			this.addOpenFile;
-		});
+		}
 	}
 
 	close {
-		var res = this.prClose;
+		var res = this.prClose(pid);
 		fileptr = nil;
+		pid = nil;
 		openFiles.remove(this);
 		^res;
 	}
 
-	prClose { // close the file
+	// close the file
+	prClose { arg pid;
 		// the GC will not call this for you
 		_PipeClose
 		^this.primitiveFailed;

@@ -1,6 +1,6 @@
 class:: Platform
 summary:: handle cross-platform differencies
-categories:: CrossPlatform
+categories:: Platform
 
 description::
 The Platform class (along with its subclasses) handles things which differ between operating systems (mac/linux/windows/...), to simplify cross-platform aspects of SuperCollider.
@@ -51,16 +51,22 @@ method:: userConfigDir
 directory for configuration files
 
 method:: systemExtensionDir
-system extension directory (see link::Guides/Using-Extensions::)
+system extension directory (see link::Guides/UsingExtensions::)
 
 method:: userExtensionDir
-user extension directory (see link::Guides/Using-Extensions::)
+user extension directory (see link::Guides/UsingExtensions::)
 
 method:: platformDir
-platform specific directory for class files (see link::Guides/Using-Extensions::)
+platform specific directory for class files (see link::Guides/UsingExtensions::)
 
 method:: pathSeparator
 platform specific path separator
+
+method:: resourceDir
+platform specific resource directory
+
+method:: defaultTempDir
+default directory for temporary files
 
 subsection:: Features
 
@@ -72,8 +78,14 @@ Platform.when(#[\Document, \SCWindow], { "yeehah!".postln });
 
 instancemethods::
 
+private:: shutdown, startup
+
 method:: name
 returns the platform name
+
+method:: recompile
+recompile class library
+
 
 subsection:: Directories and filesystem stuff
 method:: classLibraryDir
@@ -92,16 +104,27 @@ method:: userConfigDir
 directory for configuration files
 
 method:: systemExtensionDir
-system extension directory (see link::Guides/Using-Extensions::)
+system extension directory (see link::Guides/UsingExtensions::)
 
 method:: userExtensionDir
-user extension directory (see link::Guides/Using-Extensions::)
+user extension directory (see link::Guides/UsingExtensions::)
 
 method:: platformDir
-platform specific directory for class files (see link::Guides/Using-Extensions::)
+platform specific directory for class files (see link::Guides/UsingExtensions::)
 
 method:: pathSeparator
 platform specific path separator
+
+method:: resourceDir
+platform specific resource directory
+
+method:: recordingsDir
+recording directory
+
+method:: defaultTempDir
+default directory for temporary files
+
+
 
 subsection:: Startup files
 

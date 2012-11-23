@@ -59,6 +59,8 @@
 #  include "QtCollider.h"
 #endif
 
+#include "SCDocPrim.h"
+
 int yyparse();
 
 extern bool gTraceInterpreter;
@@ -95,13 +97,14 @@ PyrSymbol* getPrimitiveName(int index)
 	return gPrimitiveTable.table[index].name;
 }
 
-int slotStrLen(PyrSlot *slot) {
-        if (IsSym(slot)) {
-                return slotRawSymbol(slot)->length;
-        } else if (isKindOfSlot(slot, class_string)) {
-                return slotRawObject(slot)->size;
-        }
-        return -1;
+int slotStrLen(PyrSlot *slot)
+{
+	if (IsSym(slot))
+		return slotRawSymbol(slot)->length;
+	if (isKindOfSlot(slot, class_string))
+		return slotRawObject(slot)->size;
+
+	return -1;
 }
 
 int slotStrVal(PyrSlot *slot, char *str, int maxlen)
@@ -825,7 +828,7 @@ int blockValueArrayEnvir(struct VMGlobals *g, int numArgsPushed)
 	}
 }
 
-int blockValue(struct VMGlobals *g, int numArgsPushed)
+HOT int blockValue(struct VMGlobals *g, int numArgsPushed)
 {
 	PyrSlot *args;
 	PyrSlot *vars;
@@ -863,7 +866,7 @@ int blockValue(struct VMGlobals *g, int numArgsPushed)
 	block = slotRawBlock(&closure->block);
 	context = slotRawFrame(&closure->context);
 
-	proto = IsObj(&block->prototypeFrame) ? slotRawObject(&block->prototypeFrame) : 0;
+	proto = IsObj(&block->prototypeFrame) ? slotRawObject(&block->prototypeFrame) : NULL;
 	methraw = METHRAW(block);
 	numtemps = methraw->numtemps;
 	caller = g->frame;
@@ -997,7 +1000,8 @@ int blockValueWithKeys(VMGlobals *g, int allArgsPushed, int numKeyArgsPushed)
 	block = slotRawBlock(&closure->block);
 	context = slotRawFrame(&closure->context);
 
-	proto = slotRawObject(&block->prototypeFrame);
+	proto = IsObj(&block->prototypeFrame) ? slotRawObject(&block->prototypeFrame) : NULL;
+
 	methraw = METHRAW(block);
 	numtemps = methraw->numtemps;
 	caller = g->frame;
@@ -1159,7 +1163,8 @@ int blockValueEnvir(struct VMGlobals *g, int numArgsPushed)
 	block = slotRawBlock(&closure->block);
 	context = slotRawFrame(&closure->context);
 
-	proto = slotRawObject(&block->prototypeFrame);
+	proto = IsObj(&block->prototypeFrame) ? slotRawObject(&block->prototypeFrame) : NULL;
+
 	methraw = METHRAW(block);
 	numtemps = methraw->numtemps;
 	caller = g->frame;
@@ -1307,7 +1312,8 @@ int blockValueEnvirWithKeys(VMGlobals *g, int allArgsPushed, int numKeyArgsPushe
 	block = slotRawBlock(&closure->block);
 	context = slotRawFrame(&closure->context);
 
-	proto = slotRawObject(&block->prototypeFrame);
+	proto = IsObj(&block->prototypeFrame) ? slotRawObject(&block->prototypeFrame) : NULL;
+
 	methraw = METHRAW(block);
 	numtemps = methraw->numtemps;
 	caller = g->frame;
@@ -4171,7 +4177,7 @@ void initSCViewPrimitives();
 void initSchedPrimitives();
 	initSchedPrimitives();
 
-#if (defined(__APPLE__) && !defined(SC_IPHONE)) || defined(HAVE_ALSA)
+#if defined(__APPLE__) || defined(HAVE_ALSA) || defined(HAVE_PORTMIDI)
 void initMIDIPrimitives();
 	initMIDIPrimitives();
 #endif
@@ -4213,6 +4219,13 @@ void initOpenGLPrimitives();
 #ifdef SC_QT
 	QtCollider::initPrimitives();
 #endif
+
+#ifdef SC_IDE
+	void initScIDEPrimitives();
+	initScIDEPrimitives();
+#endif
+
+	initSCDocPrimitives();
 
 	s_recvmsg = getsym("receiveMsg");
 	post("\tNumPrimitives = %d\n", nextPrimitiveIndex());

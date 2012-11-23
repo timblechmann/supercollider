@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdexcept>
 
 #ifdef _WIN32
 # include <direct.h>
@@ -226,6 +227,26 @@ void sc_GetResourceDirectory(char* pathBuf, int length)
 	SC_StandAloneInfo::GetResourceDir(pathBuf, length);
 }
 
+
+void sc_AppendBundleName(char *str, int size)
+{
+	CFBundleRef mainBundle;
+	mainBundle = CFBundleGetMainBundle();
+	if(mainBundle){
+		CFDictionaryRef dictRef = CFBundleGetInfoDictionary(mainBundle);
+		CFStringRef strRef;
+		strRef = (CFStringRef)CFDictionaryGetValue(dictRef, CFSTR("CFBundleName"));
+		if(strRef){
+			const char *bundleName = CFStringGetCStringPtr(strRef, CFStringGetSystemEncoding());
+			if(bundleName) {
+				sc_AppendToPath(str, size, bundleName);
+				return;
+			}
+		}
+	}
+	sc_AppendToPath(str, size, "SuperCollider");
+}
+
 #elif defined(SC_IPHONE)
 
 bool sc_IsStandAlone()
@@ -276,8 +297,6 @@ void sc_GetResourceDirectory(char* pathBuf, int length)
 
 #endif
 
-
-
 // Support for Extensions
 
 // Get the user home directory.
@@ -308,13 +327,18 @@ void sc_GetSystemAppSupportDirectory(char *str, int size)
 #elif defined(SC_IPHONE)
 			"/",
 #elif defined(__APPLE__)
-			"/Library/Application Support/SuperCollider",
+			"/Library/Application Support",
 #elif defined(_WIN32)
 			( getenv("SC_SYSAPPSUP_PATH")==NULL ) ? "C:\\SuperCollider" : getenv("SC_SYSAPPSUP_PATH"),
 #else
 			"/usr/local/share/SuperCollider",
 #endif
 			size);
+			
+#if defined(__APPLE__)
+	// Get the main bundle name for the app from the enclosed Info.plist 
+	sc_AppendBundleName(str, size);
+#endif
 }
 
 
@@ -335,7 +359,9 @@ void sc_GetUserAppSupportDirectory(char *str, int size)
 #if defined(SC_IPHONE)
 	sc_AppendToPath(str, size, "Documents");
 #elif defined(__APPLE__)
-	sc_AppendToPath(str, size, "Library/Application Support/SuperCollider");
+	// Get the main bundle name for the app
+	sc_AppendToPath(str, size, "Library/Application Support");
+	sc_AppendBundleName(str, size);
 #elif defined(_WIN32)
 	sc_AppendToPath(str, size, "SuperCollider");
 #else
@@ -369,6 +395,7 @@ void sc_GetUserConfigDirectory(char *str, int size)
 	if (xdg_config_home) {
 		strncpy(str, xdg_config_home, size);
 		sc_AppendToPath(str, size, "SuperCollider");
+		return;
 	}
 
 #if defined(__linux__) || defined(__freebsd__)

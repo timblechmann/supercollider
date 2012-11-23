@@ -75,6 +75,9 @@ extern const char * gIdeName; // string used for conditional compilation accordi
 void sc_GetResourceDirectory(char* pathBuf, int length);
 bool sc_IsStandAlone();
 
+#if defined(__APPLE__) && !defined(SC_IPHONE)	// running on OS X
+void sc_AppendBundleName(char *str, int size);
+#endif
 // Support for Extensions
 
 // Get the user home directory.

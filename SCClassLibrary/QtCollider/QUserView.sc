@@ -1,7 +1,7 @@
 QUserView : QView {
-  var <drawFunc, <drawingEnabled=true, <background;
+  var <drawFunc, <drawingEnabled=true;
 
-  *qtClass { ^"QcCustomPainted" }
+  *qtClass { ^'QcCustomPainted' }
 
   *new { arg parent, bounds;
     var me = super.new(parent, bounds ?? {this.sizeHint} );
@@ -42,11 +42,6 @@ QUserView : QView {
   frameRate { ^this.getProperty( \frameRate ); }
 
   frame { ^this.getProperty( \frameCount ); }
-
-  background_ { arg aColor;
-    background = aColor;
-    this.setProperty( \background, aColor, true );
-  }
 
   // override QView's action_ to not connect to 'action()' signal
   action_ { arg func;

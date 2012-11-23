@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2011 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2011-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -24,6 +24,8 @@
 
 #include <PyrKernel.h>
 
+#include <QKeyEvent>
+
 class QcTreeWidgetFactory : public QcWidgetFactory<QcTreeWidget>
 {
   void initialize( QWidgetProxy *p, QcTreeWidget *w ) {
@@ -31,7 +33,7 @@ class QcTreeWidgetFactory : public QcWidgetFactory<QcTreeWidget>
   }
 };
 
-static QcTreeWidgetFactory treeWidgetFactory;
+QC_DECLARE_FACTORY( QcTreeWidget, QcTreeWidgetFactory );
 
 QcTreeWidget::QcTreeWidget()
 {
@@ -195,6 +197,28 @@ void QcTreeWidget::sort( int column, bool descending )
   sortItems( column, descending ? Qt::DescendingOrder : Qt::AscendingOrder );
 }
 
+void QcTreeWidget::keyPressEvent( QKeyEvent *e )
+{
+  QTreeWidget::keyPressEvent( e );
+
+  switch (e->key())
+  {
+  case Qt::Key_Up:
+  case Qt::Key_Down:
+  case Qt::Key_Left:
+  case Qt::Key_Right:
+  case Qt::Key_PageUp:
+  case Qt::Key_PageDown:
+  case Qt::Key_Home:
+  case Qt::Key_End:
+    // Prevent propagating to parent when scroller reaches minimum or maximum:
+    e->accept();
+  default: break;
+  }
+}
+
+//////////////////////////////// Item //////////////////////////////////////
+
 QcTreeWidget::ItemPtr QcTreeWidget::Item::safePtr( QTreeWidgetItem * item )
 {
   if( item && item->type() == Item::Type )
@@ -206,7 +230,7 @@ QcTreeWidget::ItemPtr QcTreeWidget::Item::safePtr( QTreeWidgetItem * item )
 void QcTreeWidget::Item::initialize (
   VMGlobals *g, PyrObject *obj, const QcTreeWidget::ItemPtr &ptr )
 {
-  Q_ASSERT( isKindOf( obj, class_QTreeViewItem ) );
+  Q_ASSERT( isKindOf( obj, SC_CLASS(QTreeViewItem) ) );
   if( ptr.id() ) {
     // store the SafePtr
     QcTreeWidget::ItemPtr *newPtr = new QcTreeWidget::ItemPtr( ptr );
@@ -230,4 +254,10 @@ int QcTreeWidget::Item::finalize( VMGlobals *g, PyrObject *obj )
     delete ptr;
   }
   return errNone;
+}
+
+bool QcTreeWidget::Item::operator< (const QTreeWidgetItem &other) const
+{
+  int column = treeWidget()->sortColumn();
+  return text(column).toLower() < other.text(column).toLower();
 }

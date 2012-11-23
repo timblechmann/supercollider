@@ -18,6 +18,10 @@ argument:: chain
 FFT chain
 argument:: bufsize
 FFT buffer size
+argument:: frombin
+limiting analysis to the bins of interest
+argument:: tobin
+limiting analysis to the bins of interest
 returns::
 A list from DC up to Nyquist of code:: [mag[0], phase[0], mag[1], phase[1], ... mag[nyquist], phase[nyquist]]. ::
 discussion::
@@ -32,7 +36,7 @@ code::
 s.boot.doWhenBooted {
 	var fftsize = 1024;
 	b = Buffer.alloc(s, fftsize, 1);
-	c = Buffer.read(s, Help.dir +/+ "sounds/a11wlk01.wav");
+	c = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
 }
 )
 

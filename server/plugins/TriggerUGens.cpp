@@ -28,11 +28,7 @@
 #ifdef NOVA_SIMD
 #include "simd_memory.hpp"
 
-#if defined(__GNUC__) && !defined(__clang__)
-#define inline_functions __attribute__ ((flatten))
-#else
-#define inline_functions
-#endif
+#include "function_attributes.h"
 
 #endif
 
@@ -374,8 +370,8 @@ extern "C"
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef NOVA_SIMD
-inline_functions void Trig1_next_nova(Trig1 *unit, int inNumSamples);
-inline_functions void Trig1_next_k_nova(Trig1 *unit, int inNumSamples);
+FLATTEN void Trig1_next_nova(Trig1 *unit, int inNumSamples);
+FLATTEN void Trig1_next_k_nova(Trig1 *unit, int inNumSamples);
 #endif
 
 void Trig1_Ctor(Trig1 *unit)
@@ -990,10 +986,14 @@ void SetResetFF_next_k(SetResetFF *unit, int inNumSamples)
 	float prevreset = unit->m_prevreset;
 	float level = unit->mLevel;
 
+	float curtrig = ZXP(trig);
 	if (prevreset <= 0.f && curreset > 0.f) level = 0.f;
+	else if (prevtrig <= 0.f && curtrig > 0.f) level = 1.f;
+	ZXP(out) = level;
+	prevtrig = curtrig;
 
-	LOOP1(inNumSamples,
-		float curtrig = ZXP(trig);
+	LOOP(inNumSamples - 1,
+		curtrig = ZXP(trig);
 		if (prevtrig <= 0.f && curtrig > 0.f) level = 1.f;
 		ZXP(out) = level;
 		prevtrig = curtrig;
@@ -1126,7 +1126,7 @@ void Latch_next_aa(Latch *unit, int inNumSamples)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef NOVA_SIMD
-inline_functions void Gate_next_ak_nova(Gate *unit, int inNumSamples)
+FLATTEN void Gate_next_ak_nova(Gate *unit, int inNumSamples)
 {
 	float *trig = ZIN(1);
 	float level = unit->mLevel;
@@ -1139,7 +1139,7 @@ inline_functions void Gate_next_ak_nova(Gate *unit, int inNumSamples)
 		nova::setvec_simd(OUT(0), level, inNumSamples);
 }
 
-inline_functions void Gate_next_ak_nova_64(Gate *unit, int inNumSamples)
+FLATTEN void Gate_next_ak_nova_64(Gate *unit, int inNumSamples)
 {
 	float *trig = ZIN(1);
 	float level = unit->mLevel;
@@ -1874,8 +1874,8 @@ void Peak_next_ak_unroll(Peak *unit, int inNumSamples);
 void Peak_next_ai_unroll(Peak *unit, int inNumSamples);
 
 #ifdef NOVA_SIMD
-inline_functions void Peak_next_ak_k_nova(Peak *unit, int inNumSamples);
-inline_functions void Peak_next_ai_k_nova(Peak *unit, int inNumSamples);
+FLATTEN void Peak_next_ak_k_nova(Peak *unit, int inNumSamples);
+FLATTEN void Peak_next_ai_k_nova(Peak *unit, int inNumSamples);
 #endif
 
 void Peak_Ctor(Peak *unit)

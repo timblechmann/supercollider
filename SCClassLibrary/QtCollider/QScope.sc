@@ -2,7 +2,7 @@ QScope : QView {
   var <bufnum, <style=0, <xZoom=1.0, <yZoom=1.0, <x=0.0, <y=0.0;
   var <waveColors;
 
-  *qtClass { ^"QcScope" }
+  *qtClass { ^'QcScope' }
 
   bufnum_ { arg anInt;
     bufnum = anInt;
@@ -38,8 +38,4 @@ QScope : QView {
     waveColors = aColorArray;
     this.setProperty( \waveColors, aColorArray );
   }
-
-  background { ^this.getProperty( \background ); }
-
-  background_ { arg color; this.setProperty( \background, color, true ); }
 }

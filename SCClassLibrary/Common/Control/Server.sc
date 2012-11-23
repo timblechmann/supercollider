@@ -117,7 +117,7 @@ ServerOptions
 		if (outputStreamsEnabled.notNil, {
 			o = o ++ " -O " ++ outputStreamsEnabled ;
 		});
-		if (inDevice == outDevice)
+		if ((thisProcess.platform.name!=\osx) or: {inDevice == outDevice})
 		{
 			if (inDevice.notNil,
 			{
@@ -187,6 +187,11 @@ ServerShmInterface {
 		^super.new.connect(port)
 	}
 
+	copy {
+		// never ever copy! will cause duplicate calls to the finalizer!
+		^this
+	}
+
 	connect {
 		_ServerShmInterface_connectSharedMem
 		^this.primitiveFailed
@@ -208,12 +213,12 @@ ServerShmInterface {
 	}
 
 	setControlBusValue {
-		_ServerShmInterface_getControlBusValue
+		_ServerShmInterface_setControlBusValue
 		^this.primitiveFailed
 	}
 
 	setControlBusValues {
-		_ServerShmInterface_getControlBusValues
+		_ServerShmInterface_setControlBusValues
 		^this.primitiveFailed
 	}
 }
@@ -329,12 +334,7 @@ Server {
 		named = IdentityDictionary.new;
 		set = Set.new;
 		default = local = Server.new(\localhost, NetAddr("127.0.0.1", 57110));
-		Platform.switch(\windows, {
-			program = "scsynth.exe";
-		}, {
-			internal = Server.new(\internal, NetAddr.new);
-			program = "cd % && exec ./scsynth".format(String.scDir.quote);
-		});
+		internal = Server.new(\internal, NetAddr.new);
 	}
 
 	*fromName { arg name;
@@ -433,6 +433,11 @@ Server {
 
 						ServerQuit.run(this);
 
+						if (serverInterface.notNil) {
+							serverInterface.disconnect;
+							serverInterface = nil;
+						};
+
 						AppClock.sched(5.0, {
 							// still down after 5 seconds, assume server is really dead
 							// if you explicitly shut down the server then newAllocators
@@ -463,13 +468,18 @@ Server {
 		}, responseName, addr).oneShot;
 	}
 
-	waitForBoot { arg onComplete, limit=100;
-		if(serverRunning.not) { this.boot };
-		this.doWhenBooted(onComplete, limit);
+	waitForBoot { arg onComplete, limit=100, onFailure;
+		// onFailure.true: why is this necessary?
+		// this.boot also calls doWhenBooted.
+		// doWhenBooted prints the normal boot failure message.
+		// if the server fails to boot, the failure error gets posted TWICE.
+		// So, we suppress one of them.
+		if(serverRunning.not) { this.boot(onFailure: true) };
+		this.doWhenBooted(onComplete, limit, onFailure);
 	}
 
-	doWhenBooted { arg onComplete, limit=100;
-		var mBootNotifyFirst = bootNotifyFirst;
+	doWhenBooted { arg onComplete, limit=100, onFailure;
+		var mBootNotifyFirst = bootNotifyFirst, postError = true;
 		bootNotifyFirst = false;
 
 		^Routine({
@@ -483,9 +493,15 @@ Server {
 			});
 
 			if(serverRunning.not,{
-				"server failed to start".error;
-				"For advice: [http://supercollider.sf.net/wiki/index.php/ERROR:_server_failed_to_start]".postln;
+				if(onFailure.notNil) {
+					postError = (onFailure.value == false);
+				};
+				if(postError) {
+					"server failed to start".error;
+					"For advice: [http://supercollider.sf.net/wiki/index.php/ERROR:_server_failed_to_start]".postln;
+				};
 				serverBooting = false;
+				this.changed(\serverRunning);
 			}, onComplete);
 		}).play(AppClock);
 	}
@@ -597,7 +613,7 @@ Server {
 		});
 	}
 
-	boot { arg startAliveThread=true, recover=false;
+	boot { arg startAliveThread=true, recover=false, onFailure;
 		var resp;
 		if (serverRunning, { "server already running".inform; ^this });
 		if (serverBooting, { "server already booting".inform; ^this });
@@ -609,7 +625,7 @@ Server {
 		this.doWhenBooted({
 			serverBooting = false;
 			if (sendQuit.isNil) {
-				sendQuit = not(this.inProcess) and: {this.isLocal};
+				sendQuit = this.inProcess or: {this.isLocal};
 			};
 
 			if (this.inProcess) {
@@ -621,10 +637,10 @@ Server {
 			};
 
 			this.initTree;
-			(volume.volume != 0.0).if({
+			if(volume.volume != 0.0) {
 				volume.play;
-				});
-		});
+			};
+		}, onFailure: onFailure ? false);
 		if (remoteControlled.not, {
 			"You will have to manually boot remote server.".inform;
 		},{
@@ -738,10 +754,10 @@ Server {
 		sendQuit = nil;
 		this.serverRunning = false;
 		if(scopeWindow.notNil) { scopeWindow.quit };
-		RootNode(this).freeAll;
-		volume.isPlaying.if({
+		if(volume.isPlaying) {
 			volume.free
-			});
+		};
+		RootNode(this).freeAll;
 		this.newAllocators;
 	}
 
@@ -867,7 +883,7 @@ Server {
 						[\bufnum, recordBuf.bufnum]);
 				CmdPeriod.doOnce {
 					recordNode = nil;
-					if (recordBuf.notNil) { recordBuf.close {|buf| buf.free; }; recordBuf = nil; };
+					if (recordBuf.notNil) { recordBuf.close {|buf| buf.freeMsg }; recordBuf = nil; };
 				}
 			} {
 				recordNode.run(true)
@@ -884,7 +900,7 @@ Server {
 		if(recordNode.notNil) {
 			recordNode.free;
 			recordNode = nil;
-			recordBuf.close({ arg buf; buf.free; });
+			recordBuf.close({ |buf| buf.freeMsg });
 			"Recording Stopped: %\n".postf(recordBuf.path);
 			recordBuf = nil;
 		} {
@@ -1000,15 +1016,17 @@ Server {
 
 	volume_ {arg newVolume;
 		volume.volume_(newVolume);
-		}
+	}
 
 	mute {
 		volume.mute;
-		}
+	}
 
 	unmute {
 		volume.unmute;
 	}
+
+	hasShmInterface { ^serverInterface.notNil }
 
 	reorder { arg nodeList, target, addAction=\addToHead;
 		target = target.asTarget;
@@ -1017,7 +1035,7 @@ Server {
 
 	getControlBusValue {|busIndex|
 		if (serverInterface.isNil) {
-			error("Server-getControlBusValue only supports local servers")
+			Error("Server-getControlBusValue only supports local servers").throw;
 		} {
 			^serverInterface.getControlBusValue(busIndex)
 		}
@@ -1025,7 +1043,7 @@ Server {
 
 	getControlBusValues {|busIndex, busChannels|
 		if (serverInterface.isNil) {
-			error("Server-getControlBusValues only supports local servers")
+			Error("Server-getControlBusValues only supports local servers").throw;
 		} {
 			^serverInterface.getControlBusValues(busIndex, busChannels)
 		}
@@ -1033,7 +1051,7 @@ Server {
 
 	setControlBusValue {|busIndex, value|
 		if (serverInterface.isNil) {
-			error("Server-getControlBusValue only supports local servers")
+			Error("Server-getControlBusValue only supports local servers").throw;
 		} {
 			^serverInterface.setControlBusValue(busIndex, value)
 		}
@@ -1041,7 +1059,7 @@ Server {
 
 	setControlBusValues {|busIndex, valueArray|
 		if (serverInterface.isNil) {
-			error("Server-getControlBusValues only supports local servers")
+			Error("Server-getControlBusValues only supports local servers").throw;
 		} {
 			^serverInterface.setControlBusValues(busIndex, valueArray)
 		}

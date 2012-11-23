@@ -286,6 +286,9 @@ Document {
 
 	*setTheme { | themeName |
 		theme = themes[themeName];
+		if(theme.proto.isNil) {
+			theme = theme.copy.parent_(themes[\default]);
+		};
 		thisProcess.platform.writeClientCSS;
 		Document.implementationClass.prSetSyntaxColorTheme(
 			theme.textColor,
@@ -445,7 +448,7 @@ Document {
 		{ selectedText.first == $[ and: { selectedText.last == $] }}
 		{
 			// open help file
-			selectedText[1 .. selectedText.size-2].openHelpFile
+			selectedText[1 .. selectedText.size-2].help
 		}
 		{ selectedText.containsStringAt(0, "http://")
 			or: { selectedText.containsStringAt(0, "file://") } }

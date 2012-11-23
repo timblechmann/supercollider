@@ -3,6 +3,8 @@ QFont {
   var <>name, <size, <>bold, <>italic, <hasPointSize=false;
   /* ----------------- class -------------------*/
 
+  *implementsClass {^'Font'}
+
   *initClass {
 
   }
@@ -73,6 +75,19 @@ QFont {
   pixelSize { ^( if(hasPointSize){nil}{size} ) }
 
   pointSize { ^( if(hasPointSize){size}{nil} ) }
+
+  // support Qt GUI in combination with CocoaDocument
+  asSCFont {
+    var cocoa, scfont;
+    cocoa = GUI.get(\cocoa);
+    if(cocoa.notNil) {
+      scfont = cocoa.font.new(name, size);
+      if(bold){scfont = scfont.boldVariant};
+      ^scfont;
+    }{
+      ^nil
+    }
+  }
 
   /* ------------------ private -----------------*/
 

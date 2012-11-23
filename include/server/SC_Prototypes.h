@@ -23,6 +23,8 @@
 #define _SC_Prototypes_
 
 #include <ctype.h> // for size_t
+#include <cstdlib>
+#include <cstring>
 
 #include "SC_Types.h"
 #include "scsynthsend.h"
@@ -193,7 +195,6 @@ void SendDoneWithIntValue(struct ReplyAddress *inReply, const char *inCommandNam
 void SendFailure(struct ReplyAddress *inReply, const char *inCommandName, const char *errString);
 void SendFailureWithBufnum(struct ReplyAddress *inReply, const char *inCommandName, const char *errString, uint32 index);
 void ReportLateness(struct ReplyAddress *inReply, float32 seconds);
-void DumpReplyAddress(struct ReplyAddress *inReplyAddress);
 int32 Hash(struct ReplyAddress *inReplyAddress);
 
 ////////////////////////////////////////////////////////////////////////

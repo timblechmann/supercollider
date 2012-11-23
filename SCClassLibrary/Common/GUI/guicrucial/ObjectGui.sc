@@ -1,13 +1,16 @@
+
+
 ObjectGui : SCViewHolder {
 	/*
-		this is a controller class. it creates the views and implements the relationship between them and the model
+		this is a controller class:
+			it creates the views and implements the relationship between them and the model
 		model: the object for which this is a graphical user interface
 		view: this.view is the flow view (aka the arg layout) that is passed to guiBody
 			individual views/widgets are placed in it and their actions talk to either this object or the model
 	*/
 	var <model,<dragSource;
 
-	guiBody { arg layout;
+	guiBody { arg layout,bounds ... args;
 		/* implement this method in your gui subclass */
 
 		// if your model implement guiBody then call that
@@ -15,7 +18,7 @@ ObjectGui : SCViewHolder {
 		// where model/gui code separation is not especially important
 		// and where the controller class doesn't need to maintain any state or vars
 		if(model.respondsTo(\guiBody) and: {model.isKindOf(ObjectGui).not},{
-			model.guiBody(layout)
+			model.guiBody(layout,bounds,*args)
 		})
 	}
 
@@ -32,7 +35,7 @@ ObjectGui : SCViewHolder {
 		layout.flow({ arg layout;
 			this.view = layout;
 			this.writeName(layout);
-			this.performList(\guiBody,[layout] ++ args);
+			this.performList(\guiBody,[layout,bounds] ++ args);
 		},bounds).background_(this.background);
 		//if you created it, front it
 		if(parent.isNil,{
@@ -92,7 +95,6 @@ ObjectGui : SCViewHolder {
 			.align_(\left)
 			.beginDragAction_({ model })
 			.object_(string);
-		// InspectorLink.icon(model,layout);
 	}
-
 }
+

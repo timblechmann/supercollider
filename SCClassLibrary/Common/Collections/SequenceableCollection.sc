@@ -118,6 +118,14 @@ SequenceableCollection : Collection {
 		^true
 	}
 
+	hash {
+		var hash = this.class.hash;
+		this.do { | item |
+			hash = hash << 1 bitXor: item.hash // encode item order by left shifting
+		};
+		^hash
+	}
+
 	copyRange { arg start, end;
 		var newColl;
 		var i = start;
@@ -326,6 +334,19 @@ SequenceableCollection : Collection {
 		list = list.add(sublist);
 		^list
 	}
+	split { arg separator=$/;
+		var list = Array.new, index, prevIndex = -1, sepsize;
+		separator = separator.as(this.class);
+		sepsize = separator.size;
+		loop {
+			index = this.find(separator, offset: prevIndex + 1);
+			if(index.isNil) {
+				^list.add(this[prevIndex..]);
+			};
+			list = list.add(this[prevIndex..index - 1]);
+			prevIndex = index + sepsize;
+		}
+	}
 	clump { arg groupSize;
 		var list = Array.new((this.size / groupSize).roundUp.asInteger);
 		var sublist = this.species.new(groupSize);
@@ -375,11 +396,11 @@ SequenceableCollection : Collection {
 		});
 		^list
 	}
-	
+
 	flat {
 		^this.prFlat(this.species.new(this.flatSize))
 	}
-	
+
 	prFlat { |list|
 		this.do({ arg item, i;
 			if (item.respondsTo('prFlat'), {
@@ -402,7 +423,7 @@ SequenceableCollection : Collection {
 		});
 		^list
 	}
-	
+
 	flop {
 		var list, size, maxsize;
 
@@ -410,15 +431,15 @@ SequenceableCollection : Collection {
 		maxsize = 0;
 		this.do({ arg sublist;
 			var sz;
-			sz = if (sublist.isSequenceableCollection, { sublist.size },{ 1 });
+			sz = if(sublist.isSequenceableCollection, { sublist.size }, { 1 });
 			if (sz > maxsize, { maxsize = sz });
 		});
 
 		list = this.species.fill(maxsize, { this.species.new(size) });
 		this.do({ arg isublist, i;
-			if (isublist.isSequenceableCollection, {
+			if(isublist.isSequenceableCollection, {
 				list.do({ arg jsublist, j;
-					jsublist.add( isublist.wrapAt(j); );
+					jsublist.add( isublist.wrapAt(j) );
 				});
 			},{
 				list.do({ arg jsublist, j;
@@ -427,6 +448,22 @@ SequenceableCollection : Collection {
 			});
 		});
 		^list
+	}
+
+	flopWith { |func|
+		var maxsize = this.maxValue { |sublist|
+			if(sublist.isSequenceableCollection) { sublist.size } { 1 }
+		};
+
+		^this.species.fill(maxsize, { |i|
+			func.value( *this.collect { |sublist|
+				if(sublist.isSequenceableCollection) {
+					sublist.wrapAt(i)
+				} {
+					sublist
+				}
+			})
+		})
 	}
 
 	flopTogether { arg ... moreArrays;
@@ -442,6 +479,29 @@ SequenceableCollection : Collection {
 		^array.collect { |sublist|
 			sublist.flop.collect { |each| each.drop(-1) } // remove stand-in
 		};
+	}
+
+	flopDeep { arg rank;
+		var size, maxsize;
+		if(rank.isNil) { rank = this.maxDepth - 1 };
+		if(rank <= 1) { ^this.flop };
+
+		size = this.size;
+		maxsize = this.maxSizeAtDepth(rank);
+		^this.species.fill(maxsize, { |i|
+			this.wrapAtDepth(rank, i)
+		})
+	}
+
+	wrapAtDepth { arg rank, index;
+		if(rank == 0) { ^this.wrapAt(index) };
+		^this.collect { |item, i|
+			if(item.isSequenceableCollection) {
+				item.wrapAtDepth(rank - 1, index)
+			} {
+				item
+			}
+		}
 	}
 
 	unlace { arg numlists, clumpSize=1, clip=false;
@@ -800,7 +860,7 @@ SequenceableCollection : Collection {
 			});
 			^newList
 		};
-		error("unrecognized adverb: '" ++ adverb ++ "' for operator '" ++ aSelector ++ "'\n");
+		Error("unrecognized adverb: '" ++ adverb ++ "' for operator '" ++ aSelector ++ "'\n").throw;
 		^nil
 	}
 	performBinaryOpOnSimpleNumber { arg aSelector, aNumber, adverb;
@@ -842,6 +902,12 @@ SequenceableCollection : Collection {
 		}
 	}
 
+	// this method is for UGen inputs that require Refs to block direct multichannel expansion.
+	// here, we assume this is already an array of Refs, which we simply return.
+	multichannelExpandRef { arg rank;
+		^this
+	}
+
 	// support some UGen convenience methods.
 	// NOTE: don't forget to add a wrapper here when adding a method to UGen or AbstractFunction
 	clip { arg ... args; ^this.multiChannelPerform('clip', *args) }
@@ -864,6 +930,7 @@ SequenceableCollection : Collection {
 	lag2ud { arg ... args; ^this.multiChannelPerform('lag2ud', *args) }
 	lag3ud { arg ... args; ^this.multiChannelPerform('lag3ud', *args) }
 	varlag { arg ... args; ^this.multiChannelPerform('varlag', *args) }
+	slew { arg ... args; ^this.multiChannelPerform('slew', *args) }
 	blend { arg ... args; ^this.multiChannelPerform('blend', *args) }
 	checkBadValues { arg ... args; ^this.multiChannelPerform('checkBadValues', *args) }
 	prune { arg ... args; ^this.multiChannelPerform('prune', *args) }

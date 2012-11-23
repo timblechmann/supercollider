@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2011 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2011-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -23,10 +23,13 @@
 #include "QcApplication.h"
 #include "Common.h"
 #include "style/ProxyStyle.hpp"
+#include "style/style.hpp"
 
 #include <QPlastiqueStyle>
 #include <QTimer>
 #include <QEventLoop>
+#include <QDir>
+#include <QWebSettings>
 
 #ifdef Q_WS_X11
 # include <X11/Xlib.h>
@@ -34,25 +37,49 @@
 
 #include <clocale>
 
+namespace QtCollider {
+  void loadFactories ();
+}
+
+inline void initResources() { Q_INIT_RESOURCE(resources); }
+
+static QPalette gSystemPalette;
+QPalette QtCollider::systemPalette() { return gSystemPalette; }
+
 QC_PUBLIC
 void QtCollider::init() {
   if( !QApplication::instance() ) {
     qcDebugMsg( 1, "Initializing QtCollider" );
+
+    initResources();
+
+    QtCollider::loadFactories();
+
+    QLocale::setDefault( QLocale::c() );
+
 #ifdef Q_WS_X11
     XInitThreads();
 #endif
+
 #ifdef Q_OS_MAC
     QApplication::setAttribute( Qt::AA_MacPluginApplication, true );
 #endif
+
     static int qcArgc = 1;
-    static char qcArg0[] = "";
-    static char *qcArgv[1];
-    qcArgv[0] = qcArg0;
+    static char qcArg0[] = "SuperCollider";
+    static char *qcArgv[1] = {qcArg0};
+
     QcApplication *qcApp = new QcApplication( qcArgc, qcArgv );
+
     qcApp->setQuitOnLastWindowClosed( false );
-#ifdef Q_OS_MAC
-    qcApp->setStyle( new QtCollider::ProxyStyle( new QPlastiqueStyle ) );
-#endif
+
+    qcApp->setStyle( new QtCollider::Style::StyleImpl( new QPlastiqueStyle ) );
+
+    gSystemPalette = qcApp->palette();
+
+    // Enable javascript localStorage for WebViews
+    QWebSettings::globalSettings()->setAttribute( QWebSettings::LocalStorageEnabled, true );
+
     // NOTE: Qt may tamper with the C language locale, affecting POSIX number-string conversions.
     // Revert the locale to default:
     setlocale( LC_NUMERIC, "C" );

@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2010 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2010-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -25,8 +25,12 @@
 #include "../Slot.h"
 #include "../QcApplication.h"
 #include "../QObjectProxy.h"
-#include "../style/ProxyStyle.hpp"
+#include "../style/style.hpp"
 #include "QtCollider.h"
+
+#ifdef Q_WS_MAC
+# include "../hacks/hacks_mac.hpp"
+#endif
 
 #include <PyrKernel.h>
 
@@ -36,7 +40,7 @@
 #include <QStyleFactory>
 #include <QWebSettings>
 
-using namespace QtCollider;
+namespace QtCollider {
 
 QC_LANG_PRIMITIVE( QtGUI_SetDebugLevel, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
@@ -120,6 +124,13 @@ QC_LANG_PRIMITIVE( Qt_FocusWidget, 0,  PyrSlot *r, PyrSlot *a, VMGlobals *g )
 
   QWidget *w = QApplication::focusWidget();
 
+#ifdef Q_WS_MAC
+  // On Mac we need to make additional checks, as Qt does not monitor
+  // focus changes to native Cocoa windows in the same application.
+  if( w && !QtCollider::Mac::isKeyWindow( w ) )
+    w = 0;
+#endif
+
   if( w ) {
     QObjectProxy *proxy = QObjectProxy::fromObject(w);
     if( proxy && proxy->scObject() ) {
@@ -142,7 +153,7 @@ QC_LANG_PRIMITIVE( Qt_SetStyle, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
   QStyle *style = QStyleFactory::create( str );
   if( !style ) return errFailed;
 
-  QApplication::setStyle( new QtCollider::ProxyStyle( style ) );
+  QApplication::setStyle( new QtCollider::Style::StyleImpl( style ) );
   return errNone;
 }
 
@@ -167,3 +178,54 @@ QC_LANG_PRIMITIVE( QWebView_ClearMemoryCaches, 0, PyrSlot *r, PyrSlot *a, VMGlob
 
   return errNone;
 }
+
+QC_LANG_PRIMITIVE( Qt_IsMethodOverridden, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g )
+{
+  if(NotObj(a) || NotSym(a+1))
+    return errWrongType;
+
+  PyrObject *self = slotRawObject(r);
+  PyrObjectHdr *superclass = slotRawObject(a);
+  PyrSymbol *method = slotRawSymbol(a+1);
+
+  for(PyrClass *klass = self->classptr;
+      klass != superclass && klass != class_object;
+      klass = slotRawSymbol(&klass->superclass)->u.classobj)
+  {
+    PyrSlot *methodSlot = &klass->methods;
+    if(!IsObj(methodSlot)) continue;
+    PyrObject *methodArray = slotRawObject(methodSlot);
+    PyrSlot *methods = methodArray->slots;
+    for(int i = 0; i < methodArray->size; ++i)
+    {
+      PyrMethod *m = slotRawMethod(methods+i);
+      if(slotRawSymbol(&m->name) == method){
+        SetTrue(r);
+        return errNone;
+      }
+    }
+  }
+
+  SetFalse(r);
+  return errNone;
+}
+
+void defineMiscPrimitives()
+{
+  LangPrimitiveDefiner definer;
+  definer.define<QtGUI_SetDebugLevel>();
+  definer.define<QtGUI_DebugLevel>();
+  definer.define<QWindow_ScreenBounds>();
+  definer.define<QWindow_AvailableGeometry>();
+  definer.define<Qt_StringBounds>();
+  definer.define<Qt_AvailableFonts>();
+  definer.define<Qt_GlobalPalette>();
+  definer.define<Qt_SetGlobalPalette>();
+  definer.define<Qt_FocusWidget>();
+  definer.define<Qt_SetStyle>();
+  definer.define<Qt_AvailableStyles>();
+  definer.define<Qt_IsMethodOverridden>();
+  definer.define<QWebView_ClearMemoryCaches>();
+}
+
+} // namespace QtCollider

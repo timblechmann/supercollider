@@ -30,14 +30,17 @@ class QcAbstractStepValue
       _ctrlScale( 10.f ),
       _altScale( 0.1f )
     {}
-    bool modifyStep( float *step );
-    void setShiftScale( float scale ) { _shiftScale = scale; }
-    void setCtrlScale( float scale ) { _ctrlScale = scale; }
-    void setAltScale( float scale ) { _altScale = scale; }
+    bool modifyStep( double *step );
+    void setShiftScale( double scale ) { _shiftScale = scale; }
+    void setCtrlScale( double scale ) { _ctrlScale = scale; }
+    void setAltScale( double scale ) { _altScale = scale; }
+    double shiftScale() { return _shiftScale; }
+    double ctrlScale() { return _ctrlScale; }
+    double altScale() { return _altScale; }
   private:
-    float _shiftScale;
-    float _ctrlScale;
-    float _altScale;
+    double _shiftScale;
+    double _ctrlScale;
+    double _altScale;
 };
 
 #endif

@@ -32,8 +32,12 @@
 #include <QUrl>
 
 #ifdef Q_WS_X11
-#include <QX11Info>
-#include "hacks/hacks_x11.hpp"
+# include "hacks/hacks_x11.hpp"
+# include <QX11Info>
+# include <X11/Xlib.h>
+// X11 defines the following, clashing with QEvent::Type enum
+# undef KeyPress
+# undef KeyRelease
 #endif
 
 using namespace QtCollider;
@@ -229,12 +233,7 @@ bool QWidgetProxy::filterEvent( QObject *o, QEvent *e, EventHandlerData &eh, QLi
   // NOTE We assume that qObject need not be checked here, as we wouldn't get events if
   // it wasn't existing
 
-  int type = e->type();
-
-  eh = eventHandlers().value( type );
-  if( eh.type != type ) return false;
-
-  switch( type ) {
+  switch( eh.type ) {
 
     case QEvent::KeyPress:
       return ((_globalEventMask & KeyPress) || eh.enabled)
@@ -253,7 +252,7 @@ bool QWidgetProxy::filterEvent( QObject *o, QEvent *e, EventHandlerData &eh, QLi
       return eh.enabled && interpretMouseEvent( o, e, args );
 
     case QEvent::Wheel:
-      return interpretMouseWheelEvent( o, e, args );
+      return eh.enabled && interpretMouseWheelEvent( o, e, args );
 
     case QEvent::DragEnter:
     case QEvent::DragMove:
@@ -272,16 +271,10 @@ bool QWidgetProxy::interpretMouseEvent( QObject *o, QEvent *e, QList<QVariant> &
 
   QWidget *w = widget();
 
-  if( e->type() == QEvent::Enter || e->type() == QEvent::Leave ) {
-    QPoint pos = QCursor::pos();
+  QEvent::Type etype = e->type();
 
-
-    if( w ) pos = w->mapFromGlobal( pos );
-
-    args << pos.x();
-    args << pos.y();
+  if( etype == QEvent::Enter || etype == QEvent::Leave )
     return true;
-  }
 
   QMouseEvent *mouse = static_cast<QMouseEvent*>( e );
   QPoint pt = ( _mouseEventWidget == w ?
@@ -292,28 +285,52 @@ bool QWidgetProxy::interpretMouseEvent( QObject *o, QEvent *e, QList<QVariant> &
 
   args << (int) mouse->modifiers();
 
-  if( e->type() == QEvent::MouseMove ) return true;
+  if( etype == QEvent::MouseMove )
+  {
+    int buttons = mouse->buttons();
 
-  int button;
-  switch( mouse->button() ) {
-    case Qt::LeftButton:
-      button = 0; break;
-    case Qt::RightButton:
-      button = 1; break;
-    case Qt::MidButton:
-      button = 2; break;
-    default:
-      button = -1;
+    if( buttons == 0 ) {
+      // Special treatment of mouse-tracking events.
+
+      QWidget *win = w->window();
+
+      // Only accept if window has a special property enabled.
+      if( !(win && win->property("_qc_win_mouse_tracking").toBool()) )
+        return false;
+
+      // Reject the events when mouse pointer leaves the window,
+      // resulting in out-of-bounds coordinates
+      if( win == w ) {
+        if( pt.x() < 0 || pt.x() >= w->width() || pt.y() < 0 || pt.y() >= w->height() )
+          return false;
+      }
+    }
+
+    args << (int) mouse->buttons();
   }
+  else
+  {
+    // MouseButtonPress, MouseButtonDblClick, MouseButtonRelease
 
-  args << button;
+    int button;
 
-  switch( e->type() ) {
-    case QEvent::MouseButtonPress:
-      args << 1; break;
-    case QEvent::MouseButtonDblClick:
-      args << 2; break;
-    default: ;
+    switch( mouse->button() ) {
+      case Qt::LeftButton:
+        button = 0; break;
+      case Qt::RightButton:
+        button = 1; break;
+      case Qt::MidButton:
+        button = 2; break;
+      default:
+        button = -1;
+    }
+
+    args << button;
+
+    if( etype == QEvent::MouseButtonPress )
+      args << 1;
+    else if( etype == QEvent::MouseButtonDblClick )
+      args << 2;
   }
 
   return true;
@@ -353,14 +370,80 @@ bool QWidgetProxy::interpretKeyEvent( QObject *o, QEvent *e, QList<QVariant> &ar
 
   QKeyEvent *ke = static_cast<QKeyEvent*>( e );
 
-  QString text = ke->text();
-  int unicode = ( text.count() == 1 ? text[0].unicode() : 0 );
+  int key = ke->key();
 
-  args << text;
-  args << (int) ke->modifiers();
+  int mods = ke->modifiers();
+
+  QChar character;
+
+#ifdef Q_WS_MAC
+  bool isLetter = key >= Qt::Key_A && key <= Qt::Key_Z;
+  if (mods & Qt::MetaModifier && isLetter)
+  {
+      character = QChar(key - Qt::Key_A + 1);
+  }
+  else if(mods & Qt::AltModifier && isLetter)
+  {
+      character = (mods & Qt::ShiftModifier) ? QChar(key) : QChar(key - Qt::Key_A + 97 );
+  }
+  else
+#endif
+  {
+      QString text( ke->text() );
+      if (text.count()) character = text[0];
+  }
+
+  int unicode = character.unicode();
+
+#ifdef Q_WS_X11
+  KeySym sym = ke->nativeVirtualKey();
+  int keycode = XKeysymToKeycode( QX11Info::display(), sym );
+#else
+  // FIXME: On Mac OS X, this does not work for modifier keys
+  int keycode = ke->nativeVirtualKey();
+#endif
+
+  args << character;
+  args << mods;
   args << unicode;
-  args << ke->key();
+  args << keycode;
+  args << key;
   args << ke->spontaneous();
+
+  return true;
+}
+
+static QString urlAsString( const QUrl & url )
+{
+  if(url.scheme() == "file")
+    return url.toLocalFile();
+  else
+    return url.toString();
+}
+
+static bool interpretMimeData( const QMimeData *data, QList<QVariant> &args )
+{
+  if( data->hasUrls() )
+  {
+    QList<QUrl> urls = data->urls();
+    if( urls.count() > 1 ) {
+      VariantList list;
+      Q_FOREACH( QUrl url, urls )
+        list.data << urlAsString( url );
+      args << QVariant::fromValue<VariantList>(list);
+    }
+    else {
+      args << urlAsString( urls[0] );
+    }
+  }
+  else if( data->hasText() )
+  {
+    args << data->text();
+  }
+  else
+  {
+    return false;
+  }
 
   return true;
 }
@@ -372,10 +455,16 @@ bool QWidgetProxy::interpretDragEvent( QObject *o, QEvent *e, QList<QVariant> &a
   QDropEvent *dnd = static_cast<QDropEvent*>(e);
 
   const QMimeData *data = dnd->mimeData();
-  if ( !data->hasFormat( "application/supercollider" ) )
-    return false;
 
-  if( dnd->type() != QEvent::DragEnter ) {
+  if( dnd->type() == QEvent::DragEnter )
+  {
+    bool internal = data->hasFormat( "application/supercollider" );
+    args << internal;
+    if(!internal)
+      interpretMimeData(data, args);
+  }
+  else
+  {
     QPoint pos = dnd->pos();
     args << pos.x() << pos.y();
   }
@@ -396,7 +485,7 @@ void QWidgetProxy::customPaint( QPainter *painter )
   QtCollider::lockLang();
 
   if( QtCollider::beginPainting( painter ) ) {
-    invokeScMethod( s_doDrawFunc, QList<QVariant>(), 0, true );
+    invokeScMethod( SC_SYM(doDrawFunc), QList<QVariant>(), 0, true );
     QtCollider::endPainting();
   }
 

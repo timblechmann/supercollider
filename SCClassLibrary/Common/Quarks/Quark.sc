@@ -131,17 +131,29 @@ Quark
 		};
 		^deps;
 	}
-	openHelpFile {
-		var p = info.helpdoc;
-		if(p.isNil) {^nil};
-		case
-			{p.endsWith(".html")} {
-				HelpBrowser.goTo(HelpBrowser.getOldWrapUrl(parent.local.path +/+ path +/+ p))
-			}
-			{p.endsWith(".scd") or: {p.endsWith(".txt")}} {
-				HelpBrowser.goTo(parent.local.path +/+ path +/+ p)
-			}
-			{ HelpBrowser.openHelpFor(p) };
+	help {
+		var p = info.schelp;
+		if(p.notNil) {
+			HelpBrowser.openHelpFor(p);
+			^this
+		};
+		if(File.exists(parent.local.path +/+ path +/+ "HelpSource")) {
+			HelpBrowser.openBrowsePage("Quarks>"++name);
+			^this;
+		};
+		p = info.helpdoc;
+		if(p.notNil) {
+			case
+				{p.endsWith(".html")} {
+					HelpBrowser.goTo(HelpBrowser.getOldWrapUrl(parent.local.path +/+ path +/+ p))
+				}
+				{p.endsWith(".scd") or: {p.endsWith(".txt")}} {
+					HelpBrowser.goTo(parent.local.path +/+ path +/+ p)
+				}
+				{ "Uknown help file type: %".format(p).warn };
+			^this
+		};
+		HelpBrowser.openBrowsePage("Quarks>"++name);
 	}
 	printOn { arg stream;
 		stream << "Quark: " << name;
@@ -198,8 +210,7 @@ Quark
 
 QuarkView {
 	var	<quark, <isInstalled, <toBeInstalled = false, <toBeDeinstalled = false, installButton,
-		nameView, authorView, infoButton, srcButton, browseHelpButton,
-		<treeItem;
+		nameView, authorView, infoButton, srcButton, browseHelpButton;
 
 	*new { |parent, extent, quark, isInstalled|
 		^super.new.init(parent, extent, quark, isInstalled)
@@ -211,58 +222,50 @@ QuarkView {
 		quark = aQuark;
 		isInstalled = argIsInstalled;
 
-		if( parent.class.name === \QTreeView ) {
-			installButton = Button().fixedSize_(Size(20,20));
-			treeItem = parent.addItem([
-				nil, quark.name,
-				quark.summary.replace("\n"," ").replace($\t.asString,"")
-			]).setView( 0, installButton );
-		}{
-			//installBounds = Rect(0,0, extent.y, extent.y);
-			infoBounds = Rect(0,0, 25, extent.y);
-			sourceBounds = Rect(0, 0, 20, extent.y);
-			checkoutBounds = Rect(0,0,50,extent.y);
-			remainder = extent.x - (infoBounds.width*2)  - sourceBounds.width -
-				checkoutBounds.width - (4*pad);
-			descrBounds = Rect(0, 0, (remainder * 0.60).asInteger, extent.y);
-			authorBounds = Rect(0, 0, (remainder * 0.40).asInteger, extent.y);
+		//installBounds = Rect(0,0, extent.y, extent.y);
+		infoBounds = Rect(0,0, 25, extent.y);
+		sourceBounds = Rect(0, 0, 20, extent.y);
+		checkoutBounds = Rect(0,0,50,extent.y);
+		remainder = extent.x - (infoBounds.width*2)  - sourceBounds.width -
+			checkoutBounds.width - (4*pad);
+		descrBounds = Rect(0, 0, (remainder * 0.60).asInteger, extent.y);
+		authorBounds = Rect(0, 0, (remainder * 0.40).asInteger, extent.y);
 
-			installButton = GUI.button.new(parent, Rect(15,15,17,17));
+		installButton = GUI.button.new(parent, Rect(15,15,17,17));
 
-			// the name with author
-			nameView = GUI.staticText.new(parent, descrBounds).string_(quark.name);
-			authorView = GUI.staticText.new(parent, authorBounds).string_(quark.author);
-			infoButton = GUI.button.new(parent, infoBounds)
+		// the name with author
+		nameView = GUI.staticText.new(parent, descrBounds).string_(quark.name);
+		authorView = GUI.staticText.new(parent, authorBounds).string_(quark.author);
+		infoButton = GUI.button.new(parent, infoBounds)
+			.font_( Font.sansSerif( 10 ))
+			.states_([["info"]]).action_{this.fullDescription};
+
+		browseHelpButton = GUI.button.new(parent, infoBounds)
+			.font_( Font.sansSerif( 10 ))
+			.states_([["help"]])
+			.action_({ quark.help });
+
+		if(quark.isLocal) {
+			srcButton = GUI.button.new(parent, sourceBounds)
 				.font_( Font.sansSerif( 10 ))
-				.states_([["info"]]).action_{this.fullDescription};
-
-			browseHelpButton = GUI.button.new(parent, infoBounds)
-				.font_( Font.sansSerif( 10 ))
-				.states_([["help"]])
-				.action_({ Help(quark.parent.local.path +/+ quark.path).gui });
-
-			if(quark.isLocal and: {thisProcess.platform.name == \osx}) {
-				srcButton = GUI.button.new(parent, sourceBounds)
-					.font_( Font.sansSerif( 10 ))
-					.states_([["src"]]).action_{
-						("open " ++ ("%/%".format(Quarks.local.path, quark.path).escapeChar($ ))).unixCmd;
-					};
-			};
-
-			/*if(quark.isLocal.not,{
-				GUI.button.new(parent, checkoutBounds)
-					.font_( Font.sansSerif( 10 ))
-					.states_([["checkout"]]).action_{
-						Quarks.checkout(quark.name);
-					};
-			});*/
+				.states_([["src"]]).action_{
+					openOS( "%/%".format(Quarks.local.path, quark.path) );
+				};
 		};
+
+		/*if(quark.isLocal.not,{
+			GUI.button.new(parent, checkoutBounds)
+				.font_( Font.sansSerif( 10 ))
+				.states_([["checkout"]]).action_{
+					Quarks.checkout(quark.name);
+				};
+		});*/
 
 		this.updateButtonStates;
 	}
 	updateButtonStates {
 		var palette = GUI.current.tryPerform(\palette);
-		var c = palette !? {palette.buttonColor};
+		var c = palette !? {palette.button};
 
 		isInstalled.if({
 			// Quark is currently installed
@@ -300,30 +303,82 @@ QuarkView {
 	}
 	fullDescription {
 		var window;
-		var helpdoc = quark.info.helpdoc;
-		if(helpdoc.notNil) {
-				// get full path
-			helpdoc = "%/%/%".format(Quarks.local.simplePath, quark.path, helpdoc);
-			if(File.exists(helpdoc).not) { helpdoc = nil };
-		};
 		window = GUI.window.new(quark.name, Rect(100, 100, 400, 200)).front;
-		GUI.textView.new( window, Rect(4, 4, 392, 170 + (helpdoc.isNil.binaryValue * 22)))
+		GUI.textView.new( window, Rect(4, 4, 392, 192))
 			.font_( Font.sansSerif( 12 ) )
 			.resize_( 5 )
 			.autohidesScrollers_( true )
 			.hasVerticalScroller_( true )
 			.string_( quark.longDesc )
 			.editable_( false );
-		if(helpdoc.notNil) {
-			GUI.button.new(window, Rect(125, 176, 150, 20))
-				.resize_(8)
-				.states_([["Open quark help"]])
-				.action_({
-					helpdoc.openHTMLFile
-				});
-		};
+		GUI.button.new(window, Rect(125, 176, 150, 20))
+			.resize_(8)
+			.states_([["Open quark help"]])
+			.action_({ quark.help });
 	}
 	remove {
 		[installButton, nameView, infoButton, srcButton].do(_.remove);
+	}
+}
+
+QuarkViewQt {
+	var <quark, <isInstalled, <toBeInstalled = false, <toBeDeinstalled = false, <treeItem;
+	var installButton;
+
+	*new { |parent, quark, isInstalled|
+		^super.new.init(parent, quark, isInstalled)
+	}
+
+	init { |parent, aQuark, argIsInstalled|
+
+		quark = aQuark;
+		isInstalled = argIsInstalled;
+
+		installButton = Button().fixedSize_(Size(20,20));
+		treeItem = parent.addItem([
+			nil, quark.name,
+			quark.summary !? { quark.summary.replace("\n"," ").replace("\t","") }
+		]).setView( 0, installButton );
+
+		this.updateButtonStates;
+	}
+
+	updateButtonStates {
+		var palette = GUI.current.tryPerform(\palette);
+		var c = palette !? {palette.button};
+
+		isInstalled.if({
+			// Quark is currently installed
+			installButton.states = [
+				// installed
+				["+", nil, if(c.notNil){Color.green.blend(c,0.5)}{Color.green(1, 0.5)}],
+				// selected to deinstall
+				["x", nil, if(c.notNil){Color.red.blend(c,0.5)}{Color.red(1, 0.5)}]
+			];
+			installButton.action = { arg butt;
+				toBeDeinstalled = butt.value>0;
+			};
+
+		},{
+			// Quark is currently not installed
+			installButton.states = [
+				// never installed
+				["-", nil, ],
+				// selected to install
+				["*", nil, if(c.notNil){Color.blue.blend(c,0.5)}{Color.blue(1, 0.5)}]
+			];
+			installButton.action = { arg butt;
+				toBeInstalled = butt.value>0;
+			};
+		});
+		this.reset;
+	}
+	reset {
+		installButton.valueAction = 0;
+	}
+	flush {
+		toBeInstalled.if  {isInstalled = true;  toBeInstalled   = false};
+		toBeDeinstalled.if{isInstalled = false; toBeDeinstalled = false};
+		this.updateButtonStates;
 	}
 }

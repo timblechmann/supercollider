@@ -35,8 +35,10 @@
 #include "SC_Samp.h"
 #include "SC_Prototypes.h"
 #include "SC_Errors.h"
+#include "SC_Unit.h"
 #include "clz.h"
 #include "SC_fftlib.h"
+#include "../../common/SC_SndFileHelpers.hpp"
 
 // undefine the shadowed scfft functions
 #undef scfft_create
@@ -396,10 +398,10 @@ void clear_outputs(Unit *unit, int samples)
 
     if ((samples & 15) == 0)
         for (size_t i=0; i!=outputs; ++i)
-            nova::zerovec_simd(OUT(i), samples);
+            nova::zerovec_simd(unit->mOutBuf[i], samples);
     else
         for (size_t i=0; i!=outputs; ++i)
-            nova::zerovec(OUT(i), samples);
+            nova::zerovec(unit->mOutBuf[i], samples);
 }
 
 void node_end(struct Node * node)
@@ -561,7 +563,7 @@ int do_asynchronous_command(World *inWorld, void* replyAddr, const char* cmdName
                                             stage2, stage3, stage4, cleanup,
                                             completionMsgSize, completionMsgData);
     return 0;
-};
+}
 
 } /* extern "C" */
 
@@ -610,6 +612,13 @@ void sc_plugin_interface::initialize(server_arguments const & args, float * cont
     sc_interface.fNodeRun = &node_set_run;
     sc_interface.fPrint = &print;
     sc_interface.fDoneAction = &done_action;
+
+    /* sndfile functions */
+#ifdef NO_LIBSNDFILE
+    sc_interface.fSndFileFormatInfoFromStrings = NULL;
+#else
+    sc_interface.fSndFileFormatInfoFromStrings = &sndfileFormatInfoFromStrings;
+#endif
 
     /* wave tables */
     sc_interface.mSine = gSine;
@@ -769,6 +778,7 @@ inline void sndbuf_init(SndBuf * buf)
     buf->mask1 = 0;
     buf->coord = 0;
     buf->sndfile = 0;
+    buf->isLocal = false;
 }
 
 inline void sndbuf_copy(SndBuf * dest, const SndBuf * src)
@@ -783,6 +793,7 @@ inline void sndbuf_copy(SndBuf * dest, const SndBuf * src)
     dest->mask1 = src->mask1;
     dest->coord = src->coord;
     dest->sndfile = src->sndfile;
+    dest->isLocal = src->isLocal;
 }
 
 static inline size_t compute_remaining_samples(size_t frames_per_read, size_t already_read, size_t total_frames)
@@ -847,6 +858,7 @@ int sc_plugin_interface::allocate_buffer(SndBuf * buf, uint32_t frames, uint32_t
     buf->mask1 = buf->mask - 1;    /* for oscillators */
     buf->samplerate = samplerate;
     buf->sampledur = 1.0 / samplerate;
+    buf->isLocal = false;
     return kSCErr_None;
 }
 
@@ -907,70 +919,6 @@ int sc_plugin_interface::buffer_alloc_read_channels(uint32_t index, const char *
     f.seek(start, SEEK_SET);
     read_channel(f, channel_count, channel_data, frames, buf->data);
 
-    return 0;
-}
-
-/* directly taken from supercollider sources
-   Copyright (c) 2002 James McCartney. All rights reserved.
-*/
-int sampleFormatFromString(const char* name)
-{
-    if (!name) return SF_FORMAT_PCM_16;
-
-    size_t len = strlen(name);
-    if (len < 1) return 0;
-
-    if (name[0] == 'u') {
-        if (len < 5) return 0;
-        if (name[4] == '8') return SF_FORMAT_PCM_U8; // uint8
-            return 0;
-    } else if (name[0] == 'i') {
-        if (len < 4) return 0;
-        if (name[3] == '8') return SF_FORMAT_PCM_S8;      // int8
-            else if (name[3] == '1') return SF_FORMAT_PCM_16; // int16
-                else if (name[3] == '2') return SF_FORMAT_PCM_24; // int24
-                    else if (name[3] == '3') return SF_FORMAT_PCM_32; // int32
-    } else if (name[0] == 'f') {
-        return SF_FORMAT_FLOAT; // float
-    } else if (name[0] == 'd') {
-        return SF_FORMAT_DOUBLE; // double
-    } else if (name[0] == 'm' || name[0] == 'u') {
-        return SF_FORMAT_ULAW; // mulaw ulaw
-    } else if (name[0] == 'a') {
-        return SF_FORMAT_ALAW; // alaw
-    }
-    return 0;
-}
-
-int headerFormatFromString(const char *name)
-{
-    if (!name) return SF_FORMAT_AIFF;
-    if (strcasecmp(name, "AIFF")==0) return SF_FORMAT_AIFF;
-    if (strcasecmp(name, "AIFC")==0) return SF_FORMAT_AIFF;
-    if (strcasecmp(name, "RIFF")==0) return SF_FORMAT_WAV;
-    if (strcasecmp(name, "WAVEX")==0) return SF_FORMAT_WAVEX;
-    if (strcasecmp(name, "WAVE")==0) return SF_FORMAT_WAV;
-    if (strcasecmp(name, "WAV" )==0) return SF_FORMAT_WAV;
-    if (strcasecmp(name, "Sun" )==0) return SF_FORMAT_AU;
-    if (strcasecmp(name, "IRCAM")==0) return SF_FORMAT_IRCAM;
-    if (strcasecmp(name, "NeXT")==0) return SF_FORMAT_AU;
-    if (strcasecmp(name, "raw")==0) return SF_FORMAT_RAW;
-    if (strcasecmp(name, "MAT4")==0) return SF_FORMAT_MAT4;
-    if (strcasecmp(name, "MAT5")==0) return SF_FORMAT_MAT5;
-    if (strcasecmp(name, "PAF")==0) return SF_FORMAT_PAF;
-    if (strcasecmp(name, "SVX")==0) return SF_FORMAT_SVX;
-    if (strcasecmp(name, "NIST")==0) return SF_FORMAT_NIST;
-    if (strcasecmp(name, "VOC")==0) return SF_FORMAT_VOC;
-    if (strcasecmp(name, "W64")==0) return SF_FORMAT_W64;
-    if (strcasecmp(name, "PVF")==0) return SF_FORMAT_PVF;
-    if (strcasecmp(name, "XI")==0) return SF_FORMAT_XI;
-    if (strcasecmp(name, "HTK")==0) return SF_FORMAT_HTK;
-    if (strcasecmp(name, "SDS")==0) return SF_FORMAT_SDS;
-    if (strcasecmp(name, "AVR")==0) return SF_FORMAT_AVR;
-    if (strcasecmp(name, "SD2")==0) return SF_FORMAT_SD2;
-    if (strcasecmp(name, "FLAC")==0) return SF_FORMAT_FLAC;
-    if (strcasecmp(name, "vorbis")==0) return SF_FORMAT_VORBIS;
-    if (strcasecmp(name, "CAF")==0) return SF_FORMAT_CAF;
     return 0;
 }
 
@@ -1111,7 +1059,10 @@ void sc_plugin_interface::buffer_sync(uint32_t index)
 
 void sc_plugin_interface::free_buffer(uint32_t index)
 {
-    sndbuf_init(world.mSndBufsNonRealTimeMirror + index);
+    SndBuf * buf = world.mSndBufsNonRealTimeMirror + index;
+    if (buf->sndfile)
+        sf_close(buf->sndfile);
+    sndbuf_init(buf);
 }
 
 void sc_plugin_interface::initialize_synths_perform(void)

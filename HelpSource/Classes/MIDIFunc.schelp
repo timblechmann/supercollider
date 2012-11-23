@@ -1,21 +1,21 @@
 CLASS:: MIDIFunc
 summary:: Fast Responder for incoming MIDI Messages
-categories:: MIDI
+categories:: External Control>MIDI
 related:: Guides/MIDI, Classes/MIDIdef
 
 DESCRIPTION::
 MIDIFunc (and its subclass link::Classes/MIDIdef::) registers one or more functions to respond to an incoming MIDI message. Many of its methods are inherited from its superclass link::Classes/AbstractResponderFunc::.
 
-note:: Use of the older classes MIDIResponder, CCResponder, NoteOnResponder, NoteOffResponder, BendResponder, TouchResponder, and ProgramChangeResponder can be unsafe, since responders in user and class code can override each other unintentionally. MIDIFunc and link::Classes/MIDIdef:: are faster, safer, and have more logical argument order. Thus they are the recommended way of registering for incoming MIDI messages as of SC 3.5.::
+note:: MIDIFunc and link:Classes/MIDIdef:: aim to improve upon the MIDIresponder classes by being faster and easier to use. They were made with the intention of creating a more convenient, logical and consistent interface, which shares a common design with link::Classes/OSCFunc:: and link::Classes/OSCdef::. As of this time, however, they still lack some features of the MIDIresponder classes, notably the learn method. Note that unlike those classes, MIDIFuncs are removed on Cmd-. by default. This can be overriden using either of the fix or permanent methods.::
 
 
 CLASSMETHODS::
 private:: initClass, cmdPeriod
 
 METHOD:: defaultDispatchers
-Get or set an link::Classes/IndentityDictionary:: containing the default dispatcher objects for MIDIFuncs of different types (these are what you get if you pass nil as the dispatcher argument to link::#*new::). These objects will decide if any of their registered MIDIFuncs should respond to an incoming MIDI message. The dictionary should have the keys code::[\noteOn, \noteOff, \control, \polytouch, \touch, \program, \bend]:: and values of an appropriate subclass of link::Classes/AbstractDispatcher:: for each message type. By default these will be instances of link::Classes/MIDIMessageDispatcher:: for the the first four message types, and instances of link::Classes/MIDIMessageDispatcherNV:: for the last three.
+Get or set an link::Classes/IdentityDictionary:: containing the default dispatcher objects for MIDIFuncs of different types (these are what you get if you pass nil as the dispatcher argument to link::#*new::). These objects will decide if any of their registered MIDIFuncs should respond to an incoming MIDI message. The dictionary should have the keys code::[\noteOn, \noteOff, \control, \polytouch, \touch, \program, \bend]:: and values of an appropriate subclass of link::Classes/AbstractDispatcher:: for each message type. By default these will be instances of link::Classes/MIDIMessageDispatcher:: for the the first four message types, and instances of link::Classes/MIDIMessageDispatcherNV:: for the last three.
 
-returns:: The getter returns an link::Classes/IndentityDictionary::.
+returns:: The getter returns an link::Classes/IdentityDictionary::.
 
 METHOD:: new
 Create a new, enabled MIDIFunc. Normally one would use one of the message type specific convenience methods below, rather than use this method directly.

@@ -1,5 +1,5 @@
 //  supercollider-style synthdef
-//  Copyright (C) 2008, 2009 Tim Blechmann
+//  Copyright (C) 2008-2012 Tim Blechmann
 //
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -33,8 +33,7 @@
 #include "SC_Types.h"
 #include "SC_Wire.h"
 
-namespace nova
-{
+namespace nova {
 
 class sc_synthdef
 {
@@ -42,17 +41,14 @@ class sc_synthdef
     typedef std::vector<float, aligned_allocator<float> > fvector;
     typedef std::vector<c_string, aligned_allocator<string> > svector;
 
-    typedef boost::int16_t int16;
-    typedef boost::int32_t int32;
-
     typedef std::vector<char, aligned_allocator<char> > char_vector;
 
 public:
-    typedef std::map<string, int, std::less<string>, aligned_allocator<string> > parameter_map_t;
+    typedef std::map<string, int32_t, std::less<string>, aligned_allocator<string> > parameter_map_t;
 
     struct input_spec
     {
-        input_spec(int16_t source, int16_t index):
+        input_spec(int32_t source, int32_t index):
             source(source), index(index)
         {}
 
@@ -65,14 +61,14 @@ public:
             return index < rhs.index;
         }
 
-        int16_t source;   /* index of ugen or -1 for constant */
-        int16_t index;    /* number of output or constant index */
+        int32_t source;   /* index of ugen or -1 for constant */
+        int32_t index;    /* number of output or constant index */
     };
     typedef std::vector<input_spec, aligned_allocator<input_spec> > input_spec_vector;
 
     struct unit_spec_t
     {
-        explicit unit_spec_t(const char *& buffer);
+        explicit unit_spec_t(const char *& buffer, int version);
 
         unit_spec_t(string const & name, int16_t rate, int16_t special_index,
                     input_spec_vector const & in_specs,
@@ -84,13 +80,12 @@ public:
 #ifdef BOOST_HAS_RVALUE_REFS
         unit_spec_t(unit_spec_t && rhs):
             name(std::move(rhs.name)), rate(rhs.rate), special_index(rhs.special_index),
-            input_specs(std::move(rhs.input_specs)), output_specs(std::move(rhs.output_specs))
+            input_specs(std::move(rhs.input_specs)), output_specs(std::move(rhs.output_specs)),
+            buffer_mapping(std::move(rhs.buffer_mapping)), prototype(rhs.prototype)
         {}
 
-        unit_spec_t(unit_spec_t const & rhs):
-            name(rhs.name), rate(rhs.rate), special_index(rhs.special_index),
-            input_specs(rhs.input_specs), output_specs(rhs.output_specs)
-        {}
+        unit_spec_t(unit_spec_t const & rhs) = default;
+        unit_spec_t & operator=(unit_spec_t const & rhs) = default;
 #endif
         string name;
         int16_t rate;           /* 0: scalar rate, 1: buffer rate, 2: full rate, 3: demand rate */
@@ -98,7 +93,7 @@ public:
 
         input_spec_vector input_specs;
         char_vector output_specs;      /* calculation rates */
-        std::vector<int16_t, aligned_allocator<int16_t> > buffer_mapping;
+        std::vector<int32_t, aligned_allocator<int32_t> > buffer_mapping;
 
         std::size_t memory_requirement(void)
         {
@@ -118,7 +113,7 @@ public:
     typedef std::vector<unit_spec_t, aligned_allocator<unit_spec_t> > graph_t;
     typedef std::vector<int32_t, aligned_allocator<int32_t> > calc_units_t;
 
-    explicit sc_synthdef(const char *& buffer);
+    sc_synthdef(const char *& buffer, int version);
 
 #ifdef BOOST_HAS_RVALUE_REFS
     sc_synthdef(sc_synthdef && rhs):
@@ -127,11 +122,8 @@ public:
         calc_unit_indices(std::move(rhs.calc_unit_indices)), memory_requirement_(rhs.memory_requirement_)
     {}
 
-    sc_synthdef(sc_synthdef const & rhs):
-        name_(rhs.name_), constants(rhs.constants), parameters(rhs.parameters),
-        parameter_map(rhs.parameter_map), graph(rhs.graph), buffer_count(rhs.buffer_count),
-        calc_unit_indices(rhs.calc_unit_indices), memory_requirement_(rhs.memory_requirement_)
-    {}
+    sc_synthdef(sc_synthdef const & rhs) = default;
+    sc_synthdef& operator=(sc_synthdef const & rhs) = default;
 #endif
 
     std::string dump(void) const;
@@ -163,7 +155,7 @@ public:
     }
 
 private:
-    void read_synthdef(const char *&);
+    void read_synthdef(const char *&, int version);
 
     /** assign buffers, collect memory requirement & cache ugen prototype */
     void prepare(void);

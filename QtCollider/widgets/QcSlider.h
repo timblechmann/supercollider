@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2010 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2010-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -24,33 +24,71 @@
 
 #include "QcAbstractStepValue.h"
 #include "../QcHelper.h"
+#include "../style/style.hpp"
 
-#include <QSlider>
+#include <QWidget>
 
-class QcSlider : public QSlider, public QcHelper, public QcAbstractStepValue
+class QcSlider : public QWidget, QcHelper, QcAbstractStepValue, QtCollider::Style::Client
 {
   Q_OBJECT
-  Q_PROPERTY( float shiftScale READ dummyFloat WRITE setShiftScale );
-  Q_PROPERTY( float ctrlScale READ dummyFloat WRITE setCtrlScale );
-  Q_PROPERTY( float altScale READ dummyFloat WRITE setAltScale );
-  Q_PROPERTY( float step READ dummyFloat WRITE setStep )
-  Q_PROPERTY( float value READ value WRITE setValue );
+  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale );
+  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale );
+  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale );
+  Q_PROPERTY( double step READ step WRITE setStep )
+  Q_PROPERTY( double pixelStep READ pixelStep )
+  Q_PROPERTY( double value READ value WRITE setValue );
+  Q_PROPERTY( int orientation READ orientation WRITE setOrientation );
+  Q_PROPERTY( int handleLength READ handleLength WRITE setHandleLength );
+  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor );
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
+  Q_PROPERTY( QColor knobColor READ knobColor WRITE setKnobColor );
 
-  public:
-    QcSlider();
-    float value() { return QSlider::value() * 0.0001f; }
-    void setStep( float );
-    void setValue( float val ) { QSlider::setValue( val * 10000 ); }
   public Q_SLOTS:
     void increment( double factor );
     void decrement( double factor );
+
   Q_SIGNALS:
     void action();
-  private Q_SLOTS:
-    void action( int val );
+    void preAction( double );
+
+  public:
+    QcSlider();
+    double value() { return _value; }
+    void setValue( double val );
+
+    double step() { return _step; }
+    void setStep( double d ) { _step = d; }
+    double pixelStep();
+
+    Qt::Orientation orientation() const { return _ort; }
+    void setOrientation( int );
+
+    int handleLength() const { return _hndLen; }
+    void setHandleLength( int i ) { _hndLen = i; updateGeometry(); update(); }
+
+    const QColor & knobColor() const
+      { return _knobColor.isValid() ? _knobColor : palette().color(QPalette::ButtonText); }
+    void setKnobColor(const QColor &c) { _knobColor = c; update(); }
+
+    virtual QSize sizeHint() const;
+    virtual QSize minimumSizeHint() const;
+
+  protected:
+    virtual void mousePressEvent ( QMouseEvent * );
+    virtual void mouseMoveEvent ( QMouseEvent * );
+    virtual void wheelEvent ( QWheelEvent * );
+    virtual void paintEvent ( QPaintEvent * );
+
   private:
-    int lastVal;
-    bool bDoAction;
+    QRect thumbRect ();
+    double valueAt( const QPoint &pos );
+
+    Qt::Orientation _ort;
+    double _value;
+    double _step;
+    int _hndLen;
+
+    QColor _knobColor;
 };
 
 #endif

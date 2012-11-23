@@ -42,6 +42,9 @@ this number internally, maximum value you can give this argument
 is 2^16 = 65536. Note that it gets progressively more expensive to run for higher powers! 512, 1024,
 2048, 4096 standard.
 
+argument::mul
+
+argument::add
 
 Examples::
 
@@ -97,7 +100,7 @@ x.set(\trig,1); // after this trigger, the change will take effect.
 
 
 // next example
-b = Buffer.read(s, Help.dir +/+ "sounds/a11wlk01.wav");
+b = Buffer.read(s, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
 
 (
 	{ var input, kernel;

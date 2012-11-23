@@ -39,13 +39,16 @@
 # include <sys/mman.h>
 #endif
 
+#ifdef __LINUX__
+#include <sys/resource.h>
+#endif
+
 #include "SC_DirUtils.h"
 
 using namespace nova;
 using namespace std;
 
-namespace
-{
+namespace {
 
 /* signal handler */
 void terminate(int i)
@@ -137,6 +140,21 @@ void start_audio_backend(server_arguments const & args)
     instance->start_dsp_threads();
 }
 
+#elif defined(PORTAUDIO_BACKEND)
+
+void start_audio_backend(server_arguments const & args)
+{
+    bool success = instance->open_stream(args.hw_name, args.input_channels, args.hw_name, args.output_channels,
+        args.samplerate, args.blocksize, args.blocksize);
+
+    if (!success)
+        exit(1);
+
+    instance->prepare_backend();
+    instance->activate_audio();
+    instance->start_receive_thread();
+    instance->start_dsp_threads();
+}
 
 #else
 
@@ -236,11 +254,20 @@ void drop_rt_scheduling()
         cerr << "Warning: cannot drop rt priority" << endl;
 }
 
+void enable_core_dumps(void)
+{
+#ifdef __LINUX__
+    rlimit core_limit = { RLIM_INFINITY, RLIM_INFINITY };
+    assert( setrlimit( RLIMIT_CORE, &core_limit ) == 0 ); // enable core dumps for debug builds
+#endif
+}
+
 } /* namespace */
 
 int main(int argc, char * argv[])
 {
     drop_rt_scheduling(); // when being called from sclang, we inherit a low rt-scheduling priority. but we don't want it!
+    enable_core_dumps();
 
     server_arguments::initialize(argc, argv);
     server_arguments const & args = server_arguments::instance();

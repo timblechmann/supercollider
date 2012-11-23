@@ -130,14 +130,14 @@ function buildMethodList() {
                 var m = mets[j];
                 var mname = m.slice(2);
                 var pfx = m[1];
-                var ext = m[0]=="+";
+                var undoc = m[0]=="?";
                 if(!methods.hasOwnProperty(mname))
                     methods[mname] = [];
                 if(!methods[mname].push) {
                     debug("Problem with method '"+mname+"' in "+doc.path);
                     debug(methods[mname].toString());
                 } else {
-                    methods[mname].push({doc:doc,pfx:pfx,ext:ext});
+                    methods[mname].push({doc:doc,pfx:pfx,undoc:undoc});
                 }
             }
         }
@@ -241,6 +241,10 @@ function matchDoc(doc,file,folder,re) {
         }
     }
 
+    if(doc.hasOwnProperty('path') && checkboxes[0].checked && re.test(file)) {
+        return true;
+    }
+
     if(doc.hasOwnProperty('keywords')) {
         for(var i=0;i<doc.keywords.length;i++) {
             var kw = doc.keywords[i];
@@ -265,6 +269,14 @@ var docs;
 var re;
 var node;
 var subclassCache = {};
+
+function strCmp(a,b) {
+    if(a<b) return -1;
+    else
+    if(a>b) return 1;
+    else
+    return 0;
+}
 
 function getSubClasses(doc) {
     var a = [];
@@ -307,7 +319,12 @@ function doPrint() {
             }
             n.innerHTML = v.title;
             div.appendChild(n);
-            div.appendChild(document.createTextNode(" - "+v.summary+" "));
+            if(/Undocumented classes/.test(v.categories)) {
+                n.className = "undoc";
+                div.appendChild(document.createTextNode(" -  "));
+            } else {
+                div.appendChild(document.createTextNode(" - "+v.summary+" "));
+            }
 
             if(v.installed!="standard") {
                 var n = document.createElement("span");
@@ -357,11 +374,7 @@ function doPrint() {
             var x = mets[mindex][1].sort(function(a,b) { //document list
                     a = a.pfx + a.doc.title;
                     b = b.pfx + b.doc.title;
-                    if(a<b) return -1;
-                    else
-                    if(a>b) return +1;
-                    else
-                    return 0;
+                    return strCmp(a,b);
             });
 
             for(var i=0;i<x.length;i++) {
@@ -369,7 +382,9 @@ function doPrint() {
                 var v = m.doc;
 
                 var div2 = document.createElement("div");
+
                 div2.className = "met_docs";
+
                 div.appendChild(div2);
 
                 var p = m.pfx;
@@ -378,10 +393,16 @@ function doPrint() {
                 var a = document.createElement("a");
                 a.setAttribute("href",helpRoot+"/"+v.path+".html#"+m.pfx+mname);
                 a.innerHTML = v.title;
+                if(m.undoc)
+                    a.className = "undoc";
                 div2.appendChild(a);
-                if(m.ext)
-                    div2.appendChild(document.createTextNode("+"));
-                div2.appendChild(document.createTextNode(" - "+v.summary+" "));
+
+                if(/Undocumented classes/.test(v.categories)) {
+                    div2.appendChild(document.createTextNode(" -  "));
+                } else {
+                    div2.appendChild(document.createTextNode(" - "+v.summary+" "));
+                }
+
                 var n = document.createElement("span");
                 n.className = "soft";
                 var res = "["+v.path.split("/")[0];
@@ -539,22 +560,14 @@ function doSearch() {
             [k, docs[k].sort(function(a,b) {
                 a = a.title;
                 b = b.title;
-                if(a<b) return -1;
-                else
-                if(a>b) return 1;
-                else
-                return 0;
+                return strCmp(a,b);
             })]
         );
         var order = { Classes:1, Reference:2, Overviews:3, Guides:4, Tutorials:5 };
         docs = tmp.sort(function(a,b) {
             a = order[a[0]] || 10;
             b = order[b[0]] || 10;
-            if(a<b) return -1;
-            else
-            if(a>b) return 1;
-            else
-            return 0;
+            return strCmp(a,b);
         });
 
         // search methods
@@ -579,6 +592,11 @@ function doSearch() {
                     }
                 }
             }
+            mets = mets.sort(function(a,b) {
+                a = a[0];
+                b = b[0];
+                return strCmp(a,b);
+            });
         }
 
         doPrint();
@@ -640,7 +658,7 @@ Search text:<input type="text" id="search_input" value="" size="40" onkeyup="Sea
 <td>Match:
 <td>
 <div id="search_checks">
-<input type="checkbox" id="check_title" checked="true">Title/Class</input>
+<input type="checkbox" id="check_title" checked="true">Title/Filename</input>
 <input type="checkbox" id="check_summary" checked="true">Summary</input>
 <input type="checkbox" id="check_categories">Categories</input>
 <input type="checkbox" id="check_methods" checked="true">Methods</input>

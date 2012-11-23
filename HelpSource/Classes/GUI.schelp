@@ -1,7 +1,7 @@
 class:: GUI
 summary:: Factory abstraction for all GUI related core classes
-categories:: GUI>GUI-Tools
-related:: Overviews/GUI-Classes, Overviews/GUI-Overview, Classes/ViewRedirect
+categories:: GUI>Kits
+related:: Overviews/GUI-Classes, Guides/GUI-Introduction, Classes/ViewRedirect
 
 
 description::
@@ -97,12 +97,8 @@ classmethods::
 subsection:: Methods and Variables for GUI
 
 method:: new
-argument:: key
 
 method:: makeGUI
-argument:: key
-argument:: args
-argument:: properties
 
 method:: initClass
 Sets the code::skin:: to default values on compile.
@@ -169,7 +165,7 @@ The scheme to add.
 method:: doesNotUnderstand
 All method calls are mapped to the current scheme, so that for example code::GUI.button:: can be used and is delegated to the button association of the current scheme.
 argument:: selector
-argument:: args
+argument:: ... args
 
 method:: setSkin
 argument:: skinName

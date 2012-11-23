@@ -1,7 +1,7 @@
 class:: SCContainerView
 summary:: An abstract superclass for container views
-categories:: GUI
-related:: Classes/CompositeView, Classes/HLayoutView, Classes/VLayoutView, Classes/ScrollView, Classes/SCTopView, Classes/SCScrollTopView
+categories:: GUI>Kits>Cocoa
+related:: Classes/CompositeView, Classes/HLayoutView, Classes/VLayoutView, Classes/ScrollView
 
 description::
 Users will not normally directly create instances of ContainerView, but only use it through its subclasses. It provides the basic mechanisms for container views of various kinds, which are used for placing and grouping widgets in a window.
@@ -24,7 +24,7 @@ An automatic layout management for a container. Currently the only one existing 
 note::Crucial Library also has a useful layout tool called GridLayout.::
 argument:: arg1
 
-method:: addFlowLayout(margin, gap)
+method:: addFlowLayout
 A convenience utility which sets decorator to link::Classes/FlowLayout:: and returns the decorator. See link::Classes/FlowLayout:: for examples.
 argument:: margin
 An instance of link::Classes/Point::.

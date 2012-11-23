@@ -1,7 +1,7 @@
 QTextView : QAbstractScroll {
   var <stringColor, <font, <editable=true;
 
-  *qtClass { ^"QcTextEdit" }
+  *qtClass { ^'QcTextEdit' }
 
   enterInterpretsSelection { ^this.getProperty( \enterInterpretsSelection ); }
 
@@ -39,6 +39,10 @@ QTextView : QAbstractScroll {
     stringColor = aColor;
     this.setProperty( \textColor, aColor );
   }
+
+  background { ^this.palette.base }
+
+  background_ { arg color; this.palette = this.palette.base_(color); }
 
   selectedString { ^this.getProperty( \selectedString ); }
 

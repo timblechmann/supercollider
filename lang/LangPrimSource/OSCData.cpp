@@ -990,7 +990,7 @@ int prBootInProcessServer(VMGlobals *g, int numArgsPushed)
 #elif !defined(_WIN32)
 		options.mSharedMemoryID = getpid();
 #else
-		options.mSharedMemoryID = GetCurrentProcessId()
+		options.mSharedMemoryID = GetCurrentProcessId();
 #endif
 
 		gInternalSynthServer.mWorld = World_New(&options);
@@ -1136,6 +1136,7 @@ static int disconnectSharedMem(VMGlobals *g, PyrObject * object)
 
 int prConnectSharedMem(VMGlobals *g, int numArgsPushed)
 {
+#if !defined(SC_IPHONE)
 	PyrSlot *a = g->sp - 1;
 	PyrSlot *b = g->sp;
 
@@ -1158,7 +1159,9 @@ int prConnectSharedMem(VMGlobals *g, int numArgsPushed)
 		postfl("Cannot connect to shared memory: %s\n", e.what());
 		return errFailed;
 	}
-
+#else
+	postfl("Warning: Shared memory server interface disabled on iphone\n");
+#endif
 	return errNone;
 }
 
@@ -1341,8 +1344,8 @@ void init_OSC_primitives()
 	definePrimitive(base, index++, "_ServerShmInterface_getControlBusValue", prGetControlBusValue, 2, 0);
 	definePrimitive(base, index++, "_ServerShmInterface_getControlBusValues", prGetControlBusValues, 3, 0);
 
-	definePrimitive(base, index++, "_ServerShmInterface_setControlBusValue", prSetControlBusValue, 2, 0);
-	definePrimitive(base, index++, "_ServerShmInterface_setControlBusValues", prSetControlBusValues, 3, 0);
+	definePrimitive(base, index++, "_ServerShmInterface_setControlBusValue", prSetControlBusValue, 3, 0);
+	definePrimitive(base, index++, "_ServerShmInterface_setControlBusValues", prSetControlBusValues, 4, 0);
 
 	//post("initOSCRecs###############\n");
 	s_call = getsym("call");

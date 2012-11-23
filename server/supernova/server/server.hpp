@@ -35,7 +35,7 @@
 #include "../../common/server_shm.hpp"
 
 #ifdef PORTAUDIO_BACKEND
-#include "audio_backend/audio_frontend.hpp"
+#include "audio_backend/portaudio_backend.hpp"
 #elif defined(JACK_BACKEND)
 #include "audio_backend/jack_backend.hpp"
 #endif
@@ -47,6 +47,8 @@ struct realtime_engine_functor
     static inline void sync_clock(void);
     static void init_thread(void);
     static inline void run_tick(void);
+    static void log_(const char *);
+    static void log_printf_(const char *, ...);
 };
 
 extern class nova_server * instance;
@@ -124,23 +126,29 @@ struct scheduler_hook
     inline void operator()(void);
 };
 
+namespace detail {
+#if defined(PORTAUDIO_BACKEND)
+typedef portaudio_backend<realtime_engine_functor, float, false> audio_backend;
+#elif defined(JACK_BACKEND)
+typedef jack_backend<realtime_engine_functor, float, false> audio_backend;
+#else
+#error "no audio backend selected"
+#endif
+
+} // detail
 
 class nova_server:
     public asynchronous_log_thread,
     public node_graph,
     public server_shared_memory_creator,
     public scheduler<scheduler_hook, thread_init_functor>,
-#if defined(JACK_BACKEND)
-    public jack_backend<realtime_engine_functor, float, false>,
-#endif
+    public detail::audio_backend,
     public synth_factory,
     public buffer_manager,
     public sc_osc_handler
 {
 public:
-#if defined(JACK_BACKEND)
-    typedef jack_backend<realtime_engine_functor, float, false> audio_backend;
-#endif
+    typedef detail::audio_backend audio_backend;
 
     /* main nova_server function */
     nova_server(server_arguments const & args);
@@ -169,6 +177,11 @@ public:
     void run(void)
     {
         system_interpreter.run();
+    }
+
+    void prepare_to_terminate()
+    {
+        server_shared_memory_creator::disconnect();
     }
 
     void terminate(void)

@@ -1,7 +1,7 @@
 class:: Document
 redirect:: implementationClass
 summary:: An abstract class for editor-specific text document editing classes
-categories:: GUI
+categories:: Frontends
 related:: Classes/CocoaDocument, Classes/EmacsDocument, Classes/ScelDocument
 
 description::
@@ -34,7 +34,6 @@ An instance of link::Classes/Environment::. The link::Classes/Environment:: to b
 discussion::
 code::
 Document.new("this is the title", "this is the text");
-::
 ::
 
 method:: open
@@ -81,7 +80,6 @@ discussion::
 code::
 Document.current.name.postln; // Prints "Document.html"
 ::
-::
 
 method:: listener
 Returns the current Document which is the listener, i.e. the Document where interpreter messages are posted.
@@ -121,7 +119,7 @@ A class for implementing Document, e.g. link::Classes/CocoaDocument::.
 
 method:: postColor
 Get / set the listeners pen color.
-argument:: color
+argument:: col
 An instance of link::Classes/Color::.
 discussion::
 code::
@@ -143,7 +141,6 @@ r = Routine({
 
 r.play;
 r.stop;
-::
 ::
 
 method:: setTheme
@@ -189,8 +186,6 @@ code::
 Document.setTheme('default');
 ::
 Next time you invoke syntaxColorize, the color theme set by setTheme will be used for syntax colorization. If you want to change the background color for the document window and selected text, in order to make them fit with your syntax colorization theme, see the help for the link::Classes/Document#background:: and link::Classes/Document#selectedBackground:: methods for Document.
-::
-
 
 subsection:: Path Utilities
 
@@ -204,7 +199,6 @@ discussion::
 In Main-startUp you can set this to a more practical directory:
 code::
 Document.dir = "~/Documents/SuperCollider";
-::
 ::
 
 method:: wikiDir
@@ -287,7 +281,6 @@ discussion::
 code::
 Document.current.name.postln;
 ::
-::
 
 method:: title
 Get / set the title (same as link::Classes/Document#name::).
@@ -304,7 +297,6 @@ code::
 a = Document("background", "'hardly see anything");
 a.background_(Color.blue(alpha:0.8)); // notice that alpha controls the window transparency
 )
-::
 ::
 
 method:: alwaysOnTop
@@ -423,7 +415,6 @@ Test here and click in front of the numbers: 17 and 23.
 code::
 Document.current.mouseUpAction = nil; // clear mouseUpActiont
 ::
-::
 
 
 method:: keyDownAction
@@ -436,7 +427,6 @@ Document.current.keyDownAction = { arg ...args; args.postln };
 // now type some text
 Document.current.keyDownAction = nil;
 ::
-::
 
 method:: keyUpAction
 Get/set the action to be performed on link::Classes/Document#keyUp::.
@@ -446,7 +436,6 @@ code::
 Document.current.keyUpAction = { arg ...args; args.postln };
 // now type some text
 Document.current.keyUpAction = nil;
-::
 ::
 
 method:: makeWikiPage
@@ -460,7 +449,6 @@ An instance of link::Classes/String::. The directory in which to save the page.
 discussion::
 code::
 Document.current.makeWikiPage("test1");
-::
 ::
 
 method:: openWikiPage
@@ -478,7 +466,6 @@ discussion::
 code::
 Document.current.selectLine(390);
 ::
-::
 
 method:: selectRange
 Select a text range in the string of the document.
@@ -491,7 +478,6 @@ code::
 (
 Document.current.selectRange(Document.current.selectedRangeLocation + 3, 150);
 )
-::
 ::
 
 method:: balanceParens
@@ -538,7 +524,6 @@ doc.selectRange(doc.selectionStart - 40, 10);
 doc.selectedString.postln;
 )
 ::
-::
 
 method:: currentLine
 Returns the current line as a link::Classes/String::.
@@ -553,8 +538,6 @@ doc.currentLine.postln;
 
 method:: getSelectedLines
 Returns all full lines from before code::rangestart:: to after code::rangestart + rangesize:: as a link::Classes/String::.
-argument:: rangestart
-argument:: rangesize
 discussion::
 code::
 (
@@ -564,20 +547,16 @@ doc.selectRange(doc.selectionStart - 40, 10);
 doc.getSelectedLines(doc.selectionStart - 40, 130).postln;
 )
 ::
-::
 
 
 method:: string
 Gets or sets the string within a certain range.
-argument:: rangestart
-argument:: rangesize
-
-Sets the string within a certain range.
 argument:: string
+A link::Classes/String::.
 argument:: rangestart
-An link::Classes/Integer::. Default value is code::nil::.
+An link::Classes/Integer::.
 argument:: rangesize
-An link::Classes/Integer::. Default value is 1.
+An link::Classes/Integer::.
 discussion::
 code::
 // Select the following code in parentheses and execute it
@@ -588,7 +567,6 @@ Document.current.string_(": test test test test test ",
 )
 // Watch me change content
 ::
-::
 
 method:: font
 Gets or sets the font within a certain range.
@@ -597,7 +575,7 @@ An instance of link::Classes/Font::.
 argument:: rangestart
 An link::Classes/Integer::. Default value is -1. If code::rangestart = -1::, the whole document is selected.
 argument:: rangesize
-An link::Classes/nteger::. Default value is 0.
+An link::Classes/Integer::. Default value is 0.
 discussion::
 code::
 // Select the following code in parentheses and execute it
@@ -607,7 +585,6 @@ Document.current.font_(Font("Impact", 14),
 	18);
 )
 // Watch me change font
-::
 ::
 
 method:: stringColor
@@ -628,7 +605,6 @@ Document.current.stringColor_(Color.rand(0.2, 0.8),
 )
 // Watch me change color
 ::
-::
 
 method:: selectedBackground
 Gets or sets the document's background color for selected text. Applies to the whole document instance.
@@ -643,26 +619,12 @@ w.selectedBackground_(Color.new255(120, 180, 110));
 w.selectRange(10, 13);
 )
 ::
-::
 
 method:: syntaxColorize
 Syntax colorize a document.
 
 method:: underlineSelection
 Underlines the current selection of a Document.
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 subsection:: Auto-Completion
@@ -679,8 +641,6 @@ code::
 	*openAutoComplete
 	autoComplete
 ::
-
-
 
 subsection:: Subclassing and Internal Methods
 
@@ -820,5 +780,19 @@ fork({
 		pair[1].wait;
 	}
 }, AppClock)
+)
+::
+
+Changing the default look of documents can be done with the help of the link::#*initAction:: method. Run the following example once. Afterwards all newly created documents will have a dark grey background. To make this change happen every time you start supercollider, put the code inside your startup.scd file (and optionally wrap it in a code::{}.defer(0.1):: ).
+code::
+(
+Document.listener.background = Color.red;	//a special color for post document
+Document.listener.bounds = Rect(1, 461, 620, 567);	//move and resize post document
+Document.initAction = {|doc|			//function to run for every new document
+	doc.background = Color.grey(0.1, 0.9);
+	doc.bounds = Rect(0, 119, 1280, 659);
+	doc.selectedBackground = Color(0.4, 0.05, 0.18);
+	doc.stringColor = Color.grey(0.9);
+};
 )
 ::

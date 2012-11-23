@@ -39,7 +39,7 @@ f.writeArchive(PathName.tmp ++ "myFunc"); // fails
 
 method::new
 
-Create a new instance. The creation of new instances of any Object actually happens in this method (or with newCopyArgs ) when it is called by a child class. see link::Reference/Writing-Classes::
+Create a new instance. The creation of new instances of any Object actually happens in this method (or with newCopyArgs ) when it is called by a child class. see link::Guides/WritingClasses::
 
 method::newCopyArgs
 
@@ -424,22 +424,29 @@ a = { |a, b, c| postf("% plus % plus % is %\n", a, b, c, a + b + c); "" };
 a.performMsg([\value, 1, 2, 3]);
 ::
 
-method::performWithEnvir::
+method::performWithEnvir
 
-
-selector: A Symbol representing a method selector.
-envir: The remaining arguments derived from the environment and passed as arguments to the method named by the selector.
-
+argument:: selector
+A Symbol representing a method selector.
+argument:: envir
+The remaining arguments derived from the environment and passed as arguments to the method named by the selector.
+discussion::
+code::
 a = { |a, b, c| postf("% plus % plus % is %\n", a, b, c, a + b + c); "" };
 a.performWithEnvir(\value, (a: 1, c: 3, d: 4, b: 2));
+::
 
 method::performKeyValuePairs
 
-selector: A Symbol representing a method selector.
-pairs: Array or List with key-value pairs.
-
+argument:: selector
+A Symbol representing a method selector.
+argument:: pairs
+Array or List with key-value pairs.
+discussion::
+code::
 a = { |a, b, c| postf("% plus % plus % is %\n", a, b, c, a + b + c); "" };
 a.performKeyValuePairs(\value, [\a, 1, \b, 2, \c, 3, \d, 4]);
+::
 
 method::tryPerform
 
@@ -472,7 +479,7 @@ method::multiChannelPerform
 Perform selector with multichannel-expansion.
 argument:: selector
 A Symbol representing a method selector.
-argument:: args
+argument:: ... args
 Method arguments, which if they contain an array, will call the method multiple times for each sub-element.
 discussion::
 Example:
@@ -560,7 +567,7 @@ method::shouldNotImplement
 
 Throws a ShouldNotImplementError. Use this to indicate that this inherited method should not be defined or used in the receiver.
 
-method::deprecated(method, alternateMethod)
+method::deprecated
 
 Throws a DeprecatedError. Use this to indicate that the enclosing method has been replaced by a better one (possibly in another class), and that it will likely be removed in the future. Unlike other errors, DeprecatedError only halts execution if Error.debug == true. In all cases it posts a warning indicating that the method is deprecated and what is the recommended alternative.
 
@@ -655,7 +662,7 @@ f = { |x, i| [x, i].postln; };
 ($Q).do(f); // Object.do
 ::
 
-method::generate(func, state)
+method::generate
 
 Object iterates by the message do, sent to the receiver.
 This method is used internally by list comprehensions.

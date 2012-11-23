@@ -88,7 +88,8 @@ Scale {
 	}
 
 	degreeToRatio { |degree, octave = 0|
-		^this.ratios.at(degree) * (this.octaveRatio ** octave);
+		octave = octave + (degree div: degrees.size);
+		^this.ratios.wrapAt(degree) * (this.octaveRatio ** octave);
 	}
 
 	degreeToFreq { |degree, rootFreq, octave|
@@ -125,12 +126,12 @@ Scale {
 		^tuning.stepsPerOctave
 	}
 
-	== { |scale|
-		^degrees == scale.degrees and: { tuning == scale.tuning }
+	== { arg that;
+		^this.compareObject(that, #[\degrees, \tuning])
 	}
 
-	hash {
-		^degrees.hash bitXor: tuning.hash
+	hash { 
+		^this.instVarHash(#[\degrees, \tuning])
 	}
 
 	storeOn { |stream|
@@ -216,10 +217,11 @@ Tuning {
 	}
 
 	== { |argTuning|
-		^tuning == argTuning.tuning and: { octaveRatio == argTuning.octaveRatio }	}
+		^this.compareObject(argTuning, #[\tuning, \octaveRatio])
+	}
 
 	hash {
-		^tuning.hash bitXor: octaveRatio.hash
+		^this.instVarHash([\tuning, \octaveRatio])
 	}
 
 	*doesNotUnderstand { |selector, args|
@@ -515,13 +517,16 @@ ScaleInfo {
 			"\\" ++ k ++ ": " ++ scales.at(k).name
 		}).join("\n");
 
-		dirDoc = dirDoc ?? {
+		if(Document.implementationClass.notNil) {
+			dirDoc = dirDoc ?? {
 				Document.new("Tuning Directory", dirString)
 				.onClose_({ dirDoc.free; dirDoc = nil });
-		};
-		dirDoc.front;
-		dirDoc.string = dirString;
-
+			};
+			dirDoc.front;
+			dirDoc.string = dirString;
+		} {
+			dirString.postln;
+		}
 	}
 }
 
@@ -629,12 +634,16 @@ TuningInfo {
 			"\\" ++ k ++ ": " ++ tunings.at(k).name
 		}).join("\n");
 
-		dirDoc = dirDoc ?? {
+		if(Document.implementationClass.notNil) {
+			dirDoc = dirDoc ?? {
 				Document.new("Tuning Directory", dirString)
 				.onClose_({ dirDoc.free; dirDoc = nil });
-		};
-		dirDoc.front;
-		dirDoc.string = dirString;
+			};
+			dirDoc.front;
+			dirDoc.string = dirString;
+		} {
+			dirString.postln;
+		}
 
 	}
 }

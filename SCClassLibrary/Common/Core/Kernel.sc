@@ -125,8 +125,15 @@ Class {
 	helpFilePath {
 		^this.name.asString.findHelpFile
 	}
+	help {
+		this.openHelpFile
+	}
 	openHelpFile {
-		this.name.asString.openHelpFile
+		// NOTE: because wslib provided the shortcut "Object:*help --> Object:*openHelpFile", we do the same
+		// rather than moving the implementation to the future-compatible :help method.
+		// This prevents infinite recursions for people with wslib installed.
+		// In future (3.7) this method content should be moved to :help, but no sooner.
+		this.name.asString.help
 	}
 
 	shallowCopy { ^this }
@@ -177,6 +184,11 @@ Process {
 	var curThread, mainThread;
 	var schedulerQueue;
 	var <>nowExecutingPath;
+
+	// SCVersion.sc overrides these for Main
+	*scVersionMajor { ^123 }
+	*scVersionMinor { ^0 }
+	*scVersionPostfix { ^"unknown" }
 
 	startup {
 		var time;
@@ -353,18 +365,21 @@ Process {
 
 	interpretCmdLine {
 		// interpret some text from the command line
-		interpreter.cmdLine = this.getCurrentSelection;
 		interpreter.interpretCmdLine;
 	}
 
 	interpretPrintCmdLine {
 		// interpret some text from the command line and print result
+		interpreter.interpretPrintCmdLine;
+	}
+
+	interpretPrintSelectedText {
 		interpreter.cmdLine = this.getCurrentSelection;
 		interpreter.interpretPrintCmdLine;
 	}
 
 	showHelp {
-		this.getCurrentSelection.openHelpFile
+		this.getCurrentSelection.help
 	}
 
 	argv { ^[] }
@@ -377,6 +392,8 @@ Process {
 		stream << "thisProcess";
 	}
 	archiveAsCompileString { ^true }
+
+	prSchedulerQueue { ^schedulerQueue }
 }
 
 
@@ -445,8 +462,8 @@ FunctionDef {
 	makeEnvirFromArgs {
 		var argNames, argVals;
 		argNames = this.argNames;
-		argVals = this.prototypeFrame;
-		^().putPairs([argNames, argVals].flop.flat)
+		argVals = this.prototypeFrame.keep(argNames.size);
+		^().putPairs([argNames, argVals].flop.flatten)
 	}
 
 }
@@ -463,7 +480,7 @@ Method : FunctionDef {
 		//can't add instance variables to Class
 		^this.name.asString.findHelpFile.notNil
 	}
-	openHelpFile {
+	help {
 		HelpBrowser.openHelpForMethod(this);
 	}
 	inspectorClass { ^MethodInspector }

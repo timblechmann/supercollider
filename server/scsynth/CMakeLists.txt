@@ -31,8 +31,7 @@ else()
 endif()
 
 # Here we work out which audio API to use, from system type and/or user option.
-string(TOLOWER "$ENV{AUDIOAPI}" AUDIOAPI)
-if(AUDIOAPI STREQUAL "")
+if(AUDIOAPI STREQUAL "default")
 	if(APPLE)
 		set(AUDIOAPI coreaudio)
 	elseif(WIN32)
@@ -85,6 +84,7 @@ set(scsynth_sources
 	${CMAKE_SOURCE_DIR}/common/SC_fftlib.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_AllocPool.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_DirUtils.cpp
+	${CMAKE_SOURCE_DIR}/common/SC_Reply.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_Sem.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_StandAloneInfo_Darwin.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_StringBuffer.cpp
@@ -130,11 +130,17 @@ endif()
 
 set (FINAL_BUILD 0) # disable final build for scsynth
 
+if (LIBSCSYNTH)
+	set (LIBSCSYNTH_TYPE SHARED)
+else()
+	set (LIBSCSYNTH_TYPE STATIC)
+endif()
+
 if (FINAL_BUILD)
 	CREATE_FINAL_FILE(libscsynth_final.cpp ${scsynth_sources})
-	add_library(libscsynth SHARED libscsynth_final.cpp)
+	add_library(libscsynth ${LIBSCSYNTH_TYPE} libscsynth_final.cpp)
 else()
-	add_library(libscsynth SHARED ${scsynth_sources})
+	add_library(libscsynth ${LIBSCSYNTH_TYPE} ${scsynth_sources})
 endif()
 
 set_property(TARGET libscsynth
@@ -159,7 +165,7 @@ elseif(NOT NO_LIBSNDFILE)
 	message(SEND_ERROR "Cannot find libsndfile")
 endif(SNDFILE_FOUND)
 
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
+if(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 	add_definitions(-DSC_PLUGIN_DIR="${CMAKE_INSTALL_PREFIX}/lib/SuperCollider/plugins")
 endif()
 
@@ -177,15 +183,17 @@ endif()
 
 
 if (WIN32)
-	target_link_libraries(libscsynth wsock32 ws2_32)
+	target_link_libraries(libscsynth wsock32 ws2_32 winmm)
 endif()
 
 
 set_property(TARGET libscsynth PROPERTY OUTPUT_NAME scsynth)
-# These two properties are ABI version info, not sc version:
-set_property(TARGET libscsynth PROPERTY VERSION     1.0.0)
-set_property(TARGET libscsynth PROPERTY SOVERSION   1)
 
+if (LIBSCSYNTH)
+	# These two properties are ABI version info, not sc version:
+	set_property(TARGET libscsynth PROPERTY VERSION     1.0.0)
+	set_property(TARGET libscsynth PROPERTY SOVERSION   1)
+endif()
 
 if (FFTW3F_FOUND)
 	target_link_libraries(libscsynth ${FFTW3F_LIBRARY})
@@ -211,24 +219,27 @@ if(LTO)
                  APPEND PROPERTY LINK_FLAGS "-flto -flto-report -fwhole-program")
 endif()
 
-#TODO allow apple users to install to fhs-ish path if INSTALL_FHS option is enabled
+if (LIBSCSYNTH)
+	set(INSTALL_TARGETS scsynth libscsynth)
+else()
+	set(INSTALL_TARGETS scsynth)
+endif()
 
 if(APPLE)
+	# TODO allow apple users to install to fhs-ish path if INSTALL_FHS option is enabled
 	# determines the app name and app install location (scappbundlename, scappdir):
 	include (${CMAKE_SOURCE_DIR}/cmake_modules/MacAppFolder.cmake)
-
-	install(TARGETS libscsynth scsynth
-			DESTINATION ${scappauxresourcesdir}
-			RUNTIME DESTINATION ${scappauxresourcesdir}
-			PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE OWNER_WRITE
-			COMPONENT app)
+	install(TARGETS ${INSTALL_TARGETS}
+			RUNTIME DESTINATION "${scappauxresourcesdir}"
+			LIBRARY DESTINATION "${scappauxresourcesdir}"
+			PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE OWNER_WRITE)
 elseif(WIN32)
-	install(TARGETS libscsynth scsynth
+	install(TARGETS ${INSTALL_TARGETS}
 			DESTINATION "SuperCollider"
 			PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 else()
-	install(TARGETS libscsynth scsynth
-			LIBRARY DESTINATION "lib"
+	install(TARGETS ${INSTALL_TARGETS}
 			RUNTIME DESTINATION "bin"
+			LIBRARY DESTINATION "lib"
 			PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 endif()

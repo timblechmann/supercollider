@@ -27,7 +27,7 @@
 #include <QObject>
 #include <QString>
 #include <QVariant>
-#include <QHash>
+#include <QVector>
 #include <QEvent>
 
 #include <PyrObject.h>
@@ -86,7 +86,8 @@ class QObjectProxy : public QObject
 
     virtual ~QObjectProxy();
 
-    // compare current thread to proxy's thread
+    // Check if this is the right thread.
+    // WARNING: must be called with language locked!
     bool compareThread();
 
     // WARNING: must be called with language locked!
@@ -136,7 +137,7 @@ class QObjectProxy : public QObject
 
     bool invokeEventHandler( QEvent *e, EventHandlerData &, QList<QVariant> & args );
 
-    const QHash<int,EventHandlerData> & eventHandlers() { return _eventHandlers; }
+    const QVector<EventHandlerData> & eventHandlers() { return _eventHandlers; }
 
   private Q_SLOTS:
 
@@ -154,7 +155,7 @@ class QObjectProxy : public QObject
     // NOTE: for the reason above we extract SC class name at construction
     QString _scClassName;
 
-    QHash<int,EventHandlerData> _eventHandlers;
+    QVector<EventHandlerData> _eventHandlers;
     QList<QcMethodSignalHandler*> methodSigHandlers;
     QList<QcFunctionSignalHandler*> funcSigHandlers;
     QMutex mutex;

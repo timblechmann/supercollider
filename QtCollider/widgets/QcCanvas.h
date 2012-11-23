@@ -26,19 +26,18 @@
 #include <QPixmap>
 #include <QBasicTimer>
 #include <QTime>
+#include <QPalette>
 
 class QcCanvas : public QWidget
 {
   Q_PROPERTY( bool clearOnRefresh READ clearOnRefresh WRITE setClearOnRefresh );
   Q_PROPERTY( bool drawingEnabled READ drawingEnabled WRITE setDrawingEnabled );
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
   Q_PROPERTY( float frameRate READ frameRate WRITE setFrameRate );
   Q_PROPERTY( int frameCount READ frameCount );
+  Q_PROPERTY( QColor background READ background WRITE setBackground );
   Q_OBJECT
 public:
   QcCanvas( QWidget *parent = 0 );
-  QColor background() const { return _bkgColor; }
-  void setBackground( const QColor & c ) { _bkgColor = c; update(); }
   bool drawingEnabled() const { return _paint; }
   void setDrawingEnabled( bool b ) { _paint = b; }
   bool clearOnRefresh() const { return _clearOnRefresh; }
@@ -46,6 +45,8 @@ public:
   float frameRate() const;
   void setFrameRate( float rate );
   int frameCount() const { return _frameCount; }
+  QColor background() const { return _bkg; }
+  void setBackground( const QColor &c );
 public Q_SLOTS:
   void refresh();
   void clear();
@@ -54,13 +55,13 @@ Q_SIGNALS:
   void painting(QPainter*);
 protected:
   virtual void customEvent( QEvent * );
+  virtual void changeEvent ( QEvent * );
   virtual void resizeEvent( QResizeEvent * );
   virtual void paintEvent( QPaintEvent * );
   virtual void timerEvent( QTimerEvent * );
 
 private:
   QPixmap _pixmap;
-  QColor _bkgColor;
   bool _paint;
   bool _repaintNeeded;
   bool _clearOnRefresh;
@@ -77,6 +78,7 @@ private:
   QTime _meterTime;
   int _meterFrames;
 
+  QColor _bkg;
 };
 
 #endif

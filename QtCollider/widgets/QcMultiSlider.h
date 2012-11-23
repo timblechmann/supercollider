@@ -23,18 +23,20 @@
 #define QC_MULTI_SLIDER
 
 #include "../QcHelper.h"
+#include "../style/style.hpp"
+#include "../Common.h"
 
 #include <QWidget>
 
-class QcMultiSlider : public QWidget, QcHelper
+class QcMultiSlider : public QWidget, QcHelper, QtCollider::Style::Client
 {
   // TODO setting selection with mouse
   Q_OBJECT
-  Q_PROPERTY( VariantList values READ values WRITE setValues );
-  Q_PROPERTY( VariantList reference READ dummyVariantList WRITE setReference );
-  Q_PROPERTY( float value READ value WRITE setValue );
   Q_PROPERTY( int sliderCount READ sliderCount WRITE setSliderCount);
-  Q_PROPERTY( float stepSize READ dummyFloat WRITE setStepSize );
+  Q_PROPERTY( QVector<double> values READ values WRITE setValues );
+  Q_PROPERTY( QVector<double> reference READ reference WRITE setReference );
+  Q_PROPERTY( double value READ value WRITE setValue );
+  Q_PROPERTY( double step READ step WRITE setStep );
   Q_PROPERTY( int index READ index WRITE setIndex );
   Q_PROPERTY( int selectionSize READ selectionSize WRITE setSelectionSize );
   Q_PROPERTY( Qt::Orientation orientation
@@ -47,35 +49,62 @@ class QcMultiSlider : public QWidget, QcHelper
   Q_PROPERTY( bool drawRects READ dummyBool WRITE setDrawRects );
   Q_PROPERTY( bool isFilled READ dummyBool WRITE setIsFilled );
   Q_PROPERTY( bool highlight READ dummyBool WRITE setHighlight );
-  Q_PROPERTY( QColor fillColor READ dummyColor WRITE setFillColor );
-  Q_PROPERTY( QColor strokeColor READ dummyColor WRITE setStrokeColor );
   Q_PROPERTY( bool editable READ dummyBool WRITE setEditable );
   Q_PROPERTY( int startIndex READ dummyInt WRITE setStartIndex );
+  Q_PROPERTY( QColor background READ background WRITE setBackground );
+  Q_PROPERTY( QColor fillColor READ fillColor WRITE setFillColor );
+  Q_PROPERTY( QColor strokeColor READ strokeColor WRITE setStrokeColor );
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
 
-  public:
-    QcMultiSlider();
-    QSize sizeHint() const { return QSize( 500,300 ); }
-    QSize minimumSizeHint() const { return QSize( 50, 50 ); }
   Q_SIGNALS:
     void modified();
     void interacted();
     void action();
     void metaAction();
+
   public Q_SLOTS:
     void doAction();
+
+  public:
+    QcMultiSlider();
+
+    QVector<double> values() const;
+    void setValues( const QVector<double> & );
+    double value() const;
+    void setValue( double );
+
+    QVector<double> reference() const;
+    void setReference( const QVector<double> & );
+
+    double step() const { return roundStep; }
+    void setStep( double );
+
+    QSize sizeHint() const { return QSize( 500,300 ); }
+    QSize minimumSizeHint() const { return QSize( 50, 50 ); }
+
+    const QColor & background() const
+      { return _bkgColor.isValid() ? _bkgColor : palette().color(QPalette::Base); }
+    void setBackground( const QColor & c ) { _bkgColor = c; update(); }
+
+    const QColor & fillColor() const
+      { return _fillColor.isValid() ? _fillColor : palette().color(QPalette::Text); }
+    void setFillColor( const QColor& c ) { _fillColor = c; update(); }
+
+    const QColor & strokeColor() const
+      { return _strokeColor.isValid() ? _strokeColor : palette().color(QPalette::Text); }
+    void setStrokeColor( const QColor& c ) { _strokeColor = c; update(); }
+
+  protected:
+    virtual void mousePressEvent( QMouseEvent * );
+    virtual void mouseMoveEvent( QMouseEvent * );
+    virtual void paintEvent( QPaintEvent * );
+
   private:
     Qt::Orientation orientation() const { return ort; }
-    VariantList values() const;
-    float value() const;
     int index() const { return _currentIndex; }
     int selectionSize() const { return _selectionSize; }
-
     int sliderCount() const { return _values.size(); }
     void setSliderCount( int size );
-    void setValues( const VariantList & );
-    void setReference( const VariantList & );
-    void setValue( float f );
-    void setStepSize( float f );
     void setIndex( int i );
     void setSelectionSize( int i );
     void setOrientation( Qt::Orientation o ) { ort = o; update(); }
@@ -87,25 +116,23 @@ class QcMultiSlider : public QWidget, QcHelper
     void setDrawRects( bool b ) { drawRects = b; update(); }
     void setIsFilled( bool b ) { isFilled = b; update(); }
     void setHighlight( bool b ) { highlight = b; update(); }
-    void setFillColor( const QColor& c ) { _fillColor = c; update(); }
-    void setStrokeColor( const QColor& c ) { _strokeColor = c; update(); }
     void setEditable( bool b ) { editable = b; }
-    void setStartIndex( int i ) { startIndex = i; update(); }
+    void setStartIndex( int i ) { startIndex = qBound(0, i, _values.count()-1); update(); }
 
+    QRect contentsRect();
+    QRect valueRect( int count, double & spacing );
     inline float valueFromPos( float pos, float range );
-    inline void setValue( int index, float value );
-    void mousePressEvent( QMouseEvent * );
-    void mouseMoveEvent( QMouseEvent * );
-    void paintEvent( QPaintEvent * );
+    inline void setValue( int index, double value );
+    double rounded ( double value );
 
     // values
-    QList<float> _values;
-    QList<float> _ref;
+    QList<double> _values;
+    QList<double> _ref;
     int _currentIndex;
     int _selectionSize;
 
     // functional properties
-    float roundStep;
+    double roundStep;
     bool editable;
 
     // visual properties
@@ -117,9 +144,12 @@ class QcMultiSlider : public QWidget, QcHelper
     bool drawLines;
     bool isFilled;
     bool highlight;
+    int startIndex;
+
+    QColor _bkgColor;
     QColor _fillColor;
     QColor _strokeColor;
-    int startIndex;
+    QColor _focusColor;
 
     // temporary
     QPoint moveOrigin;

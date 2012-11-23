@@ -21,7 +21,6 @@
 
 
 #include "SC_Lib_Cintf.h"
-#include "SC_ComPort.h"
 #include "SC_CoreAudio.h"
 #include "SC_UnitDef.h"
 #include "SC_BufGen.h"
@@ -204,6 +203,9 @@ void initialize_library(const char *uGensPluginPath)
 		glitches when UGens have to be paged-in. to work around this we preload all the plugins by
 		iterating through their memory space. */
 
+#ifndef __x86_64__
+	/* seems to cause a stack corruption on llvm-gcc-4.2, sdk 10.5 on 10.6 */
+
 	unsigned long images = _dyld_image_count();
 	for(unsigned long i = 0; i < images; i++) {
 		const mach_header	*hdr = _dyld_get_image_header(i);
@@ -236,18 +238,19 @@ void initialize_library(const char *uGensPluginPath)
 		}
 	}
 #endif
+
+#endif
 }
 
 typedef int (*InfoFunction)();
 
 bool checkAPIVersion(void * f, const char * filename)
 {
-	if (!f)
-		return true;
-
-	InfoFunction fn = (InfoFunction)f;
-	if ((*fn)() == sc_api_version)
-		return true;
+	if (f) {
+		InfoFunction fn = (InfoFunction)f;
+		if ((*fn)() == sc_api_version)
+			return true;
+	}
 	scprintf("*** ERROR: API Version Mismatch: %s\n", filename);
 	return false;
 }
@@ -278,7 +281,7 @@ static bool PlugIn_Load(const char *filename)
 		char *s;
 		FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
 				0, GetLastError(), 0, (char*)&s, 1, 0 );
-		scprintf("*** ERROR: GetProcAddress %s err '%s'\n", SC_PLUGIN_LOAD_SYM, s);
+		scprintf("*** ERROR: GetProcAddress err '%s'\n", s);
 		LocalFree( s );
 
 		FreeLibrary(hinstance);

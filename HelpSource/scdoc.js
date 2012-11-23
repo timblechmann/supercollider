@@ -31,6 +31,7 @@ function readCookie(name) {
 }
 */
 
+var storage;
 var sidetoc;
 var toc;
 var menubar;
@@ -42,7 +43,7 @@ function popOutTOC(original_toc, p0) {
     var left = c.style.marginLeft;
     c.style.marginLeft = "20.5em";
     document.body.insertBefore(t,c);
-    
+
     t.getElementsByClassName("toc_search")[0].getElementsByTagName("input")[0].onkeyup = toc_search;
 
     t.style.top = menubar.clientHeight;
@@ -57,7 +58,7 @@ function popOutTOC(original_toc, p0) {
         p0.style.display = "";
         sidetoc = null;
         allItems = toc.getElementsByTagName("ul")[0].getElementsByTagName("li");
-        sessionStorage.popToc = "no";
+        storage.popToc = "no";
         return false;
     }
     var x = document.createElement("div");
@@ -69,7 +70,7 @@ function popOutTOC(original_toc, p0) {
     sidetoc = t;
     allItems = t.getElementsByTagName("ul")[0].getElementsByTagName("li");
     resize_handler();
-    sessionStorage.popToc = "yes";
+    storage.popToc = "yes";
 }
 
 function resize_handler() {
@@ -102,7 +103,7 @@ function addInheritedMethods() {
         var mets = s.methods.sort();
         for(var j=0;j<mets.length;j++) {
             var m = mets[j];
-            if(doc.methods.indexOf(m)<0) { // ignore methods already documented in this helpfile
+            if(doc.methods.indexOf("_"+m.slice(1))<0) { // ignore methods already documented in this helpfile
                 var li = document.createElement("li");
                 li.innerHTML = "<a href='"+helpRoot+"/"+s.path+".html#"+m.slice(1)+"'>"+m.slice(2)+"</a>";
                 if(m[1]=="*") {
@@ -245,78 +246,175 @@ function countChar(str,chr) {
     return [x,a,b];
 }
 
+var code_click_node;
+var code_click_pos;
+
 function selectParens(ev) {
     var s =  window.getSelection();
     var r = s.getRangeAt();
     var r2 = document.createRange();
     var j;
 
-    // FIXME: it always selects from the left paren, so clicking on the right-par does not select from the matching left-par
-    // need to abort lpar search if rpar was found and then start with the rpar to the right (or closest) instead
-    function findlpar(x) {
-        var p = x;
-        var y, j;
-        while(p) {
-            if(j = p.nodeValue) {
-                j = countChar(j,"(");
-                if(j[0]>0) {
-                    return [p, j[2]];
-                }
+    function countChars(char, counterChar, text, count, back)
+    {
+        var len = text.length;
+        var i;
+        if(back) {
+            for(i=len-1; i>=0; i--) {
+                var c = text.charAt(i);
+                if(c == char) count--;
+                else if(c == counterChar) count++;
+                if( count < 1 ) break;
             }
-            for(var i=0;i<p.childNodes.length;i++) {
-                y = findlpar(p.childNodes[i]);
-                if(y) return y;
-            }
-            p = p.previousSibling;
         }
+        else {
+            for(i=0; i<len; i++) {
+                var c = text.charAt(i);
+                if(c == char) count--;
+                else if(c == counterChar) count++;
+                if( count < 1 ) break;
+            }
+        }
+        return [count, i];
+    }
+
+    function advance(node, top, back) {
+        var childs = node.childNodes;
+        if(childs && childs.length) {
+            var child = back ? childs[childs.length-1] : childs[0];
+            return child;
+        }
+        else {
+            var next;
+            if(back) {
+                while( node != top && !(next = node.previousSibling) )
+                    node = node.parentNode;
+            }
+            else {
+                while( node != top && !(next = node.nextSibling) )
+                    node = node.parentNode;
+            }
+            return next;
+        }
+    }
+
+    function findChar(char, counterChar, top, node, back, count) {
+        do {
+            var text = node.nodeValue;
+            if(text) {
+                var res = countChars(char, counterChar, text, count, back);
+                count = res[0];
+                if(count < 1) return [node, res[1]];
+            }
+            node = advance(node, top, back);
+        } while(node);
+
         return null;
     }
 
-    function findrpar(x,count) {
-        var p = x;
-        var y, j;
-        count = count || [0];
-        while(p) {
-            if(j = p.nodeValue) {
-                count[0] += countChar(j,"(")[0];
-                j = countChar(j,")");
-                if(j[0]>0) {
-                    if(count[0]==0)
-                        return [p,j[1]];
-                    else
-                        count[0] -= j[0];
-                }
-            }
-            for(var i=0;i<p.childNodes.length;i++) {
-                y = findrpar(p.childNodes[i],count);
-                if(y) return y;
-            }
-            p = p.nextSibling;
+    function findAdjacentChar(top, node, pos, chars) {
+        var ok = false;
+        var text, len;
+        var i;
+
+        // try right:
+        text = node.nodeValue;
+        len = text.length;
+        if(text && pos < len) {
+            if( (i = chars.indexOf(text[pos])) != -1 )
+                return [chars[i], node, pos];
         }
+        else {
+            var n = node;
+            do {
+                n = advance(n, top, false);
+            } while (n && !(text = n.nodeValue));
+            if(n && (len=text.length)) {
+                if( (i = chars.indexOf(text[0])) != -1 )
+                    return [chars[i], n, 0];
+            }
+        }
+
+        // try left:
+        text = node.nodeValue;
+        len = text.length;
+        if(text && pos > 0) {
+            if( (i = chars.indexOf(text[pos-1])) != -1 )
+                return [chars[i], node, pos-1];
+        }
+        else {
+            n = node;
+            do {
+                n = advance(n, top, true);
+            } while (n && !(text = n.nodeValue));
+            if(n && (len=text.length)) {
+                if( (i = chars.indexOf(text[len-1])) != -1 )
+                    return [chars[i], n, len-1];
+            }
+        }
+
         return null;
     }
 
-    var p = r.startContainer;
-    if(p.nodeValue && (j = p.nodeValue.indexOf("("))>=0) {
-        r2.setStart(p,j+1);
-        p = p.parentNode.nextSibling;
-    } else {
-        while(!p.previousSibling && p != ev.target) {
-            p = p.parentNode;
-        }
-        if(p==ev.target)
-            return;
-        var found = findlpar(p);
-        if(found)
-            r2.setStart(found[0],found[1]+1);
+    if(!code_click_node) return;
+
+    var top = ev.target;
+    while( top && top.className.indexOf("lang-sc") == -1 )
+        top = top.parentNode;
+    if(!top) return;
+
+    var pos = code_click_pos;
+    var node = code_click_node; code_click_node = null;
+    var char;
+
+    var startRes = findAdjacentChar(top, node, pos, "()");
+    if(startRes) {
+        char = startRes[0];
+        node = startRes[1];
+        pos = startRes[2];
+    }
+    else {
+        return;
     }
 
-    var found = findrpar(p);
-    if(found)
-        r2.setEnd(found[0],found[1]);
+    back = char == ")";
+    counterChar = back ? "(" : ")";
+    var count = 1, countRes;
+    var rnode, rpos;
 
-    s.removeAllRanges();
-    s.addRange(r2);
+    // try same node
+    var text = node.nodeValue;
+    if( back) text = text.substring(0, pos);
+    else text = text.substring(pos+1);
+    countRes = countChars(counterChar, char, text, count, back);
+    count = countRes[0];
+    if( count < 1 ) {
+        rpos = countRes[1];
+        if(!back) rpos += pos + 1;
+        rnode = node;
+    }
+    else {
+        // try other nodes
+        var n = advance(node, top, back);
+        res = findChar(counterChar, char, top, n, back, count);
+        if(res) {
+            rnode = res[0];
+            rpos = res[1];
+        }
+    }
+
+    if(rnode) {
+        if(back) {
+            r2.setStart(rnode, rpos);
+            r2.setEnd(node, pos+1);
+        }
+        else {
+            r2.setStart(node, pos);
+            r2.setEnd(rnode, rpos+1);
+        }
+        s.removeAllRanges();
+        s.addRange(r2);
+    }
 }
 
 escape_regexp = function(str) {
@@ -356,13 +454,23 @@ function fixTOC() {
         e.setAttribute("contentEditable",true);
 
         // select parenthesis on double-click
+        e.onclick = function(ev) {
+            var r =  window.getSelection().getRangeAt(0);
+            if(r.collapsed) {
+                code_click_node = r.startContainer;
+                code_click_pos = r.startOffset;
+            }
+        };
         e.ondblclick = selectParens;
     }
 
     addInheritedMethods();
 
-    if(sessionStorage == undefined)
-        sessionStorage = {};
+    if('localStorage' in window) {
+        storage = window.localStorage;
+    } else {
+        storage = {};
+    }
 
     var openMenu;
     var inMenu = false;
@@ -452,7 +560,7 @@ function fixTOC() {
         ts.style.border = "1px solid #ddd";
         allItems = toc.getElementsByTagName("ul")[0].getElementsByTagName("li");
         ts.onkeyup = toc_search;
-        div.appendChild(document.createTextNode("Find:"));
+        div.appendChild(document.createTextNode("Filter:"));
         div.appendChild(ts);
         t.insertBefore(div,t.firstChild);
 
@@ -480,7 +588,7 @@ function fixTOC() {
         }
         t.insertBefore(p,t.firstChild);
         resize_handler();
-        if(sessionStorage.popToc == "yes") {
+        if(storage.popToc == "yes") {
             popOutTOC(t,a);
         }
     }

@@ -212,12 +212,14 @@ Node {
 		^msg
 	}
 
-	hash {  ^server.hash bitXor: nodeID.hash	}
-
-	== { arg aNode;
-		^aNode respondsTo: #[\nodeID, \server]
-			and: { aNode.nodeID == nodeID and: { aNode.server === server }}
+	== { arg that;
+		^this.compareObject(that, #[\nodeID, \server])
 	}
+
+	hash {
+		^this.instVarHash(#[\nodeID, \server])
+	}
+
 	printOn { arg stream; stream << this.class.name << "(" << nodeID <<")" }
 	asUGenInput { Error("should not use a % inside a SynthDef".format(this.class.name)).throw }
 	asControlInput { ^this.nodeID }
@@ -503,6 +505,7 @@ Synth : Node {
 			action.value(msg.at(3)); r.remove }).add;
 		server.sendMsg(44, nodeID, index);	//"/s_get"
 	}
+	
 	getMsg { arg index;
 		^[44, nodeID, index];	//"/s_get"
 	}
@@ -512,8 +515,31 @@ Synth : Node {
 			action.value(msg.copyToEnd(4)); r.remove } ).add;
 		server.sendMsg(45, nodeID, index, count); //"/s_getn"
 	}
+
 	getnMsg { arg index, count;
 		^[45, nodeID, index, count]; //"/s_getn"
+	}
+
+	seti { arg ... args; // args are [key, index, value, key, index, value ...]
+		var msg = Array.new(args.size div: 3 * 2);
+		var synthDesc = SynthDescLib.at(defName.asSymbol);
+		if(synthDesc.isNil) {
+			"message seti failed, because SynthDef % was not added.".format(defName).warn; 
+			^this
+		};
+		forBy(0, args.size-1, 3, { |i|
+			var key = args[i], offset = args[i+1], value = args[i+2];
+			var controlName = synthDesc.controlDict[key];
+			if(controlName.notNil and: { offset < controlName.numChannels }) {
+				msg.add(controlName.index+offset);
+				if(value.isArray) {
+					msg.add(value.keep(controlName.numChannels - offset))
+				} {
+					msg.add(value)
+				}
+			}
+		});
+		server.sendMsg("/n_set", nodeID, *msg.asOSCArgArray);
 	}
 
 	printOn { arg stream; stream << this.class.name << "(" <<< defName << " : " << nodeID <<")" }

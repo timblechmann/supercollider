@@ -23,16 +23,19 @@ Slew.scopeResponse
 	scopeResponse{ |server, freqMode=1, label="Empirical Frequency response", mute = false|
 
 		var bus1, bus2, synth, win, fs;
-		server = server ?? {GUI.stethoscope.defaultServer};
 
-		if (server != GUI.freqScopeView.server) {
-			"Function-scopeReponse: resetting GUI.freqScopeView.server".warn;
-			GUI.freqScopeView.server = server;
+		if (server.isNil) {
+			server = GUI.freqScopeView.server;
+		} {
+			if (server != GUI.freqScopeView.server) {
+				"Function-scopeReponse: resetting GUI.freqScopeView.server".warn;
+				GUI.freqScopeView.server = server;
+			};
 		};
 
 		// Create two private busses
-		bus1 = Bus.audio(server, 1).postln;
-		bus2 = Bus.audio(server, 1).postln;
+		bus1 = Bus.audio(server, 1);
+		bus2 = Bus.audio(server, 1);
 
 		// Create the SCFreqScope.response using the same simple window as in the helpfile
 		// Also, onClose must free the synth and the busses
@@ -58,11 +61,13 @@ Slew.scopeResponse
 			};
 			Out.ar(bus1, noise);
 			Out.ar(bus2, filtered);
-		}.play(fs.synth.asTarget, addAction: \addBefore);
+		}.play(server.defaultGroup);
 		synth.register;
 		synth.onFree {
 			{
 				[bus1, bus2].do(_.free);
+				fs.active_(false);
+				win.close;
 			}.defer;
 		}
 
@@ -77,7 +82,7 @@ Slew.scopeResponse
 		var hasFreqInput = argNames.includes(\freq);
 
 		^if(hasFreqInput){
-			{|in| this.ar(in: in, freq:MouseX.kr(10, 10000, 1)) * Line.ar(0,1,0.1) }
+			{|in| this.ar(in: in, freq:MouseX.kr(10, SampleRate.ir / 4, 1)) * Line.ar(0,1,0.1) }
 				.scopeResponse(server, freqMode,
 					label ?? {"%: empirical frequency response (move mouse to change freq)".format(this.asString)}
 					)

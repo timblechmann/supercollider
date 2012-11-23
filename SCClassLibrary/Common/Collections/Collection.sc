@@ -14,9 +14,51 @@ Collection {
 	}
 	*fill { | size, function |
 		var obj;
+		if(size.isSequenceableCollection) { ^this.fillND(size, function) };
 		obj = this.new(size);
 		size.do { | i |
 			obj.add(function.value(i));
+		};
+		^obj
+	}
+	*fill2D { | rows, cols, function |
+		var obj = this.new(rows);
+		rows.do { |row|
+			var obj2 = this.new(cols);
+			cols.do { |col|
+				obj2 = obj2.add(function.value(row, col))
+			};
+			obj = obj.add(obj2);
+		};
+		^obj
+	}
+	*fill3D { | planes, rows, cols, function |
+		var obj = this.new(planes);
+		planes.do { |plane|
+			var obj2 = this.new(rows);
+			rows.do { |row|
+				var obj3 = this.new(cols);
+				cols.do { |col|
+					obj3 = obj3.add(function.value(plane, row, col))
+				};
+				obj2 = obj2.add(obj3);
+			};
+			obj = obj.add(obj2);
+		};
+		^obj
+	}
+	*fillND { | dimensions, function, args = #[] | // args are private
+		var n = dimensions.first;
+		var obj = this.new(n);
+		var argIndex = args.size;
+		args = args ++ 0;
+		if(dimensions.size <= 1) {
+			n.do { |i| obj.add(function.valueArray(args.put(argIndex, i))) }
+		} {
+			dimensions = dimensions.drop(1);
+			n.do { |i|
+				obj = obj.add(this.fillND(dimensions, function, args.put(argIndex, i)))
+			}
 		};
 		^obj
 	}
@@ -58,6 +100,7 @@ Collection {
 	isEmpty { ^this.size == 0 }
 	notEmpty { ^this.size > 0 }
 	asCollection { ^this }
+	isCollection { ^true }
 
 	add { ^this.subclassResponsibility(thisMethod) }
 	addAll { | aCollection | aCollection.asCollection.do { | item | this.add(item) } }
@@ -396,6 +439,24 @@ Collection {
 		^minValue;
 	}
 
+	maxSizeAtDepth { arg rank;
+		var maxsize = 0;
+		if(rank == 0) { ^this.size };
+		this.do { |sublist|
+			var sz = if(sublist.isCollection)
+					{ sublist.maxSizeAtDepth(rank - 1) } { 1 };
+			if (sz > maxsize) { maxsize = sz };
+		};
+		^maxsize
+	}
+
+	maxDepth { arg max = 0;
+		this.do { |elem|
+			if(elem.isCollection) { max = max(max, elem.maxDepth(max + 1)) }
+		};
+		^max
+	}
+
 	invert { | axis |
 		var index;
 		// can be used to invert a pitch list about a given axis
@@ -548,7 +609,7 @@ Collection {
 
 	writeDef { | file |
 		file.putString("SCgf");
-		file.putInt32(1); // file version
+		file.putInt32(2); // file version
 		file.putInt16(this.size); // number of defs in file.
 
 		this.do { | item | item.writeDef(file); }

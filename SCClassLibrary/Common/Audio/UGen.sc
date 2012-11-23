@@ -139,6 +139,10 @@ UGen : AbstractFunction {
 		^VarLag.multiNew(this.rate, this, time, curvature, warp, start)
 	}
 
+	slew { arg up = 1, down = 1;
+		^Slew.multiNew(this.rate, this, up, down)
+	}
+
 	prune { arg min, max, type;
 		switch(type,
 			\minmax, {
@@ -370,8 +374,8 @@ UGen : AbstractFunction {
 		^nil
 	}
 	writeInputSpec { arg file, synthDef;
-		file.putInt16(synthIndex);
-		file.putInt16(this.outputIndex);
+		file.putInt32(synthIndex);
+		file.putInt32(this.outputIndex);
 	}
 	writeOutputSpec { arg file;
 		file.putInt8(this.rateNumber);
@@ -386,18 +390,16 @@ UGen : AbstractFunction {
 		^this.class.name.asString;
 	}
 	writeDef { arg file;
-		//[\WR, this.class.name, rate, this.numInputs, this.numOutputs].postln;
 		file.putPascalString(this.name);
 		file.putInt8(this.rateNumber);
-		file.putInt16(this.numInputs);
-		file.putInt16(this.numOutputs);
+		file.putInt32(this.numInputs);
+		file.putInt32(this.numOutputs);
 		file.putInt16(this.specialIndex);
 		// write wire spec indices.
 		inputs.do({ arg input;
 			input.writeInputSpec(file, synthDef);
 		});
 		this.writeOutputSpecs(file);
-		//[this.class.name, file.length].postln;
 	}
 
 ///////////////////////////////////////////////////////////////
@@ -409,7 +411,7 @@ UGen : AbstractFunction {
 				input.source.descendants.add(this);
 			});
 		});
-		
+
 		widthFirstAntecedents.do({ arg ugen;
 			antecedents.add(ugen);
 			ugen.descendants.add(this);
@@ -438,6 +440,28 @@ UGen : AbstractFunction {
 
 	dumpName {
 		^synthIndex.asString ++ "_" ++ this.class.name.asString
+	}
+
+	performDeadCodeElimination {
+		if (descendants.size == 0) {
+			this.inputs.do {|a|
+				if (a.isKindOf(UGen)) {
+					a.descendants.remove(this);
+					a.optimizeGraph
+				}
+			};
+			buildSynthDef.removeUGen(this);
+			^true;
+		};
+		^false
+	}
+}
+
+// ugen, which has no side effect and can therefore be considered for a dead code elimination
+// read access to buffers/busses are allowed
+PureUGen : UGen {
+	optimizeGraph {
+		super.performDeadCodeElimination
 	}
 }
 

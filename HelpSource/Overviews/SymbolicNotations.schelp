@@ -149,6 +149,7 @@ Rect(left, top, right-left, bottom-top)
 ## code:: ugen @ ugen :: || create a Point with two link::Classes/UGen::s
 ## code:: rect & rect :: || intersection of two rectangles
 ## code:: rect | rect :: || union of two rectangles (returns a Rect whose boundaries exactly encompass both Rects)
+::
 
 section:: IOStream operators
 definitionlist::
@@ -324,7 +325,7 @@ This works only with single-argument methods like binary operators.
 
 section:: Class and instance variable access
 
-Inside a class definition (see link::Tutorials/Writing-Classes:: ):
+Inside a class definition (see link::Guides/WritingClasses:: ):
 code::
 {
     classvar <a,    // Define a class variable with a getter method (for outside access)

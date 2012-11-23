@@ -1,6 +1,6 @@
 /************************************************************************
 *
-* Copyright 2010-2011 Jakob Leben (jakob.leben@gmail.com)
+* Copyright 2010-2012 Jakob Leben (jakob.leben@gmail.com)
 *
 * This file is part of SuperCollider Qt GUI.
 *
@@ -33,10 +33,10 @@
 #include <QDrag>
 #include <QMimeData>
 
-using namespace QtCollider;
-
 // WARNING these primitives have to always execute asynchronously, or Cocoa language client will
 // hang.
+
+namespace QtCollider {
 
 QC_LANG_PRIMITIVE( QWidget_SetFocus, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
@@ -82,7 +82,7 @@ QC_LANG_PRIMITIVE( QWidget_MapToGlobal, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 }
 
 QC_LANG_PRIMITIVE( QWidget_SetLayout, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  if( !isKindOfSlot( a, class_QLayout ) ) return errWrongType;
+  if( !isKindOfSlot( a, SC_CLASS(QLayout) ) ) return errWrongType;
 
   QWidgetProxy *wProxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
 
@@ -111,8 +111,6 @@ QC_LANG_PRIMITIVE( QWidget_SetAlwaysOnTop, 1, PyrSlot *r, PyrSlot *a, VMGlobals 
   return errNone;
 }
 
-namespace QtCollider {
-
 struct MimeData : public QMimeData {
   virtual ~MimeData() {
     qcDebugMsg(1,"Drag data object destroyed, clearing QView.currentDrag.");
@@ -129,8 +127,6 @@ struct MimeData : public QMimeData {
   }
 };
 
-}
-
 QC_LANG_PRIMITIVE( QWidget_StartDrag, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
   QWidgetProxy *wProxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
   if( !wProxy->compareThread() ) return QtCollider::wrongThreadError();
@@ -142,8 +138,9 @@ QC_LANG_PRIMITIVE( QWidget_StartDrag, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g ) 
 
   mime->setData( "application/supercollider", QByteArray() );
 
-  if( isKindOfSlot( data, class_Color ) )
-    mime->setColorData( QVariant(Slot::toColor(data)) );
+  QColor color( Slot::toColor(data) );
+  if( color.isValid() )
+    mime->setColorData( QVariant(color) );
 
   if( !str.isEmpty() )
     mime->setText( str );
@@ -163,3 +160,47 @@ QC_LANG_PRIMITIVE( QWidget_SetGlobalEventEnabled, 2, PyrSlot *r, PyrSlot *a, VMG
 
   return errNone;
 }
+
+QC_LANG_PRIMITIVE( QWidget_SetAcceptsMouse, 1,  PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
+  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+  if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
+
+  QWidget *w = proxy->widget();
+  if( !w ) return errNone;
+
+  bool accept = IsTrue(a);
+  w->setAttribute( Qt::WA_TransparentForMouseEvents, !accept );
+
+  return errNone;
+}
+
+QC_LANG_PRIMITIVE( QWidget_AcceptsMouse, 1,  PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
+  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+  if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
+
+  QWidget *w = proxy->widget();
+  if( !w ) return errNone;
+
+  bool accept = !w->testAttribute( Qt::WA_TransparentForMouseEvents );
+  SetBool(r, accept);
+
+  return errNone;
+}
+
+void defineQWidgetPrimitives()
+{
+  LangPrimitiveDefiner definer;
+  definer.define<QWidget_SetFocus>();
+  definer.define<QWidget_BringFront>();
+  definer.define<QWidget_Refresh>();
+  definer.define<QWidget_MapToGlobal>();
+  definer.define<QWidget_SetLayout>();
+  definer.define<QWidget_GetAlwaysOnTop>();
+  definer.define<QWidget_SetAlwaysOnTop>();
+  definer.define<QWidget_StartDrag>();
+  definer.define<QWidget_SetGlobalEventEnabled>();
+  definer.define<QWidget_AcceptsMouse>();
+  definer.define<QWidget_SetAcceptsMouse>();
+}
+
+} // namespace QtCollider

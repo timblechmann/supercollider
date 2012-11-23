@@ -36,14 +36,6 @@
 #define SC_AUDIO_API_COREAUDIOIPHONE	5
 #define SC_AUDIO_API_ANDROIDJNI 6
 
-#ifdef _WIN32
-# ifndef SC_INNERSC
-#  define SC_AUDIO_API SC_AUDIO_API_PORTAUDIO
-# else
-#  define SC_AUDIO_API SC_AUDIO_API_INNERSC_VST
-# endif
-#endif
-
 #ifdef SC_ANDROID
 #define SC_AUDIO_API SC_AUDIO_API_ANDROIDJNI
 #endif
@@ -53,7 +45,9 @@
 #endif
 
 #ifndef SC_AUDIO_API
-# ifdef __APPLE__ 
+# if defined(_WIN32)
+#  define SC_AUDIO_API SC_AUDIO_API_PORTAUDIO
+# elif defined(__APPLE__)
 #  define SC_AUDIO_API SC_AUDIO_API_COREAUDIO
 # else
 #  error SC_AUDIO_API undefined, cannot determine audio backend
@@ -352,41 +346,6 @@ inline SC_AudioDriver* SC_NewAudioDriver(struct World *inWorld)
     return new SC_PortAudioDriver(inWorld);
 }
 #endif // SC_AUDIO_API_PORTAUDIO
-
-#if SC_AUDIO_API == SC_AUDIO_API_INNERSC_VST
-
-struct VstTimeInfo;
-
-class SC_VSTAudioDriver : public SC_AudioDriver
-{
-
-    int   mInputChannelCount, mOutputChannelCount;
-    bool  mIsStreaming;
-
-protected:
-    // Driver interface methods
-	virtual bool  DriverSetup(int* outNumSamplesPerCallback, double* outSampleRate);
-	virtual bool  DriverStart();
-	virtual bool  DriverStop();
-  void          Callback(
-                  const void *input, void *output,
-                  unsigned long frameCount, const VstTimeInfo* timeInfo );
-
-public:
-              SC_VSTAudioDriver(struct World *inWorld);
-  	virtual  ~SC_VSTAudioDriver();
-
-//    int PortAudioCallback( const void *input, void *output,
-//            unsigned long frameCount, const PaStreamCallbackTimeInfo* timeInfo,
-//            PaStreamCallbackFlags statusFlags );
-};
-
-inline SC_AudioDriver* SC_NewAudioDriver(struct World *inWorld)
-{
-  // This is called from "World* World_New(WorldOptions *inOptions)" in "SC_World.cpp"
-  return new SC_VSTAudioDriver(inWorld); //This gets saved in inWorld->hw->mAudioDriver
-}
-#endif // SC_AUDIO_API == SC_AUDIO_API_INNERSC_VST
 
 #if SC_AUDIO_API == SC_AUDIO_API_ANDROIDJNI
 
