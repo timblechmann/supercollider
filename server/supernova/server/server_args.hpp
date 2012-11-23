@@ -24,8 +24,7 @@
 #include <vector>
 #include <memory>
 
-namespace nova
-{
+namespace nova {
 
 class server_arguments
 {
@@ -63,7 +62,7 @@ public:
     uint32_t buffers, max_nodes, max_synthdefs;
 
     uint32_t rt_pool_size;
-    uint32_t wires, randomseeds;
+    uint32_t wires, rng_count;
 
     uint16_t load_synthdefs;
     int16_t verbosity;
@@ -81,7 +80,7 @@ public:
     std::string command_file, input_file, output_file, header_format, sample_format;
 
 private:
-    static std::auto_ptr<server_arguments> instance_;
+    static std::unique_ptr<server_arguments> instance_;
 };
 
 } /* namespace nova */

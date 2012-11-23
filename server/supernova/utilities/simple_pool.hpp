@@ -27,12 +27,6 @@ extern "C"
 #include <cstdlib>
 #include <cstring>              /* for std::memset */
 
-#include <boost/array.hpp>
-#include <boost/noncopyable.hpp>
-#include <boost/static_assert.hpp>
-#include <boost/mpl/arithmetic.hpp>
-#include <boost/mpl/modulus.hpp>
-
 #include "nova-tt/spin_lock.hpp"
 #include "nova-tt/dummy_mutex.hpp"
 #include "nova-tt/mlock.hpp"
@@ -48,8 +42,7 @@ namespace nova {
  *
  * */
 template <bool blocking = false>
-class simple_pool:
-    boost::noncopyable
+class simple_pool
 {
     typedef typename boost::mpl::if_c<blocking,
                                       spin_lock,
@@ -88,6 +81,9 @@ class simple_pool:
 public:
     simple_pool(void)
     {}
+
+    simple_pool(simple_pool const & rhs) = delete;
+    simple_pool & operator=(simple_pool const & rhs) = delete;
 
     simple_pool(std::size_t size, bool lock = false)
     {

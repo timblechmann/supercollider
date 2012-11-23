@@ -1,7 +1,7 @@
 if(APPLE)
 
 	###### The user may set the app name, causing a standalone build
-	######  cmake -D standalone:string=MyFabApp ../
+	######	cmake -D standalone:string=MyFabApp ../
 	if ("${standalone}" STREQUAL "")
 		set(scappbundlename ${PROJECT_NAME})
 	else()
@@ -9,7 +9,7 @@ if(APPLE)
 		set(scappbundlename ${standalone})
 		message(STATUS "Building sc in STANDALONE mode. App name: " ${standalone})
 	endif()
-	
+
 	set(scappauxresourcesdir "${scappbundlename}/${scappbundlename}.app/Contents/Resources")
 
 	###### Allow user to select a FHS-style install
@@ -17,5 +17,5 @@ if(APPLE)
 	option(INSTALL_FHS
 		"use FHS-style install (e.g. to /usr/local) rather than to a mac-style app folder"
 		FALSE)
-	
+
 endif(APPLE)

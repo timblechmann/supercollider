@@ -21,20 +21,21 @@ Main : Process {
 		GUI.fromID( this.platform.defaultGUIScheme );
 		GeneralHID.fromID( this.platform.defaultHIDScheme );
 		this.platform.startup;
-		StartUp.run;
 		openPorts = Set[NetAddr.langPort];
+		StartUp.run;
 
-		("Welcome to SuperCollider" + Main.version
-			++ (Platform.ideName.switch(
-				"scvim", {", type :SChelp for help"},
-				"scel",  {", type C-c C-y for help"},
-				"sced",  {", type ctrl-U for help"},
-				"scapp", {", type cmd-d for help"}
+		("Welcome to SuperCollider %.".format(Main.version)
+			+ (Platform.ideName.switch(
+				"scvim", {"For help type :SChelp."},
+				"scel",  {"For help type C-c C-y."},
+				"sced",  {"For help type ctrl-U."},
+				"scapp", {"For help type cmd-d."},
+				"scqt", {"For help press %.".format(if(this.platform.name==\osx,"Cmd-D","Ctrl-D"))}
 			) ?? {
 				(
-					osx: ", type cmd-d for help",
-					linux: ", for help type ctrl-c ctrl-h (Emacs) or :SChelp (vim) or ctrl-U (sced/gedit)",
-				 	windows: ", press F1 for help",
+					osx: "For help type cmd-d.",
+					linux: "For help type ctrl-c ctrl-h (Emacs) or :SChelp (vim) or ctrl-U (sced/gedit).",
+				 	windows: "For help press F1.",
 					iphone: ""
 				 ).at(platform.name);
 

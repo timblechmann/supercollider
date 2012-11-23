@@ -1,9 +1,10 @@
 ServerOptions
 {
-	var <>numPrivateAudioBusChannels=112;
+	// order of variables is important here. Only add new instance variables to the end.
+	var <numAudioBusChannels=128;
 	var <>numControlBusChannels=4096;
-	var <>numInputBusChannels=8;
-	var <>numOutputBusChannels=8;
+	var <numInputBusChannels=8;
+	var <numOutputBusChannels=8;
 	var numBuffers=1026;
 
 	var <>maxNodes=1024;
@@ -35,6 +36,8 @@ ServerOptions
 
 	var <>memoryLocking = false;
 	var <>threads = nil; // for supernova
+
+	var <numPrivateAudioBusChannels=112;
 
 	device {
 		^if(inDevice == outDevice)
@@ -151,13 +154,33 @@ ServerOptions
 		^numOutputBusChannels + numInputBusChannels
 	}
 
-	numAudioBusChannels{
-		^numPrivateAudioBusChannels + numInputBusChannels + numOutputBusChannels
-	}
-
 	bootInProcess {
 		_BootInProcessServer
 		^this.primitiveFailed
+	}
+
+	numPrivateAudioBusChannels_ {arg numChannels = 112;
+		numPrivateAudioBusChannels = numChannels;
+		this.recalcChannels;
+	}
+
+	numAudioBusChannels_ {arg numChannels=128;
+		numAudioBusChannels = numChannels;
+		numPrivateAudioBusChannels = numAudioBusChannels - numInputBusChannels - numOutputBusChannels;
+	}
+
+	numInputBusChannels_ {arg numChannels=8;
+		numInputBusChannels = numChannels;
+		this.recalcChannels;
+	}
+
+	numOutputBusChannels_ {arg numChannels=8;
+		numOutputBusChannels = numChannels;
+		this.recalcChannels;
+	}
+
+	recalcChannels {
+		numAudioBusChannels = numPrivateAudioBusChannels + numInputBusChannels + numOutputBusChannels;
 	}
 
 	*prListDevices {
@@ -257,7 +280,7 @@ Server {
 	*default_ { |server|
 		default = server; // sync with s?
 		if (sync_s, { thisProcess.interpreter.s = server });
-		this.all.do(_.changed(\default));
+		this.all.do(_.changed(\default, server));
 	}
 
 	*new { arg name, addr, options, clientID=0;
@@ -637,9 +660,6 @@ Server {
 			};
 
 			this.initTree;
-			if(volume.volume != 0.0) {
-				volume.play;
-			};
 		}, onFailure: onFailure ? false);
 		if (remoteControlled.not, {
 			"You will have to manually boot remote server.".inform;
@@ -1063,5 +1083,13 @@ Server {
 		} {
 			^serverInterface.setControlBusValues(busIndex, valueArray)
 		}
+	}
+
+	*scsynth {
+		this.program = this.program.replace("supernova", "scsynth")
+	}
+
+	*supernova {
+		this.program = this.program.replace("scsynth", "supernova")
 	}
 }

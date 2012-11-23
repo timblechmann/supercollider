@@ -41,7 +41,7 @@
 
 {
     //struct PyrObject *mSCObject;
-	struct SCCocoaTextView *mSCViewObject;
+	class SCCocoaTextView *mSCViewObject;
 	BOOL usesTabToFocusNextView;
 	BOOL enterExecutesSelection;
 }
@@ -52,9 +52,9 @@
 - (struct PyrObject*)getSCObject;
 - (void)textDidEndEditing:(NSNotification *)aNotification;
 - (void)textDidBeginEditing:(NSNotification *)aNotification;
-- (void)setSCView: (struct SCCocoaTextView*)inObject;
+- (void)setSCView: (class SCCocoaTextView*)inObject;
 - (IBAction) executeSelection: (id) sender;
-- (void)sendSelection: (char*) methodName;
+- (void)sendSelection: (NSString*) nsmethodName;
 - (void) keyUp: (NSEvent*) event;
 - (BOOL) handleKeyDown: (NSEvent*) event;
 - (void) mouseDown: (NSEvent*) event;
@@ -73,7 +73,7 @@
 @interface SCTextFieldResponder : NSTextField
 #endif
 {
-	struct SCTextField *mSCViewObject;
+	class SCTextField *mSCViewObject;
 	BOOL mDragStarted;
 	BOOL mAcceptsFirstResponder;
 	BOOL mEditingInactive; // we use this to determine if editing is not active when keyDown is received
@@ -81,7 +81,7 @@
 }
 
 - (struct PyrObject*)getSCObject;
-- (void)setSCView: (struct SCTextField*)inObject;
+- (void)setSCView: (class SCTextField*)inObject;
 - (void) setAcceptsFirstResponder: (BOOL) flag;
 - (void) addNumberFormatter;
 - (void) setEditingInactive: (BOOL)flag;
@@ -122,7 +122,7 @@
 @end
 
 @interface SCNSWebView : WebView {
-	struct SCWebView *mSCWebView;
+	class SCWebView *mSCWebView;
 	int loadCount;
 	bool handleLinks;
 	BOOL enterExecutesSelection;
@@ -131,8 +131,8 @@
 - (void)initVars;
 - (void) setHandleLinks: (bool)handle;
 - (void)resetLoadCount;
-- (void)setSCObject: (struct SCWebView*)inObject;
-- (struct SCWebView*)getSCObject;
+- (void)setSCObject: (class SCWebView*)inObject;
+- (class SCWebView*)getSCObject;
 - (void)webView:(WebView *)sender didStartProvisionalLoadForFrame:(WebFrame *)frame;
 - (void)webView:(WebView *)sender didFailProvisionalLoadWithError:(NSError *)error forFrame:(WebFrame *)frame;
 - (void)doFailAction;
@@ -143,7 +143,7 @@
 - (void)webView:(WebView *)webView unableToImplementPolicyWithError:(NSError *)error frame:(WebFrame *)frame;
 - (void)doLinkAction:(NSString *)urlString;
 - (void) setEnterExecutesSelection: (BOOL) flag;
-- (void)sendSelection: (char*) methodName;
+- (void)sendSelection: (NSString*) nsmethodName;
 - (void)setSelection;
 - (IBAction)openCode:(id)sender;
 - (IBAction) showHelpFor: (id) sender;

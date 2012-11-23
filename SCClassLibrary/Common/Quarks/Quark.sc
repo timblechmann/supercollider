@@ -143,14 +143,7 @@ Quark
 		};
 		p = info.helpdoc;
 		if(p.notNil) {
-			case
-				{p.endsWith(".html")} {
-					HelpBrowser.goTo(HelpBrowser.getOldWrapUrl(parent.local.path +/+ path +/+ p))
-				}
-				{p.endsWith(".scd") or: {p.endsWith(".txt")}} {
-					HelpBrowser.goTo(parent.local.path +/+ path +/+ p)
-				}
-				{ "Uknown help file type: %".format(p).warn };
+			HelpBrowser.goTo(URI.fromLocalPath(parent.local.path +/+ path +/+ p).asString)
 			^this
 		};
 		HelpBrowser.openBrowsePage("Quarks>"++name);

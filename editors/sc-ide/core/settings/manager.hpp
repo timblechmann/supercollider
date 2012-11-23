@@ -76,8 +76,10 @@ public:
     QKeySequence shortcut( const QString & key );
 
     const QList<QAction*> & actions() { return mActions; }
-    void addAction ( QAction *action );
+    void addAction ( QAction *action, const QString & key, const QString & category = QString() );
     QString keyForAction ( QAction *action );
+
+    QFont codeFont();
 
 private:
     void setDefault ( const QString & key, const QVariant & value )
@@ -103,6 +105,13 @@ private:
     QList<QAction*> mActions;
 };
 
+struct ActionData {
+    QString category;
+    QString key;
+};
+
 }} // namespace ScIDE::Settings
+
+Q_DECLARE_METATYPE( ScIDE::Settings::ActionData );
 
 #endif

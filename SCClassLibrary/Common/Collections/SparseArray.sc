@@ -172,6 +172,11 @@ Order : SequenceableCollection {
 	choose {
 		^array.choose
 	}
+
+	storeOn { arg stream;
+		stream << this.class.name;
+		stream << ".newFromIndices( " <<<* [ array, indices ] << " )";
+	}
 }
 
 
@@ -244,7 +249,8 @@ SparseArray : Order {
 	collect { arg function;
 		^this.class.reduceArray(
 			this.asArray.collect(function),
-			default !? { function.value(default, 0) }		)
+			default !? { function.value(default, 0) }
+		)
 	}
 
 	select { arg function;
@@ -273,7 +279,6 @@ SparseArray : Order {
 	// if index is irrelevant, assume that the result for all implicit elements is the same
 	sparseSum { | function |
 		var sum = 0;
-		"sparseSum : inner array size is %".format(array.size).postln;
 		if (function.isNil) { // optimized version if no function
 			array.do { | elem | sum = sum + elem; };
 			sum = sum + (default * (this.size-array.size));
@@ -316,7 +321,6 @@ SparseArray : Order {
 	}
 
 	removeAt { arg index;
-		//^this.notYetImplemented(thisMethod)
 		var res, slot = this.slotFor(index), size = indices.size;
 		if(index >= this.size) { ^nil };
 
@@ -422,8 +426,14 @@ SparseArray : Order {
 		}
 	}
 
-	// private implementation
+	storeOn { | stream |
+		if (stream.atLimit) { ^this };
+		stream << this.class.name << "[ " ;
+		this.storeItemsOn(stream);
+		stream << " ]" ;
+	}
 
+	// private implementation
 	prPutSlot { arg nextSlot, index, obj;
 		var slot = max(0, nextSlot - 1);
 		index = index.asInteger; // SparseArray supports only integer indices

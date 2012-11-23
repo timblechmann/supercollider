@@ -21,14 +21,45 @@
 #ifndef SCIDE_MAIN_HPP_INCLUDED
 #define SCIDE_MAIN_HPP_INCLUDED
 
-#include <QObject>
 #include <QAction>
+#include <QObject>
+
+#include <QtNetwork/QLocalSocket>
+#include <QtNetwork/QLocalServer>
 
 #include "sc_process.hpp"
+#include "sc_server.hpp"
 #include "doc_manager.hpp"
 #include "settings/manager.hpp"
 
 namespace ScIDE {
+
+class SessionManager;
+
+// scide instances have a LocalServer. when called with an argument, it will try to reconnect
+// to the instance with the lowest number.
+class SingleInstanceGuard:
+    public QObject
+{
+    Q_OBJECT
+
+public:
+    bool tryConnect(QStringList const & arguments);
+
+public Q_SLOTS:
+    void onNewIpcConnection()
+    {
+        mIpcSocket = mIpcServer->nextPendingConnection();
+        connect(mIpcSocket, SIGNAL(disconnected()), mIpcSocket, SLOT(deleteLater()));
+        connect(mIpcSocket, SIGNAL(readyRead()), this, SLOT(onIpcData()));
+    }
+
+    void onIpcData();
+
+private:
+    QLocalServer * mIpcServer;
+    QLocalSocket * mIpcSocket;
+};
 
 class Main:
     public QObject
@@ -42,9 +73,21 @@ public:
         return singleton;
     }
 
-    Settings::Manager *settings()       { return mSettings;    }
-    DocumentManager * documentManager() { return mDocManager;  }
-    SCProcess * scProcess(void)         { return mSCProcess;   }
+    static ScProcess * scProcess()             { return instance()->mScProcess;      }
+    static ScServer  * scServer()              { return instance()->mScServer;       }
+    static SessionManager * sessionManager()   { return instance()->mSessionManager; }
+    static DocumentManager * documentManager() { return instance()->mDocManager;     }
+    static Settings::Manager *settings()       { return instance()->mSettings;       }
+
+    static void evaluateCode(QString const & text, bool silent = false)
+    {
+        instance()->scProcess()->evaluateCode(text, silent);
+    }
+
+    static bool openDocumentation(const QString & string);
+    static bool openDocumentationForMethod(const QString & className, const QString & methodName);
+    static void openDefinition(const QString &string, QWidget * parent);
+    static void findReferences(const QString &string, QWidget * parent);
 
 public Q_SLOTS:
     void storeSettings() {
@@ -56,16 +99,25 @@ public Q_SLOTS:
         Q_EMIT(applySettingsRequest(mSettings));
     }
 
+    void quit();
+
 Q_SIGNALS:
     void storeSettingsRequest(Settings::Manager *);
     void applySettingsRequest(Settings::Manager *);
 
+private slots:
+    void onScLangResponse( const QString &, const QString & );
+
 private:
     Main(void);
+    bool eventFilter(QObject *obj, QEvent *event);
+    void handleOpenFileScRequest( const QString & data );
 
     Settings::Manager *mSettings;
-    SCProcess * mSCProcess;
+    ScProcess * mScProcess;
+    ScServer * mScServer;
     DocumentManager *mDocManager;
+    SessionManager *mSessionManager;
 };
 
 }

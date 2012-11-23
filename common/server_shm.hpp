@@ -22,6 +22,7 @@
 
 #include "scope_buffer.hpp"
 
+#include <boost/version.hpp>
 #include <boost/foreach.hpp>
 #include <boost/ref.hpp>
 #include <boost/lexical_cast.hpp>
@@ -43,8 +44,9 @@ static inline string make_shmem_name(unsigned int port_number)
 	return string("SuperColliderServer_") + boost::lexical_cast<string>(port_number);
 }
 
-struct server_shared_memory
+class server_shared_memory
 {
+public:
 	typedef offset_ptr<float> sh_float_ptr;
 	typedef offset_ptr<scope_buffer> scope_buffer_ptr;
 
@@ -71,7 +73,7 @@ struct server_shared_memory
 	{
 		segment.deallocate(control_busses_.get());
 
-		for (int i = 0; i != scope_buffers.size(); ++i)
+		for (size_t i = 0; i != scope_buffers.size(); ++i)
 			segment.deallocate(scope_buffers[i].get());
 	}
 
@@ -107,7 +109,9 @@ public:
 		shmem_name(detail_server_shm::make_shmem_name(port_number)),
 		segment(bi::open_or_create, shmem_name.c_str(), 8192 * 1024)
 	{
+#if (BOOST_VERSION < 105100)
 		segment.flush();
+#endif
 
 		const int num_scope_buffers = 128;
 		size_t scope_pool_size = num_scope_buffers * sizeof(float) * 8192; // pessimize, about 4 MB

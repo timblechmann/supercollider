@@ -18,15 +18,13 @@
 
 #include <cstdio>
 
-#include <boost/bind.hpp>
-
 #include "sc_synth.hpp"
 #include "sc_ugen_factory.hpp"
 #include "../server/server.hpp"
 
 namespace nova {
 
-sc_synth::sc_synth(int node_id, sc_synth_prototype_ptr const & prototype):
+sc_synth::sc_synth(int node_id, sc_synth_definition_ptr const & prototype):
     abstract_synth(node_id, prototype), trace(0), unit_buffers(0)
 {
     World const & world = sc_factory->world;
@@ -51,7 +49,7 @@ sc_synth::sc_synth(int node_id, sc_synth_prototype_ptr const & prototype):
     const size_t constants_count = synthdef.constants.size();
 
     /* we allocate one memory chunk */
-    const size_t wire_buffer_alignment = 64; // align to cache line boundaries
+    const size_t wire_buffer_alignment = 64 * 8; // align to cache line boundaries
     const size_t alloc_size = prototype->memory_requirement();
 
     const size_t sample_alloc_size = world.mBufLength * synthdef.buffer_count
@@ -93,7 +91,7 @@ sc_synth::sc_synth(int node_id, sc_synth_prototype_ptr const & prototype):
     unit_buffers = allocator.alloc<sample>(sample_alloc_size);
 
     const int alignment_mask = wire_buffer_alignment - 1;
-    unit_buffers = (sample*) ((size_t(unit_buffers) + alignment_mask) & ~alignment_mask);     /* next aligned pointer */
+    unit_buffers = (sample*) ((intptr_t(unit_buffers) + alignment_mask) & ~alignment_mask);     /* next aligned pointer */
 
     /* allocate unit generators */
     sc_factory->allocate_ugens(synthdef.graph.size());
@@ -157,6 +155,10 @@ void sc_synth::set_control_array(slot_index_t slot_index, size_t count, sample *
         set(slot_index+i, val[i]);
 }
 
+float sc_synth::get(slot_index_t slot_index) const
+{
+    return mControls[slot_index];
+}
 
 void sc_synth::map_control_bus_control (unsigned int slot_index, int control_bus_index)
 {
@@ -232,9 +234,9 @@ extern spin_lock log_guard;
 #endif
 
 #ifdef thread_local
-static thread_local boost::array<char, 32768> trace_scratchpad;
+static thread_local std::array<char, 262144> trace_scratchpad;
 #else
-static boost::array<char, 32768> trace_scratchpad;
+static std::array<char, 262144> trace_scratchpad;
 #endif
 
 struct scratchpad_printer
@@ -288,7 +290,7 @@ void sc_synth::run_traced(void)
 
     scratchpad_printer printer(trace_scratchpad.data());
 
-    printer.printf("\nTRACE %d  %s    #units: %d\n", id(), this->prototype_name(), calc_unit_count);
+    printer.printf("\nTRACE %d  %s    #units: %d\n", id(), this->definition_name(), calc_unit_count);
 
     for (size_t i = 0; i != calc_unit_count; ++i) {
         Unit * unit = calc_units[i];

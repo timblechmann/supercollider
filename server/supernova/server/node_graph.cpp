@@ -26,8 +26,7 @@
 
 #include "dsp_thread_queue/dsp_thread_queue.hpp"
 
-namespace nova
-{
+namespace nova {
 
 void node_graph::add_node(server_node * node, node_position_constraint const & constraint)
 {
@@ -104,7 +103,7 @@ void node_graph::remove_node(server_node * n)
     if (!n->is_synth())
         group_free_all(static_cast<abstract_group*>(n));
 
-    node_set.erase(*n);
+    release_node_id(n);
     /** \todo recursively remove nodes from node_set
      *        for now this is done by the auto-unlink hook
      * */
@@ -168,7 +167,7 @@ void node_graph::synth_reassign_id(int32_t node_id)
         hidden_id = -std::abs<int32_t>(hasher(node_id));
 
     assert(hidden_id < 0);
-    node_set.erase(*node);
+    release_node_id(node);
     node->reset_id(hidden_id);
     node_set.insert(*node);
 }
@@ -201,12 +200,14 @@ abstract_group::~abstract_group(void)
 
 void abstract_group::pause(void)
 {
-    std::for_each(child_nodes.begin(), child_nodes.end(), boost::bind(&server_node::pause, _1));
+    for (server_node & node : child_nodes)
+        node.pause();
 }
 
 void abstract_group::resume(void)
 {
-    std::for_each(child_nodes.begin(), child_nodes.end(), boost::bind(&server_node::resume, _1));
+    for (server_node & node : child_nodes)
+        node.resume();
 }
 
 void abstract_group::add_child(server_node * node)

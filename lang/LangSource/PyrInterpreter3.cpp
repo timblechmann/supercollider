@@ -200,7 +200,7 @@ PyrProcess* newPyrProcess(VMGlobals *g, PyrClass *procclassobj)
 	}
 
 	PyrSymbol * contextsym = getsym("functionCompileContext");
-	int index = slotRawInt(&class_interpreter->classIndex) + contextsym->u.index;
+	size_t index = slotRawInt(&class_interpreter->classIndex) + contextsym->u.index;
 	PyrMethod * meth = gRowTable[index];
 	if (!meth || slotRawSymbol(&meth->name) != contextsym) {
 		error("compile context method 'functionCompileContext' not found.\n");
@@ -465,7 +465,7 @@ static inline void handlePushClassVar(VMGlobals* g, PyrSlot *& sp, unsigned char
 static inline void handleStoreInstVar(VMGlobals* g, PyrSlot *& sp, unsigned char *& ip, unsigned int index)
 {
 	PyrObject* obj = slotRawObject(&g->receiver);
-	if (obj->obj_flags & obj_immutable)
+	if (obj->IsImmutable())
 		StoreToImmutableA(g, sp, ip);
 	else {
 		PyrSlot * slot = obj->slots + index;
@@ -537,7 +537,8 @@ HOT void Interpret(VMGlobals *g)
 	// byte code values
 	unsigned char *ip;
 	unsigned char op1;
-	int op2, op3, index, tag;
+	size_t index;
+	int op2, op3, tag;
 	// interpreter globals
 
 	// temporary variables used in the interpreter
@@ -971,7 +972,7 @@ HOT void Interpret(VMGlobals *g)
 		handle_op_7:
 			op2 = ip[1]; ++ip; // get inst var index
 			obj = slotRawObject(&g->receiver);
-			if (obj->obj_flags & obj_immutable) { StoreToImmutableA(g, sp, ip); }
+			if (obj->IsImmutable()) { StoreToImmutableA(g, sp, ip); }
 			else {
 				slot = obj->slots + op2;
 				slotCopy(slot, sp);
@@ -2454,7 +2455,7 @@ HOT void Interpret(VMGlobals *g)
 						sp -= numArgsPushed - 1;
 						index = methraw->specialIndex;
 						obj = slotRawObject(slot);
-						if (obj->obj_flags & obj_immutable) { StoreToImmutableB(g, sp, ip); }
+						if (obj->IsImmutable()) { StoreToImmutableB(g, sp, ip); }
 						else {
 							if (numArgsPushed >= 2) {
 								slotCopy(&obj->slots[index], sp + 1);
@@ -2598,7 +2599,7 @@ HOT void Interpret(VMGlobals *g)
 						numArgsPushed -= numKeyArgsPushed << 1;
 						index = methraw->specialIndex;
 						obj = slotRawObject(slot);
-						if (obj->obj_flags & obj_immutable) { StoreToImmutableB(g, sp, ip); }
+						if (obj->IsImmutable()) { StoreToImmutableB(g, sp, ip); }
 						else {
 							if (numArgsPushed >= 2) {
 								slotCopy(&obj->slots[index], sp + 1);
@@ -2754,7 +2755,6 @@ void DumpDetailedBackTrace(VMGlobals *g)
 
 void DumpStack(VMGlobals *g, PyrSlot *sp)
 {
-	int i;
 	PyrSlot *slot;
 	char str[128];
 #if BCSTAT
@@ -2763,7 +2763,7 @@ void DumpStack(VMGlobals *g, PyrSlot *sp)
 	postfl("STACK:\n");
 	slot = sp - 64;
 	if (slot < g->gc->Stack()->slots) slot = g->gc->Stack()->slots;
-	for (i=slot - g->gc->Stack()->slots; slot<=sp; slot++, ++i) {
+	for (size_t i=slot - g->gc->Stack()->slots; slot<=sp; slot++, ++i) {
 		slotString(slot, str);
 		post("   %2d  %s\n", i, str);
 	}

@@ -1,5 +1,5 @@
 //  utility functions
-//  Copyright (C) 2005-2010  Tim Blechmann
+//  Copyright (C) 2005-2012  Tim Blechmann
 //
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -22,23 +22,13 @@
 #include <cstddef>
 #include <cassert>
 
-/** \todo later use std::tr1 type_traits */
-#include <boost/type_traits.hpp>
-#include <boost/static_assert.hpp>
+#include <type_traits>
 
-#include "boost/noncopyable.hpp"
-
-/** \todo later use std::tr1 smart pointers */
-#include <boost/shared_ptr.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/weak_ptr.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/noncopyable.hpp>
 #include <boost/detail/atomic_count.hpp>
 
 #include "branch_hints.hpp"
-
-#include <boost/foreach.hpp>
-#define foreach BOOST_FOREACH
 
 typedef unsigned int uint;
 
@@ -47,14 +37,9 @@ typedef unsigned int uint;
 #include "function_attributes.h"
 
 
-namespace nova
-{
-/* we're using some member of the boost namespace */
-using boost::noncopyable;
+namespace nova {
 
-using boost::shared_ptr;
-using boost::weak_ptr;
-using boost::scoped_ptr;
+/* we're using some member of the boost namespace */
 using boost::intrusive_ptr;
 
 /* some basic math functions */
@@ -149,12 +134,14 @@ struct checked_deleter
 
 template <typename deleter = checked_deleter >
 struct intrusive_refcountable:
-    public noncopyable,
     public deleter
 {
     intrusive_refcountable(void):
         use_count_(0)
     {}
+
+    intrusive_refcountable(intrusive_refcountable const & rhs) = delete;
+    intrusive_refcountable & operator=(intrusive_refcountable const & rhs) = delete;
 
     virtual ~intrusive_refcountable(void)
     {}

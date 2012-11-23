@@ -450,6 +450,20 @@ extern "C"
 	void excess_ka(BinaryOpUGen *unit, int inNumSamples);
 	void excess_ai(BinaryOpUGen *unit, int inNumSamples);
 	void excess_ia(BinaryOpUGen *unit, int inNumSamples);
+	void rrand_d(BinaryOpUGen *unit, int inNumSamples);
+	void rrand_1(BinaryOpUGen *unit, int inNumSamples);
+	void rrand_aa(BinaryOpUGen *unit, int inNumSamples);
+	void rrand_ak(BinaryOpUGen *unit, int inNumSamples);
+	void rrand_ka(BinaryOpUGen *unit, int inNumSamples);
+	void rrand_ai(BinaryOpUGen *unit, int inNumSamples);
+	void rrand_ia(BinaryOpUGen *unit, int inNumSamples);
+	void exprand_d(BinaryOpUGen *unit, int inNumSamples);
+	void exprand_1(BinaryOpUGen *unit, int inNumSamples);
+	void exprand_aa(BinaryOpUGen *unit, int inNumSamples);
+	void exprand_ak(BinaryOpUGen *unit, int inNumSamples);
+	void exprand_ka(BinaryOpUGen *unit, int inNumSamples);
+	void exprand_ai(BinaryOpUGen *unit, int inNumSamples);
+	void exprand_ia(BinaryOpUGen *unit, int inNumSamples);
 	void lt_d(BinaryOpUGen *unit, int inNumSamples);
 	void lt_1(BinaryOpUGen *unit, int inNumSamples);
 	void lt_aa(BinaryOpUGen *unit, int inNumSamples);
@@ -1120,6 +1134,32 @@ void hypotx_d(BinaryOpUGen *unit, int inNumSamples)
 	}
 }
 
+void rrand_d(BinaryOpUGen *unit, int inNumSamples)
+{
+	if (inNumSamples) {
+		float xa = DEMANDINPUT_A(0, inNumSamples);
+		float xb = DEMANDINPUT_A(1, inNumSamples);
+		RGen& rgen = *unit->mParent->mRGen;
+		OUT0(0) = sc_isnan(xa) || sc_isnan(xb) ? NAN : xb > xa ? xa + rgen.frand() * (xb - xa) : (xb + rgen.frand() * (xa - xb));
+	} else {
+		RESETINPUT(0);
+		RESETINPUT(1);
+	}
+}
+
+void exprand_d(BinaryOpUGen *unit, int inNumSamples)
+{
+	if (inNumSamples) {
+		float xa = DEMANDINPUT_A(0, inNumSamples);
+		float xb = DEMANDINPUT_A(1, inNumSamples);
+		RGen& rgen = *unit->mParent->mRGen;
+		OUT0(0) = sc_isnan(xa) || sc_isnan(xb) ? NAN : xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+	} else {
+		RESETINPUT(0);
+		RESETINPUT(1);
+	}
+}
+
 
 
 void zero_1(BinaryOpUGen *unit, int inNumSamples)
@@ -1420,7 +1460,21 @@ void hypotx_1(BinaryOpUGen *unit, int inNumSamples)
 	ZOUT0(0) = sc_hypotx(xa, xb);
 }
 
+void rrand_1(BinaryOpUGen *unit, int inNumSamples)
+{
+	float xa = ZIN0(0);
+	float xb = ZIN0(1);
+	RGen& rgen = *unit->mParent->mRGen;
+	ZOUT0(0) = xb > xa ? xa + rgen.frand() * (xb - xa) : (xb + rgen.frand() * (xa - xb));
+}
 
+void exprand_1(BinaryOpUGen *unit, int inNumSamples)
+{
+	float xa = ZIN0(0);
+	float xb = ZIN0(1);
+	RGen& rgen = *unit->mParent->mRGen;
+	ZOUT0(0) =  xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+}
 
 void zero_aa(BinaryOpUGen *unit, int inNumSamples)
 {
@@ -1988,7 +2042,7 @@ void div_ak(BinaryOpUGen *unit, int inNumSamples)
 		} else if (xb == 1.f) {
 			ZCopy(inNumSamples, out, a);
 		} else {
-			float recip = 1.f / xb;
+			float recip = 1.f/ xb;
 			LOOP1(inNumSamples,
 				ZXP(out) = ZXP(a) * recip;
 			);
@@ -2072,7 +2126,7 @@ FLATTEN void div_ai_nova(BinaryOpUGen *unit, int inNumSamples)
 {
 	float xb = ZIN0(1);
 
-	nova::times_vec_simd(OUT(0), IN(0), 1.f/xb, inNumSamples);
+	nova::times_vec_simd(OUT(0), IN(0), sc_reciprocal(xb), inNumSamples);
 	unit->mPrevB = xb;
 }
 
@@ -3139,16 +3193,12 @@ FLATTEN void pow_ak_nova(BinaryOpUGen *unit, int inNumSamples)
 	float xb = unit->mPrevB;
 	float next_b = ZIN0(1);
 
-	if (xb == next_b) {
+	if (xb == next_b)
 		nova::spow_vec_simd(OUT(0), IN(0), xb, inNumSamples);
-	} else {
+	else {
 		float slope = CALCSLOPE(next_b, xb);
-		LOOP1(inNumSamples,
-			float xa = ZXP(a);
-			ZXP(out) = xa >= 0.f ? pow(xa, xb) : -pow(-xa, xb);
-			xb += slope;
-		);
-		unit->mPrevB = xb;
+		nova::spow_vec_simd(OUT(0), IN(0), slope_argument(xb, slope), inNumSamples);
+		unit->mPrevB = next_b;
 	}
 }
 
@@ -3160,19 +3210,14 @@ FLATTEN void pow_ka_nova(BinaryOpUGen *unit, int inNumSamples)
 	float next_a = ZIN0(0);
 
 	if (xa == next_a) {
-		if (xa >= 0.f) {
+		if (xa >= 0.f)
 			nova::pow_vec_simd(OUT(0), xa, IN(1), inNumSamples);
-		} else {
+		else
 			nova::spow_vec_simd(OUT(0), xa, IN(1), inNumSamples);
-		}
 	} else {
 		float slope = CALCSLOPE(next_a, xa);
-		LOOP1(inNumSamples,
-			float xb = ZXP(b);
-			ZXP(out) = xa >= 0.f ? pow(xa, xb) : -pow(-xa, xb);
-			xa += slope;
-		);
-		unit->mPrevA = xa;
+		nova::spow_vec_simd(OUT(0), slope_argument(xa, slope), IN(1), inNumSamples);
+		unit->mPrevA = next_a;
 	}
 }
 
@@ -3192,7 +3237,6 @@ FLATTEN void pow_ai_nova(BinaryOpUGen *unit, int inNumSamples)
 {
 	float xb = ZIN0(1);
 	nova::spow_vec_simd(OUT(0), IN(0), xb, inNumSamples);
-	unit->mPrevB = xb;
 }
 #endif
 
@@ -3859,7 +3903,6 @@ void excess_ia(BinaryOpUGen *unit, int inNumSamples)
 	unit->mPrevA = xa;
 }
 
-
 void excess_ai(BinaryOpUGen *unit, int inNumSamples)
 {
 	float *out = ZOUT(0);
@@ -3873,6 +3916,204 @@ void excess_ai(BinaryOpUGen *unit, int inNumSamples)
 	unit->mPrevB = xb;
 }
 
+void rrand_aa(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float *a = ZIN(0);
+	float *b = ZIN(1);
+
+	RGET
+
+	LOOP1(inNumSamples,
+		float xa = ZXP(a);
+		float xb = ZXP(b);
+		ZXP(out) = xb > xa ? xa + frand2(s1, s2, s3) * (xb - xa) : (xb + frand2(s1, s2, s3) * (xa - xb));
+	);
+
+	RPUT
+}
+
+void rrand_ak(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float *a = ZIN(0);
+	float xb = unit->mPrevB;
+	float next_b = ZIN0(1);
+
+	RGET
+
+	if (xb == next_b) {
+		LOOP1(inNumSamples,
+			float xa = ZXP(a);
+			ZXP(out) = xb > xa ? xa + frand2(s1, s2, s3) * (xb - xa) : (xb + frand2(s1, s2, s3) * (xa - xb));
+		);
+	} else {
+		float slope = CALCSLOPE(next_b, xb);
+		LOOP1(inNumSamples,
+			float xa = ZXP(a);
+			ZXP(out) = xb > xa ? xa + frand2(s1, s2, s3) * (xb - xa) : (xb + frand2(s1, s2, s3) * (xa - xb));
+			xb += slope;
+		);
+		unit->mPrevB = xb;
+	}
+
+	RPUT
+}
+
+void rrand_ka(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float xa = unit->mPrevA;
+	float *b = ZIN(1);
+	float next_a = ZIN0(0);
+
+	RGET
+
+	if (xa == next_a) {
+		LOOP1(inNumSamples,
+			float xb = ZXP(b);
+			ZXP(out) = xb > xa ? xa + frand2(s1, s2, s3) * (xb - xa) : (xb + frand2(s1, s2, s3) * (xa - xb));
+		);
+	} else {
+		float slope = CALCSLOPE(next_a, xa);
+		LOOP1(inNumSamples,
+			float xb = ZXP(b);
+			ZXP(out) = xb > xa ? xa + frand2(s1, s2, s3) * (xb - xa) : (xb + frand2(s1, s2, s3) * (xa - xb));
+			xa += slope;
+		);
+		unit->mPrevA = xa;
+	}
+
+	RPUT
+}
+
+void rrand_ia(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float xa = ZIN0(0);
+	float *b = ZIN(1);
+
+	RGET
+
+	LOOP1(inNumSamples,
+		float xb = ZXP(b);
+		ZXP(out) = xb > xa ? xa + frand2(s1, s2, s3) * (xb - xa) : (xb + frand2(s1, s2, s3) * (xa - xb));
+	);
+	unit->mPrevA = xa;
+
+	RPUT
+}
+
+
+void rrand_ai(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float *a = ZIN(0);
+	float xb = ZIN0(1);
+
+	RGET
+
+	LOOP1(inNumSamples,
+		float xa = ZXP(a);
+		ZXP(out) = xb > xa ? xa + frand2(s1, s2, s3) * (xb - xa) : (xb + frand2(s1, s2, s3) * (xa - xb));
+	);
+
+	RPUT
+
+	unit->mPrevB = xb;
+}
+
+
+void exprand_aa(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float *a = ZIN(0);
+	float *b = ZIN(1);
+
+	LOOP1(inNumSamples,
+		float xa = ZXP(a);
+		float xb = ZXP(b);
+		RGen& rgen = *unit->mParent->mRGen;
+		ZXP(out) = xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+	);
+}
+
+void exprand_ak(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float *a = ZIN(0);
+	float xb = unit->mPrevB;
+	float next_b = ZIN0(1);
+	RGen& rgen = *unit->mParent->mRGen;
+
+	if (xb == next_b) {
+		LOOP1(inNumSamples,
+			float xa = ZXP(a);
+			ZXP(out) = xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+		);
+	} else {
+		float slope = CALCSLOPE(next_b, xb);
+		LOOP1(inNumSamples,
+			float xa = ZXP(a);
+			ZXP(out) = xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+			xb += slope;
+		);
+		unit->mPrevB = xb;
+	}
+}
+
+void exprand_ka(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float xa = unit->mPrevA;
+	float *b = ZIN(1);
+	float next_a = ZIN0(0);
+	RGen& rgen = *unit->mParent->mRGen;
+
+	if (xa == next_a) {
+		LOOP1(inNumSamples,
+			float xb = ZXP(b);
+			ZXP(out) = xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+		);
+	} else {
+		float slope = CALCSLOPE(next_a, xa);
+		LOOP1(inNumSamples,
+			float xb = ZXP(b);
+			ZXP(out) = xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+			xa += slope;
+		);
+		unit->mPrevA = xa;
+	}
+}
+
+void exprand_ia(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float xa = ZIN0(0);
+	float *b = ZIN(1);
+
+	LOOP1(inNumSamples,
+		float xb = ZXP(b);
+		RGen& rgen = *unit->mParent->mRGen;
+		ZXP(out) = xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+	);
+	unit->mPrevA = xa;
+}
+
+
+void exprand_ai(BinaryOpUGen *unit, int inNumSamples)
+{
+	float *out = ZOUT(0);
+	float *a = ZIN(0);
+	float xb = ZIN0(1);
+
+	LOOP1(inNumSamples,
+		float xa = ZXP(a);
+		RGen& rgen = *unit->mParent->mRGen;
+		ZXP(out) = xb > xa ? rgen.exprandrng(xa, xb) : rgen.exprandrng(xb, xa);
+	);
+	unit->mPrevB = xb;
+}
 
 
 void lt_aa(BinaryOpUGen *unit, int inNumSamples)
@@ -5636,6 +5877,8 @@ static BinaryOpFunc ChooseOneSampleFunc(BinaryOpUGen *unit)
 		case opWrap2 : func = &wrap2_1; break;
 		case opExcess : func = &excess_1; break;
 		case opFirstArg : func = &firstarg_1; break;
+		case opRandRange : func = &rrand_1; break;
+		case opExpRandRange : func = &exprand_1; break;
 		//case opSecondArg : func = &secondarg_1; break;
 		default : func = &add_1; break;
 	}
@@ -5691,6 +5934,9 @@ static BinaryOpFunc ChooseDemandFunc(BinaryOpUGen *unit)
 		case opWrap2 : func = &wrap2_d; break;
 		case opExcess : func = &excess_d; break;
 		case opFirstArg : func = &firstarg_d; break;
+		case opRandRange : func = &rrand_d; break;
+		case opExpRandRange : func = &exprand_d; break;
+
 		//case opSecondArg : func = &secondarg_d; break;
 		default : func = &add_d; break;
 	}
@@ -5752,8 +5998,12 @@ static BinaryOpFunc ChooseNormalFunc(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_aa; break;
 						case opWrap2 : func = &wrap2_aa; break;
 						case opExcess : func = &excess_aa; break;
+						case opRandRange : func = &rrand_aa; break;
+						case opExpRandRange : func = &exprand_aa; break;
 						case opFirstArg : func = &firstarg_aa; break;
 						//case opSecondArg : func = &secondarg_aa; break;
+						
+
 						default : func = &add_aa; break;
 					}
 					break;
@@ -5801,8 +6051,12 @@ static BinaryOpFunc ChooseNormalFunc(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_ak; break;
 						case opWrap2 : func = &wrap2_ak; break;
 						case opExcess : func = &excess_ak; break;
+						case opRandRange : func = &rrand_ak; break;
+						case opExpRandRange : func = &exprand_ak; break;
 						case opFirstArg : func = &firstarg_aa; break;
 						//case opSecondArg : func = &secondarg_aa; break;
+						
+						
 						default : func = &add_ak; break;
 					}
 					break;
@@ -5850,6 +6104,8 @@ static BinaryOpFunc ChooseNormalFunc(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_ai; break;
 						case opWrap2 : func = &wrap2_ai; break;
 						case opExcess : func = &excess_ai; break;
+						case opRandRange : func = &rrand_ai; break;
+						case opExpRandRange : func = &exprand_ai; break;
 						case opFirstArg : func = &firstarg_aa; break;
 						//case opSecondArg : func = &secondarg_aa; break;
 						default : func = &add_ai; break;
@@ -5901,6 +6157,8 @@ static BinaryOpFunc ChooseNormalFunc(BinaryOpUGen *unit)
 					case opFold2 : func = &fold2_ka; break;
 					case opWrap2 : func = &wrap2_ka; break;
 					case opExcess : func = &excess_ka; break;
+					case opRandRange : func = &rrand_ka; break;
+					case opExpRandRange : func = &exprand_ka; break;
 					//case opFirstArg : func = &firstarg_aa; break;
 					//case opSecondArg : func = &secondarg_aa; break;
 					default : func = &add_ka; break;
@@ -5955,6 +6213,8 @@ static BinaryOpFunc ChooseNormalFunc(BinaryOpUGen *unit)
 					case opFold2 : func = &fold2_ia; break;
 					case opWrap2 : func = &wrap2_ia; break;
 					case opExcess : func = &excess_ia; break;
+					case opRandRange : func = &rrand_ia; break;
+					case opExpRandRange : func = &exprand_ia; break;
 					//case opFirstArg : func = &firstarg_aa; break;
 					//case opSecondArg : func = &secondarg_aa; break;
 					default : func = &add_ia; break;
@@ -6024,6 +6284,8 @@ static BinaryOpFunc ChooseNovaSimdFunc_64(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_aa; break;
 						case opWrap2 : func = &wrap2_aa; break;
 						case opExcess : func = &excess_aa; break;
+						case opRandRange : func = &rrand_aa; break;
+						case opExpRandRange : func = &exprand_aa; break;
 						case opFirstArg : func = &firstarg_aa_nova; break;
 						//case opSecondArg : func = &secondarg_aa_nova; break;
 						default : func = &add_aa; break;
@@ -6073,6 +6335,8 @@ static BinaryOpFunc ChooseNovaSimdFunc_64(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_ak; break;
 						case opWrap2 : func = &wrap2_ak; break;
 						case opExcess : func = &excess_ak; break;
+						case opRandRange : func = &rrand_ak; break;
+						case opExpRandRange : func = &exprand_ak; break;
 						case opFirstArg : func = &firstarg_aa; break;
 						//case opSecondArg : func = &secondarg_aa; break;
 						default : func = &add_ak; break;
@@ -6122,6 +6386,8 @@ static BinaryOpFunc ChooseNovaSimdFunc_64(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_ai; break;
 						case opWrap2 : func = &wrap2_ai; break;
 						case opExcess : func = &excess_ai; break;
+						case opRandRange: func = &rrand_ai; break;
+						case opExpRandRange: func = &exprand_ai; break;
 						case opFirstArg : func = &firstarg_aa; break;
 						//case opSecondArg : func = &secondarg_aa; break;
 						default : func = &add_ai; break;
@@ -6173,6 +6439,8 @@ static BinaryOpFunc ChooseNovaSimdFunc_64(BinaryOpUGen *unit)
 					case opFold2 : func = &fold2_ka; break;
 					case opWrap2 : func = &wrap2_ka; break;
 					case opExcess : func = &excess_ka; break;
+					case opRandRange : func = &rrand_ka; break;
+					case opExpRandRange : func = &exprand_ka; break;
 					//case opFirstArg : func = &firstarg_aa; break;
 					//case opSecondArg : func = &secondarg_aa; break;
 					default : func = &add_ka; break;
@@ -6227,6 +6495,8 @@ static BinaryOpFunc ChooseNovaSimdFunc_64(BinaryOpUGen *unit)
 					case opFold2 : func = &fold2_ia; break;
 					case opWrap2 : func = &wrap2_ia; break;
 					case opExcess : func = &excess_ia; break;
+					case opRandRange : func = &rrand_ia; break;
+					case opExpRandRange : func = &exprand_ia; break;
 					//case opFirstArg : func = &firstarg_aa; break;
 					//case opSecondArg : func = &secondarg_aa; break;
 					default : func = &add_ia; break;
@@ -6299,6 +6569,8 @@ static BinaryOpFunc ChooseNovaSimdFunc(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_aa; break;
 						case opWrap2 : func = &wrap2_aa; break;
 						case opExcess : func = &excess_aa; break;
+						case opRandRange : func = &rrand_aa; break;
+						case opExpRandRange : func = &exprand_aa; break;
 						case opFirstArg : func = &firstarg_aa_nova; break;
 						//case opSecondArg : func = &secondarg_aa_nova; break;
 						default : func = &add_aa; break;
@@ -6348,6 +6620,8 @@ static BinaryOpFunc ChooseNovaSimdFunc(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_ak; break;
 						case opWrap2 : func = &wrap2_ak; break;
 						case opExcess : func = &excess_ak; break;
+						case opRandRange : func = &rrand_ak; break;
+						case opExpRandRange : func = &exprand_ak; break;
 						case opFirstArg : func = &firstarg_aa; break;
 						//case opSecondArg : func = &secondarg_aa; break;
 						default : func = &add_ak; break;
@@ -6397,6 +6671,8 @@ static BinaryOpFunc ChooseNovaSimdFunc(BinaryOpUGen *unit)
 						case opFold2 : func = &fold2_ai; break;
 						case opWrap2 : func = &wrap2_ai; break;
 						case opExcess : func = &excess_ai; break;
+						case opRandRange : func = &rrand_ai; break;
+						case opExpRandRange : func = &exprand_ai; break;
 						case opFirstArg : func = &firstarg_aa; break;
 						//case opSecondArg : func = &secondarg_aa; break;
 						default : func = &add_ai; break;
@@ -6448,6 +6724,8 @@ static BinaryOpFunc ChooseNovaSimdFunc(BinaryOpUGen *unit)
 					case opFold2 : func = &fold2_ka; break;
 					case opWrap2 : func = &wrap2_ka; break;
 					case opExcess : func = &excess_ka; break;
+					case opRandRange : func = &rrand_ka; break;
+					case opExpRandRange : func = &exprand_ka; break;
 					//case opFirstArg : func = &firstarg_aa; break;
 					//case opSecondArg : func = &secondarg_aa; break;
 					default : func = &add_ka; break;
@@ -6502,6 +6780,8 @@ static BinaryOpFunc ChooseNovaSimdFunc(BinaryOpUGen *unit)
 					case opFold2 : func = &fold2_ia; break;
 					case opWrap2 : func = &wrap2_ia; break;
 					case opExcess : func = &excess_ia; break;
+					case opRandRange : func = &rrand_ia; break;
+					case opExpRandRange : func = &rrand_ia; break;
 					//case opFirstArg : func = &firstarg_aa; break;
 					//case opSecondArg : func = &secondarg_aa; break;
 					default : func = &add_ia; break;

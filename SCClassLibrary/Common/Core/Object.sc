@@ -235,6 +235,9 @@ Object  {
 
 	isRest { ^false }
 
+	threadPlayer {}
+	threadPlayer_ {}
+
 	// testing
 	? { arg obj; ^this }
 	?? { arg obj; ^this }
@@ -378,7 +381,8 @@ Object  {
 
 	// arrays
 	rank { ^0 }
-	deepCollect { arg depth, function; ^function.value(this, 0) }
+	deepCollect { arg depth, function, index = 0, rank = 0; ^function.value(this, index, rank) }
+	deepDo { arg depth, function, index = 0, rank = 0; function.value(this, index, rank) }
 	slice { ^this }
 	shape { ^nil }
 	unbubble { ^this }

@@ -34,9 +34,10 @@
 
 #include <PyrKernel.h>
 
+#include <QFontDatabase>
+#include <QFontInfo>
 #include <QFontMetrics>
 #include <QDesktopWidget>
-#include <QFontDatabase>
 #include <QStyleFactory>
 #include <QWebSettings>
 
@@ -97,6 +98,61 @@ QC_LANG_PRIMITIVE( Qt_AvailableFonts, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
   }
   Slot::setVariantList( r, l );
   return errNone;
+}
+
+QC_LANG_PRIMITIVE( QFont_SetDefaultFont, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g )
+{
+    if( !QcApplication::compareThread() ) return QtCollider::wrongThreadError();
+
+    if ( !isKindOfSlot( a+0, SC_CLASS(QFont) ) )
+        return errWrongType;
+
+    QFont font( Slot::toFont(a+0) );
+    const char *className = IsSym(a+1) ? slotRawSymbol(a+1)->name : 0;
+
+    QApplication::setFont( font, className );
+
+    return errNone;
+}
+
+QC_LANG_PRIMITIVE( QFont_DefaultFamilyForStyle, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
+{
+    // NOTE:
+    // On X11 systems we rely on default fontconfig mappings of font familiy names,
+    // as style hints are not necessarily supported.
+    // On other systems, style hints should work.
+
+    if( !QcApplication::compareThread() ) return QtCollider::wrongThreadError();
+
+    if ( !IsInt(a) )
+        return errWrongType;
+
+    QFont::StyleHint styleHint;
+    QString family;
+    switch (slotRawInt(a)) {
+    case 0:
+        styleHint = QFont::SansSerif;
+        family = "sans-serif";
+        break;
+    case 1:
+        styleHint = QFont::Serif;
+        family = "serif";
+        break;
+    case 2:
+        styleHint = QFont::TypeWriter;
+        family = "monospace";
+        break;
+    default:
+        styleHint = QFont::AnyStyle;
+    }
+
+    QFont font(family);
+    font.setStyleHint(styleHint);
+
+    QFontInfo fontInfo(font);
+    Slot::setString( r, fontInfo.family() );
+
+    return errNone;
 }
 
 QC_LANG_PRIMITIVE( Qt_GlobalPalette, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
@@ -219,6 +275,8 @@ void defineMiscPrimitives()
   definer.define<QWindow_AvailableGeometry>();
   definer.define<Qt_StringBounds>();
   definer.define<Qt_AvailableFonts>();
+  definer.define<QFont_SetDefaultFont>();
+  definer.define<QFont_DefaultFamilyForStyle>();
   definer.define<Qt_GlobalPalette>();
   definer.define<Qt_SetGlobalPalette>();
   definer.define<Qt_FocusWidget>();

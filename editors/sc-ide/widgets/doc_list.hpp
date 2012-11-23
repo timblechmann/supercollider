@@ -21,10 +21,10 @@
 #ifndef SCIDE_WIDGETS_DOC_LIST_HPP_INCLUDED
 #define SCIDE_WIDGETS_DOC_LIST_HPP_INCLUDED
 
+#include "util/docklet.hpp"
 #include "../core/doc_manager.hpp"
 
 #include <QListWidget>
-#include <QDockWidget>
 #include <QSignalMapper>
 
 namespace ScIDE {
@@ -32,13 +32,13 @@ namespace ScIDE {
 class DocumentManager;
 class Document;
 
-class DocumentList : public QListWidget
+class DocumentListWidget : public QListWidget
 {
     Q_OBJECT
 
 public:
 
-    DocumentList(DocumentManager *, QWidget * parent = 0);
+    DocumentListWidget(DocumentManager *, QWidget * parent = 0);
 
 public Q_SLOTS:
 
@@ -50,7 +50,7 @@ Q_SIGNALS:
 
 private Q_SLOTS:
 
-    void onOpen( Document *, int );
+    void onOpen( Document *, int, int );
     void onClose( Document * );
     void onSaved( Document * );
     void onModificationChanged(QObject*);
@@ -58,7 +58,7 @@ private Q_SLOTS:
 
 protected:
 
-    virtual QSize sizeHint() const { return QSize(170,170); }
+    virtual QSize sizeHint() const { return QSize(200,200); }
 
 private:
     struct Item : public QListWidgetItem
@@ -80,23 +80,17 @@ private:
     QIcon mDocModifiedIcon;
 };
 
-class DocumentsDock : public QDockWidget
+class DocumentsDocklet : public Docklet
 {
+    Q_OBJECT
 public:
-    DocumentsDock(DocumentManager *manager, QWidget* parent = 0):
-        QDockWidget(tr("Documents"), parent),
-        mDocList(new DocumentList(manager))
-    {
-        setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-        setFeatures(DockWidgetFloatable | DockWidgetMovable | DockWidgetClosable);
-        setWidget(mDocList);
-    }
+    DocumentsDocklet(DocumentManager *manager, QWidget* parent = 0);
 
-    DocumentList *list() { return mDocList; }
+    DocumentListWidget *list() { return mDocList; }
 
 private:
 
-    DocumentList *mDocList;
+    DocumentListWidget *mDocList;
 };
 
 } // namespace ScIDE

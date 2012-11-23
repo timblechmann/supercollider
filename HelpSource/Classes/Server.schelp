@@ -102,6 +102,13 @@ query the system for any sc-server apps and hard quit them
 method:: freeAll
 free all nodes in all registered servers
 
+method:: supernova
+
+Switches server program to use supernova. Check link::Classes/ParGroup:: how to make use of multicore hardware with the supernova server.
+
+method:: scsynth
+
+Switches server program to use supernova.
 
 
 InstanceMethods::
@@ -179,7 +186,7 @@ A function to evaluate after the server has booted successfully.
 argument:: limit
 The number of times to check for a successful boot.
 argument:: onFailure
-A function to evaluate after the server fails to boot. If onFailure is not given, an error message is posted. Providing a function suppresses the error message. If you want to supply a function and print the normal error message, make sure that your function returns "false," e.g. code::s.waitForBoot(onFailure: { ... custom action...; false })::.
+A function to evaluate after the server fails to boot. If onFailure is not given, an error message is posted. Providing a function suppresses the error message. If you want to supply a function and print the normal error message, make sure that your function returns "false," e.g. code::s.doWhenBooted(onFailure: { ... custom action...; false })::.
 
 method:: boot
 boot the remote server, create new allocators.
@@ -255,6 +262,8 @@ table::
 ## 2 || print the contents in hexadecimal.
 ## 3 || print both the parsed and hexadecimal representations of the contents.
 ::
+
+note:: teletype::/status:: messages won't be posted, when dumping is enabled::
 
 method:: queryAllNodes
 Post a representation of this Server's current node tree to the post window. See link::#-plotTree:: for a graphical variant.
@@ -612,6 +621,6 @@ table::
 ## d || toggle dumpOSC
 ## n || post a representation of the node tree
 ## N || post a representation of the node tree and the current control values of any synths
-## s || scope (internal server only)
+## s || scope
 ::
 

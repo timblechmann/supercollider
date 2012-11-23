@@ -57,7 +57,7 @@
 #include "PyrSlot.h"
 #include "VMGlobals.h"
 #include "SC_DirUtils.h"   // for gIdeName
-#include "SC_LibraryConfig.h"
+#include "SC_LanguageConfig.hpp"
 
 #define STDIN_FD 0
 
@@ -249,10 +249,7 @@ int SC_TerminalClient::run(int argc, char** argv)
 	// read library configuration file
 	if (opt.mLibraryConfigFile) {
 		int argLength = strlen(opt.mLibraryConfigFile);
-		if (strcmp(opt.mLibraryConfigFile + argLength - 5, ".yaml"))
-			SC_LanguageConfig::readLibraryConfig(opt.mLibraryConfigFile);
-		else
-			SC_LanguageConfig::readLibraryConfigYAML(opt.mLibraryConfigFile);
+		SC_LanguageConfig::readLibraryConfigYAML(opt.mLibraryConfigFile);
 	} else
 		SC_LanguageConfig::readDefaultLibraryConfig();
 

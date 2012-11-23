@@ -174,16 +174,16 @@ HOT void PyrGC::ScanSlots(PyrSlot *inSlots, long inNumToScan)
 				PyrObjectHdr * objPrev  = obj->prev;
 				PyrObjectHdr * objNext  = obj->next;
 
+				/* link in grey set */
+				greyNext->prev = obj;
+				grey->next = obj;
+				obj->prev = grey;
+				obj->next = greyNext;
+				greyNext = obj;
+
 				// remove from old set
 				objNext->prev = objPrev;
 				objPrev->next = objNext;
-
-				/* link in grey set */
-				obj->next = greyNext;
-				obj->prev = grey;
-				greyNext->prev = obj;
-				grey->next = obj;
-				greyNext = obj;
 
 				obj->gc_color = greyColor;
 				foundGreyObjects++;
@@ -674,7 +674,7 @@ void PyrGC::Collect(int32 inNumToScan)
 	Collect();	// collect space
 }
 
-void PyrGC::Collect()
+HOT void PyrGC::Collect()
 {
 	BEGINPAUSE
 	bool stackScanned = false;
@@ -1075,7 +1075,7 @@ bool PyrGC::SanityMarkObj(PyrObject *objA, PyrObject *fromObj, int level)
 	if (objA->IsPermanent()) return true;
 	if (objA->IsMarked()) return true;
 	if (objA->size > MAXINDEXSIZE(objA)) {
-		fprintf(stderr, "obj indexed size larger than max: %d > %d\n", objA->size, MAXINDEXSIZE(objA));
+		fprintf(stderr, "obj indexed size larger than max: %d > %ld\n", objA->size, MAXINDEXSIZE(objA));
 		//dumpObject((PyrObject*)objA);
 		return false;
 	}

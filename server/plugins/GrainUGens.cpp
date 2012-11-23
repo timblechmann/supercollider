@@ -247,6 +247,10 @@ static inline bool getGrainWin(Unit * unit, float wintype, SndBuf *& window, con
 	}
 
 	assert(wintype < unit->mWorld->mNumSndBufs);
+
+	if (wintype < 0)
+		return true; // use default hann window
+
 	window = unit->mWorld->mSndBufs + (int)wintype;
 	windowData = window->data;
 	if (!windowData)
@@ -1147,15 +1151,13 @@ static inline void GrainBuf_next_start_new(GrainBuf *unit, int inNumSamples, int
 		return;
 	}
 
-	GrainBufG *grain = unit->mGrains + unit->mNumActive++;
 	float winType = grain_in_at<full_rate>(unit, 7, position);
 	DECLARE_WINDOW
 	bool success = getGrainWin(unit, winType, window, windowData, windowSamples, windowFrames, windowGuardFrame);
-	if (!success) {
-		GrainBuf_grain_cleanup(unit, grain);
+	if (!success)
 		return;
-	}
 
+	GrainBufG *grain = unit->mGrains + unit->mNumActive++;
 	int32 bufnum = grain_in_at<full_rate>(unit, 2, position);
 	grain->bufnum = bufnum;
 
@@ -1176,6 +1178,11 @@ static inline void GrainBuf_next_start_new(GrainBuf *unit, int inNumSamples, int
 
 	double rate = grain->rate = grain_in_at<full_rate>(unit, 3, position) * bufRateScale;
 	double phase = grain_in_at<full_rate>(unit, 4, position) * bufFrames;
+	if (sc_isnan(phase)) {
+		GrainBuf_grain_cleanup(unit, grain);
+		return;
+	}
+
 	grain->interp = (int)grain_in_at<full_rate>(unit, 5, position);
 	grain->winType = winType;
 

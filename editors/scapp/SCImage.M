@@ -1224,7 +1224,7 @@ int prSCImage_WriteToFile(struct VMGlobals *g, int numArgsPushed)
  	err = slotIntVal(b, &image_type);
 	if (err) return err;
 
-	NSString *StringPath = [[NSString alloc] initWithCString:path length:strlen(path)];
+	NSString *StringPath = [NSString stringWithCString:path encoding:[NSString defaultCStringEncoding]];
 	delete [] path;
 
 	SCImage *image = (SCImage *)slotRawPtr(slotRawObject(receiver)->slots);
@@ -1234,8 +1234,6 @@ int prSCImage_WriteToFile(struct VMGlobals *g, int numArgsPushed)
 	}
 	NSData *data = [[image bitmapRepresentation] representationUsingType:(NSBitmapImageFileType)image_type properties:nil];
 	BOOL result = [data writeToFile:StringPath atomically:YES];
-
-	[StringPath release];
 
 	SetBool(receiver, result ? true : false); // inform the user if save is ok
 
@@ -1650,7 +1648,6 @@ int prSCImage_setColorAt(struct VMGlobals *g, int numArgsPushed)
 
 	int x, y, err;
 	SCColor	color;
-	NSSize size = [image size];
 
 	err = slotColorVal(colorSlot, &color);
 	if(err) return err;
@@ -2367,7 +2364,7 @@ int prSCImageFilter_ApplyMultiple(struct VMGlobals *g, int numArgsPushed)
 	PyrSlot		*receiver			= g->sp - 4;
 	PyrSlot		*filtersSlot		= g->sp - 3;
 	PyrSlot		*inPlace			= g->sp - 2;
-	PyrSlot		*updateRegionSlot	= g->sp - 1;
+	//	PyrSlot		*updateRegionSlot	= g->sp - 1;
 	PyrSlot		*cropRegionSlot		= g->sp;
 	int			err = errNone;
 
@@ -2701,7 +2698,6 @@ int prSCImageFilter_ApplyKernel(struct VMGlobals *g, int numArgsPushed)
 	int			err;
 	CGRect		destExtent;
 	CGRect		cropRegion;
-	CGRect		maxRect;
 
 
 	err = errNone;

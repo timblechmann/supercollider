@@ -35,7 +35,7 @@ Please use link::Classes/Platform#*resourceDir:: instead.
 
 INSTANCEMETHODS::
 
-private::prUnixCmd, prFormat, prCat, prBounds, hash, species, getSCDir, prDrawInRect, prDrawAtPoint
+private::prUnixCmd, prFormat, prCat, prBounds, hash, species, getSCDir, prDrawInRect, prDrawAtPoint, openTextFile
 
 subsection:: Accessing characters
 
@@ -685,20 +685,10 @@ code::
 ::
 
 method::openDocument
-Create a new link::Classes/Document:: from the path corresponding to this. Returns the Document.
-code::
-(
-d = "Help/Help.html".openDocument;
-d.class;
-)
-::
-
-method::openTextFile
 Create a new link::Classes/Document:: from the path corresponding to this. The selection arguments will preselect the indicated range in the new window. Returns this.
 code::
 (
-d = "Help/Help.html".openTextFile(20, 210);
-d.class;
+String.filenameSymbol.asString.openDocument(10, 20)
 )
 ::
 
@@ -730,7 +720,7 @@ Returns class link::Classes/StringInspector::.
 
 subsection::Drawing Support
 
-The following methods must be called within an Window-drawHook or a SCUserView-drawFunc function, and will only be visible once the window or the view is refreshed. Each call to Window-refresh SCUserView-refresh will 'overwrite' all previous drawing by executing the currently defined function.
+The following methods must be called within an Window-drawFunc or a SCUserView-drawFunc function, and will only be visible once the window or the view is refreshed. Each call to Window-refresh SCUserView-refresh will 'overwrite' all previous drawing by executing the currently defined function.
 
 See also: link::Classes/Window::, link::Classes/UserView::, link::Classes/Color::, and link::Classes/Pen::.
 
@@ -744,7 +734,7 @@ code::
 (
 w = Window.new.front;
 w.view.background_(Color.white);
-w.drawHook = {
+w.drawFunc = {
 	"abababababa\n\n\n".scramble.draw
 };
 w.refresh
@@ -757,7 +747,7 @@ code::
 (
 w = Window.new.front;
 w.view.background_(Color.white);
-w.drawHook = {
+w.drawFunc = {
 	"abababababa\n\n\n".scramble.drawAtPoint(
 		100@100,
 		Font("Courier", 30),
@@ -774,7 +764,7 @@ code::
 w = Window.new.front;
 r = Rect(100, 100, 100, 100);
 w.view.background_(Color.white);
-w.drawHook = {
+w.drawFunc = {
 	"abababababa\n\n\n".scramble.drawInRect(r, Font("Courier", 12), Color.blue(0.3, 0.5));
 	Pen.strokeRect(r);
 };
@@ -789,7 +779,7 @@ code::
 w = Window.new.front;
 w.view.background_(Color.white);
 r = Rect(100, 100, 100, 100);
-w.drawHook = {
+w.drawFunc = {
 	"abababababa\n\n\n".scramble.drawCenteredIn(
 		r,
 		Font("Courier", 12),
@@ -808,7 +798,7 @@ code::
 w = Window.new.front;
 w.view.background_(Color.white);
 r = Rect(100, 100, 100, 100);
-w.drawHook = {
+w.drawFunc = {
 	"abababababa\n\n\n".scramble.drawLeftJustIn(
 		r,
 		Font("Courier", 12),
@@ -827,7 +817,7 @@ code::
 w = Window.new.front;
 w.view.background_(Color.white);
 r = Rect(100, 100, 100, 100);
-w.drawHook = {
+w.drawFunc = {
 	"abababababa\n\n\n".scramble.drawRightJustIn(
 		r,
 		Font("Courier", 12),

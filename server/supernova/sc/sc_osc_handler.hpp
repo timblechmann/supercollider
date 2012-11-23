@@ -19,8 +19,9 @@
 #ifndef SERVER_SC_OSC_HANDLER_HPP
 #define SERVER_SC_OSC_HANDLER_HPP
 
-#include <vector>
 #include <algorithm>
+#include <mutex>
+#include <vector>
 
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/date_time/microsec_time_clock.hpp>
@@ -37,13 +38,13 @@
 #include "../utilities/static_pool.hpp"
 #include "../utilities/time_tag.hpp"
 
-namespace nova
-{
+namespace nova {
+
 typedef bool (*AsyncStageFn)(World *inWorld, void* cmdData);
 typedef void (*AsyncFreeFn)(World *inWorld, void* cmdData);
 
-namespace detail
-{
+namespace detail {
+
 using namespace boost::asio;
 using namespace boost::asio::ip;
 
@@ -133,13 +134,13 @@ public:
 
     void send_udp(const char * data, unsigned int size, udp::endpoint const & receiver)
     {
-        boost::mutex::scoped_lock lock(udp_mutex);
+        std::lock_guard<std::mutex> lock(udp_mutex);
         sc_notify_observers::udp_socket.send_to(boost::asio::buffer(data, size), receiver);
     }
 
     void send_tcp(const char * data, unsigned int size, tcp::endpoint const & receiver)
     {
-        boost::mutex::scoped_lock lock(tcp_mutex);
+        std::lock_guard<std::mutex> lock(tcp_mutex);
         tcp_socket.connect(receiver);
         boost::asio::write(tcp_socket, boost::asio::buffer(data, size));
     }
@@ -154,7 +155,7 @@ private:
 protected:
     udp::socket udp_socket;
     tcp::socket tcp_socket;
-    boost::mutex udp_mutex, tcp_mutex;
+    std::mutex udp_mutex, tcp_mutex;
 };
 
 class sc_scheduled_bundles
@@ -224,10 +225,12 @@ public:
         tcp_acceptor_(detail::network_thread::io_service_),
         tcp_password_(args.server_password.c_str())
     {
-        if (args.tcp_port && !open_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP, args.tcp_port))
-            throw std::runtime_error("cannot open socket");
-        if (args.udp_port && !open_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, args.udp_port))
-            throw std::runtime_error("cannot open socket");
+        if (!args.non_rt) {
+            if (args.tcp_port && !open_socket(AF_INET, SOCK_STREAM, IPPROTO_TCP, args.tcp_port))
+                throw std::runtime_error("cannot open socket");
+            if (args.udp_port && !open_socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP, args.udp_port))
+                throw std::runtime_error("cannot open socket");
+        }
     }
 
     void start_receive_thread(void)
@@ -285,7 +288,7 @@ private:
         public boost::enable_shared_from_this<tcp_connection>
     {
     public:
-        typedef boost::shared_ptr<tcp_connection> pointer;
+        typedef std::shared_ptr<tcp_connection> pointer;
 
         static pointer create(boost::asio::io_service& io_service)
         {
@@ -319,8 +322,7 @@ private:
     void handle_accept(tcp_connection::pointer new_connection,
                        const boost::system::error_code& error)
     {
-        if (!error)
-        {
+        if (!error) {
             new_connection->start(this);
             start_accept();
         }
@@ -366,7 +368,7 @@ private:
     template <bool realtime>
     void handle_message_sym_address(received_message const & message, size_t msg_size, nova_endpoint const & endpoint);
 
-    friend class sc_scheduled_bundles::bundle_node;
+    friend struct sc_scheduled_bundles::bundle_node;
     /* @} */
 
     /* @{ */
@@ -419,7 +421,7 @@ private:
     tcp::acceptor tcp_acceptor_;
     const char * tcp_password_; /* we are not owning this! */
 
-    boost::array<char, 1<<15 > recv_buffer_;
+    std::array<char, 1<<15 > recv_buffer_;
 
     std::vector<char> overflow_vector;
     /* @} */

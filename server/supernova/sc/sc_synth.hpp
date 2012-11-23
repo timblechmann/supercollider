@@ -26,7 +26,7 @@
 #include "SC_RGen.h"
 #include "SC_Wire.h"
 
-#include "sc_synth_prototype.hpp"
+#include "sc_synth_definition.hpp"
 
 #include "../server/synth.hpp"
 #include "../server/memory_pool.hpp"
@@ -41,10 +41,10 @@ class sc_synth:
     typedef std::vector<struct Unit*, rt_pool_allocator<void*> > unit_vector;
     typedef sc_synthdef::graph_t graph_t;
 
-    friend class sc_synth_prototype;
+    friend class sc_synth_definition;
 
 public:
-    sc_synth(int node_id, sc_synth_prototype_ptr const & prototype);
+    sc_synth(int node_id, sc_synth_definition_ptr const & prototype);
 
     ~sc_synth(void);
 
@@ -103,6 +103,7 @@ public:
     void run(void);
 
     void set(slot_index_t slot_index, sample val);
+    float get(slot_index_t slot_index) const;
     void set_control_array(slot_index_t slot_index, size_t count, sample * val);
 
     sample get(slot_index_t slot_index)
@@ -177,7 +178,7 @@ private:
 
     sample get_constant(size_t index)
     {
-        return static_cast<sc_synth_prototype*>(class_ptr.get())->constants[index];
+        return static_cast<sc_synth_definition*>(class_ptr.get())->constants[index];
     }
 
     friend class sc_ugen_def;

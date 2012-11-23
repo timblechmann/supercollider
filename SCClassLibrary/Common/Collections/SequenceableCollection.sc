@@ -92,8 +92,18 @@ SequenceableCollection : Collection {
 		newlist = newlist.addAll(this).addAll(aSequenceableCollection);
 		^newlist
 	}
-	+++ { arg aSequenceableCollection;
+	+++ { arg aSequenceableCollection, adverb;
 		aSequenceableCollection = aSequenceableCollection.asSequenceableCollection;
+		if(adverb.notNil) {
+			if(adverb == 0) { ^this ++ aSequenceableCollection };
+			if(adverb == 1) { ^this +++ aSequenceableCollection };
+			if(adverb < 0) { ^aSequenceableCollection.perform('+++', this, adverb.neg) };
+			^this.deepCollect(adverb - 1, { |sublist|
+				sublist.asSequenceableCollection.collect {|item, i|
+					item.asSequenceableCollection ++ aSequenceableCollection.wrapAt(i)
+				}
+			})
+		};
 		^this.collect {|item, i|
 			item.asSequenceableCollection ++ aSequenceableCollection.wrapAt(i)
 		}
@@ -175,13 +185,13 @@ SequenceableCollection : Collection {
 		^nil
 	}
 
-        indicesOfEqual { |item|
-                var indices;
-                this.do { arg val, i;
-                        if (item == val) { indices = indices.add(i) }
-                };
-                ^indices
-        }
+	indicesOfEqual { |item|
+		var indices;
+		this.do { arg val, i;
+			if (item == val) { indices = indices.add(i) }
+		};
+		^indices
+	}
 
 
 	find { |sublist, offset=0|
@@ -333,19 +343,6 @@ SequenceableCollection : Collection {
 		});
 		list = list.add(sublist);
 		^list
-	}
-	split { arg separator=$/;
-		var list = Array.new, index, prevIndex = -1, sepsize;
-		separator = separator.as(this.class);
-		sepsize = separator.size;
-		loop {
-			index = this.find(separator, offset: prevIndex + 1);
-			if(index.isNil) {
-				^list.add(this[prevIndex..]);
-			};
-			list = list.add(this[prevIndex..index - 1]);
-			prevIndex = index + sepsize;
-		}
 	}
 	clump { arg groupSize;
 		var list = Array.new((this.size / groupSize).roundUp.asInteger);

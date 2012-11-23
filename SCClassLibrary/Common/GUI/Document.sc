@@ -4,15 +4,12 @@
 
 Document {
 
-	classvar <dir="", <wikiDir="", <allDocuments, >current;
+	classvar <dir="", <allDocuments, >current;
 	classvar <>globalKeyDownAction, <> globalKeyUpAction, <>initAction;
 
 	classvar <>autoRun = true;
-	classvar <>wikiBrowse = true;
 
 	classvar <>implementationClass;
-	classvar <postColor;
-	classvar <theme, <themes;
 
 	//don't change the order of these vars:
 	var <dataptr, <>keyDownAction, <>keyUpAction, <>mouseUpAction;
@@ -23,9 +20,9 @@ Document {
 	var <envir, savedEnvir;
 	var <editable;
 
-	  *initClass{
+	*initClass{
 		allDocuments = [];
-	  }
+	}
 
 	*startup {
 		var num, doc;
@@ -33,23 +30,6 @@ Document {
 		num.do { | i |
 			doc = this.newFromIndex(i);
 		};
-		postColor = Color.black;
-		themes = (
-			default: (
-				classColor: Color(0, 0, 0.75, 1),
-				textColor: Color(0, 0, 0, 1),
-				stringColor: Color(0.375, 0.375, 0.375, 1),
-				commentColor: Color(0.75, 0, 0, 1),
-				symbolColor: Color(0, 0.45, 0, 1),
-				numberColor: Color(0, 0, 0, 1),
-				specialValsColor: Color(0.2, 0.2, 0.75, 1), // true false nil inf
-				specialVarsColor: Color(0.4, 0.4, 0.75, 1), // super, thisProcess
-				declColor: Color(0, 0, 1, 1), // var, const, args
-				puncColor: Color(0, 0, 0, 1),
-				environColor: Color(1.0, 0.4, 0, 1)
-				)
-			);
-		theme = themes.default;
 	}
 
 	*open { | path, selectionStart=0, selectionLength=0, envir |
@@ -83,15 +63,6 @@ Document {
 		if(path == "") { dir = path } {
 			if(pathMatch(path).isEmpty) { ("there is no such path:" + path).postln } {
 				dir = path ++ "/"
-			}
-		}
-	}
-
-	*wikiDir_ { | path |
-		path = path.standardizePath;
-		if(path == "") {wikiDir = path } {
-			if(pathMatch(path).isEmpty) { ("there is no such path:" + path).postln } {
-				wikiDir = path ++ "/"
 			}
 		}
 	}
@@ -162,10 +133,21 @@ Document {
 	}
 
 	*listener {
-		^allDocuments[this.implementationClass.prGetIndexOfListener];
+		var index = this.prGetIndexOfListener;
+		if (index.notNil) {
+			^allDocuments[index];
+		} {
+			^nil
+		}
 	}
+
 	isListener {
-		^allDocuments.indexOf(this) == this.class.prGetIndexOfListener
+		var index = this.class.prGetIndexOfListener;
+		if (index.notNil) {
+			^allDocuments.indexOf(this) == index
+		} {
+			^False
+		}
 	}
 
 // document setup
@@ -176,7 +158,10 @@ Document {
 	path_ { |apath|
 		this.prSetFileName(apath);
 	}
-	dir { var path = this.path; ^path !? { path.dirname } }
+	dir {
+		var path = this.path;
+		^path !? { path.dirname }
+	}
 	name {
 		^this.title
 	}
@@ -193,36 +178,6 @@ Document {
 		this.prSetTitle(argName);
 	}
 
-	background_ { | color |
-		this.prSetBackgroundColor(color);
-	}
-	background {
-		var color;
-		color = Color.new;
-		this.prGetBackgroundColor(color);
-		^color;
-	}
-
-	selectedBackground_ { | color |
-		this.prSetSelectedBackgroundColor(color);
-	}
-
-	selectedBackground {
-		var color;
-		color = Color.new;
-		this.prGetSelectedBackgroundColor(color);
-		^color;
-	}
-
-	*postColor_ { | col |
-		postColor = col;
-		^Document.implementationClass.postColor_(col);
-	}
-
-	stringColor_ { | color, rangeStart = -1, rangeSize = 0 |
-		stringColor = color;
-		this.setTextColor(color,rangeStart, rangeSize);
-	}
 	bounds {
 		^this.prGetBounds(Rect.new);
 	}
@@ -231,7 +186,6 @@ Document {
 	}
 
 // interaction:
-
 	close {
 		this.prclose
 	}
@@ -249,10 +203,6 @@ Document {
 	}
 
 	alwaysOnTop {
-		^this.subclassResponsibility(thisMethod)
-	}
-
-	syntaxColorize {
 		^this.subclassResponsibility(thisMethod)
 	}
 
@@ -282,27 +232,6 @@ Document {
 
 	underlineSelection {
 		^this.subclassResponsibility(thisMethod)
-	}
-
-	*setTheme { | themeName |
-		theme = themes[themeName];
-		if(theme.proto.isNil) {
-			theme = theme.copy.parent_(themes[\default]);
-		};
-		thisProcess.platform.writeClientCSS;
-		Document.implementationClass.prSetSyntaxColorTheme(
-			theme.textColor,
-			theme.classColor,
-			theme.stringColor,
-			theme.symbolColor,
-			theme.commentColor,
-			theme.numberColor,
-			theme.specialValsColor,
-			theme.specialVarsColor,
-			theme.declColor,
-			theme.puncColor,
-			theme.environColor
-		);
 	}
 
 // state info
@@ -376,113 +305,8 @@ Document {
 		this.restoreCurrentEnvironment;
 	}
 
-	makeWikiPage { | wikiWord, extension=(".rtf"), directory |
-		var filename, file, doc, string, dirName;
-		directory = directory ? wikiDir;
-		filename = directory ++ wikiWord ++ extension;
-		file = File(filename, "w");
-		if (file.isOpen) {
-			string = "{\\rtf1\\mac\\ansicpg10000\\cocoartf102\\n{\\fonttbl}\n"
-				"{\\colortbl;\\red255\\green255\\blue255;}\n"
-				"Write about " ++ wikiWord ++ " here.\n}";
-			file.write(string);
-			file.close;
-
-			doc = this.class.open(filename);
-			doc.path = filename;
-			doc.selectRange(0,0x7FFFFFFF);
-			doc.onClose = {
-				if(doc.string == ("Write about " ++ wikiWord ++ " here.")) {
-					unixCmd("rm" + filename)
-				};
-			};
-		} {
-			// in a second try, check if a path must be created.
-			// user makes double click on string.
-			dirName = wikiWord.dirname;
-			if(dirName != ".") {
-				dirName = directory ++ dirName;
-				"created directory: % \n".postf(dirName);
-				dirName.mkdir;
-			};
-		}
-	}
-
-	openWikiPage {
-		var selectedText, filename, index, directory;
-		var extensions = #[".rtf", ".sc", ".scd", ".txt", "", ".rtfd", ".html"];
-		selectedText = this.selectedText;
-		index = this.selectionStart;
-
-		this.selectRange(index, 0);
-
-		// refer to local link with round parens
-		if(selectedText.first == $( /*)*/ and: {/*(*/ selectedText.last == $) }) {
-				selectedText = selectedText[1 .. selectedText.size-2];
-				directory = Document.current.path.dirname ++ "/";
-		} {
-				directory = wikiDir;
-		};
-
-		case { selectedText[0] == $* }
-		{
-			// execute file
-			selectedText = selectedText.drop(1);
-			extensions.do { |ext|
-				filename = directory ++ selectedText ++ ext;
-				if (File.exists(filename)) {
-					// open existing wiki page
-					filename.load;
-					^this
-				}
-				{
-				filename = "Help/help-scripts/" ++ selectedText ++ ext;
-				if (File.exists(filename)) {
-					// open help-script document
-					filename.load;
-					^this
-				}
-				}
-			};
-		}
-		{ selectedText.first == $[ and: { selectedText.last == $] }}
-		{
-			// open help file
-			selectedText[1 .. selectedText.size-2].help
-		}
-		{ selectedText.containsStringAt(0, "http://")
-			or: { selectedText.containsStringAt(0, "file://") } }
-		{
-			// open URL
-			openOS(selectedText)
-		}
-		{ selectedText.containsStringAt(selectedText.size-1, "/") }
-		{
-			Document(selectedText,
-				pathMatch(directory ++ selectedText).collect({ |it|it.basename ++ "\n"}).join
-			)
-		}
-
-		{
-			if(index + selectedText.size > this.text.size) { ^this };
-			extensions.do { |ext|
-				filename = directory ++ selectedText ++ ext;
-				if (File.exists(filename)) {
-					// open existing wiki page
-					this.class.open(filename);
-					^this
-				}
-			};
-			// make a new wiki page
-			this.makeWikiPage(selectedText, nil, directory);
-		};
-	}
-
 	mouseUp{ | x, y, modifiers, buttonNumber, clickCount, clickPos |
-		mouseUpAction.value(this, x, y, modifiers, buttonNumber, clickCount);		if (wikiBrowse and: { this.linkAtClickPos(clickPos).not }
-			and: { this.selectUnderlinedText(clickPos) } ) {
-			^this.openWikiPage
-		};
+		mouseUpAction.value(this, x, y, modifiers, buttonNumber, clickCount)
 	}
 
 	keyDown { | character, modifiers, unicode, keycode |
@@ -517,6 +341,10 @@ Document {
 		this.subclassResponsibility(thisMethod);
 	}
 
+	*prPostColor_{ |color|
+		this.subclassResponsibility(thisMethod);
+	}
+
 	prUsesAutoInOutdent_{|bool|
 		^this.subclassResponsibility(thisMethod);
 	}
@@ -544,19 +372,6 @@ Document {
 	}
 
 	prSetBounds { | argBounds |
-		^this.subclassResponsibility(thisMethod)
-	}
-
-	*prSetSyntaxColorTheme{ |textC, classC, stringC, symbolC, commentC, numberC, specialValsC, specialVarsC, declC, puncC, environC|
-		^this.subclassResponsibility(thisMethod);
-	}
-
-	// if range is -1 apply to whole doc
-	setFont { | font, rangeStart= -1, rangeSize=100 |
-		^this.subclassResponsibility(thisMethod)
-	}
-
-	setTextColor { | color,  rangeStart = -1, rangeSize = 0 |
 		^this.subclassResponsibility(thisMethod)
 	}
 
@@ -710,9 +525,16 @@ Document {
 	}
 
 	*prGetIndexOfListener {
-		^this.subclassResponsibility(thisMethod)
-	}
+		if (this.implementationClass.isNil) {
+			^nil
+		};
 
+		if (this.implementationClass.respondsTo(\prGetIndexOfListener)) {
+			^this.implementationClass.prGetIndexOfListener
+		} {
+			^nil
+		}
+	}
 
 	//---not yet implemented
 	// ~/Documents
@@ -755,5 +577,4 @@ Document {
 	*prBasicNew {
 		^super.new
 	}
-
 }

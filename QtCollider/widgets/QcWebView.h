@@ -24,6 +24,7 @@
 
 #include <QWebView>
 #include <QWebPage>
+#include <QUrl>
 
 namespace QtCollider {
 
@@ -72,13 +73,12 @@ public:
   void setInterpretSelection( bool b ) { _interpretSelection = b; }
 
   inline static QUrl urlFromString( const QString & str ) {
-    QUrl url( str );
-    if( url.scheme().isEmpty() ) url.setScheme( "file" );
-    return url;
+      return QUrl::fromUserInput(str);
   }
 
 protected:
   virtual void keyPressEvent( QKeyEvent * );
+  virtual void contextMenuEvent ( QContextMenuEvent * );
 
 private Q_SLOTS:
   void onLinkClicked( const QUrl & );
@@ -86,26 +86,6 @@ private Q_SLOTS:
 
 private:
   bool _interpretSelection;
-};
-
-class WebPage : public QWebPage
-{
-  Q_OBJECT
-
-public:
-
-  WebPage( QObject *parent ) : QWebPage( parent ), _delegateReload(false) {}
-  virtual void triggerAction ( WebAction action, bool checked = false );
-  virtual void javaScriptConsoleMessage ( const QString &, int, const QString & );
-  bool delegateReload() const { return _delegateReload; }
-  void setDelegateReload( bool flag ) { _delegateReload = flag; }
-
-Q_SIGNALS:
-  void jsConsoleMsg( const QString &, int, const QString & );
-
-private:
-
-  bool _delegateReload;
 };
 
 } // namespace QtCollider

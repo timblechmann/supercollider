@@ -132,21 +132,6 @@ ClassBrowser {
 				};
 			};
 
-			if(this.respondsTo(\openSVN)) {
-				~svnButton = gui.button.new(~window, Rect(0,0, 32, 24));
-				~svnButton.states = [["svn"]];
-				~svnButton.action = {
-					var filename, svnAddr;
-					if(currentState.currentMethod.notNil) {
-						svnAddr = "http://supercollider.svn.sourceforge.net/viewvc/supercollider/trunk/common/build/";
-						filename = currentState.currentClass.filenameSymbol.asString;
-						svnAddr = svnAddr ++ filename.drop(filename.find("SCClassLibrary"));
-						svnAddr = svnAddr ++ "?view=log";
-						this.openSVN( svnAddr );
-					};
-				};
-			};
-
 			~window.view.decorator.nextLine;
 
 			GUI.staticText.new(~window, Rect(0, 0, 65, 20)).string_("Search for");
@@ -366,7 +351,7 @@ ClassBrowser {
 				classVarView, instVarView, subclassTitle, methodTitle, subclassView,
 				methodView, argView, searchMenu];
 			buttonSet = IdentitySet[\superButton, \metaButton, \helpButton, \classSourceButton,
-				\methodSourceButton, \implementationButton, \refsButton, \svnButton];
+				\methodSourceButton, \implementationButton, \refsButton];
 				// updateProtos holds instructions to update the GUI
 				// for each kind of browser result to display
 			updateProtos = (

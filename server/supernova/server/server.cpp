@@ -27,7 +27,7 @@
 
 #include "nrt_synthesis.hpp"
 
-#include "sc/sc_synth_prototype.hpp"
+#include "sc/sc_synth_definition.hpp"
 #include "sc/sc_ugen_factory.hpp"
 
 #ifdef __APPLE__
@@ -42,13 +42,16 @@ namespace nova
 class nova_server * instance = 0;
 
 nova_server::nova_server(server_arguments const & args):
-    scheduler<nova::scheduler_hook, thread_init_functor>(args.threads, !args.non_rt),
     server_shared_memory_creator(args.port(), args.control_busses),
-    buffer_manager(1024), sc_osc_handler(args), dsp_queue_dirty(false)
+    scheduler<nova::scheduler_hook, thread_init_functor>(args.threads, !args.non_rt),
+    buffer_manager(args.buffers), sc_osc_handler(args), dsp_queue_dirty(false)
 {
     assert(instance == 0);
-    io_interpreter.start_thread();
     instance = this;
+
+    if (!args.non_rt)
+        io_interpreter.start_thread();
+
     sc_factory = new sc_ugen_factory;
     sc_factory->initialize(args, server_shared_memory_creator::shm->get_control_busses());
 
@@ -56,7 +59,8 @@ nova_server::nova_server(server_arguments const & args):
     /** first guess: needs to be updated, once the backend is started */
     time_per_tick = time_tag::from_samples(args.blocksize, args.samplerate);
 
-    start_receive_thread();
+    if (!args.non_rt)
+        start_receive_thread();
 }
 
 void nova_server::prepare_backend(void)
@@ -168,41 +172,11 @@ void nova_server::run_nonrt_synthesis(server_arguments const & args)
     engine.run();
 }
 
-namespace
-{
-
-struct register_prototype_cb:
-    public audio_sync_callback
-{
-    register_prototype_cb (synth_prototype_ptr const & prototype):
-        prototype(prototype)
-    {}
-
-    void run(void)
-    {
-        instance->synth_factory::register_prototype(prototype);
-    }
-
-    synth_prototype_ptr prototype;
-};
-
-} /* namespace */
-
-void nova_server::register_prototype(synth_prototype_ptr const & prototype)
-{
-    scheduler<scheduler_hook, thread_init_functor>::add_sync_callback(new register_prototype_cb(prototype));
-}
-
-
 void nova_server::rebuild_dsp_queue(void)
 {
     assert(dsp_queue_dirty);
     node_graph::dsp_thread_queue_ptr new_queue = node_graph::generate_dsp_queue();
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
     scheduler<scheduler_hook, thread_init_functor>::reset_queue_sync(std::move(new_queue));
-#else
-    scheduler<scheduler_hook, thread_init_functor>::reset_queue_sync(new_queue);
-#endif
     dsp_queue_dirty = false;
 }
 
@@ -269,10 +243,10 @@ void io_thread_init_functor::operator()() const
     name_thread("Network Send");
 }
 
-void synth_prototype_deleter::dispose(synth_prototype * ptr)
+void synth_definition_deleter::dispose(synth_definition * ptr)
 {
     if (instance) /// todo: hack to fix test suite
-        instance->add_system_callback(new delete_callback<synth_prototype>(ptr));
+        instance->add_system_callback(new delete_callback<synth_definition>(ptr));
     else
         delete ptr;
 }

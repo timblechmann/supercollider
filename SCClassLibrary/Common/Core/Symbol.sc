@@ -29,8 +29,8 @@ Symbol {
 	}
 	asSpec { ^Spec.specs.at(this) }
 	asWarp { arg spec; ^Warp.warps.at(this).new(spec) }
-	asTuning { ^TuningInfo.at(this) }
-	asScale { ^ScaleInfo.at(this) }
+	asTuning { ^Tuning.at(this) }
+	asScale { ^Scale.at(this) }
 	// testing
 	isSetter {
 		// returns true if last character of symbol is an underscore
@@ -61,10 +61,6 @@ Symbol {
 		// returns true if symbol starts with 'a' or 'c' followed by a number
 	}
 	isRest { ^this.isMap.not }
-
-	openTextFile { arg selectionStart=0, selectionLength=0;
-		^this.asString.openTextFile(selectionStart, selectionLength)
-	}
 
 	// Environment support
 	// The compiler translates use of an Environment variable like ~myvar

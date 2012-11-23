@@ -21,23 +21,30 @@
 #ifndef SCIDE_WIDGETS_MAIN_WINDOW_HPP_INCLUDED
 #define SCIDE_WIDGETS_MAIN_WINDOW_HPP_INCLUDED
 
-#include <QMainWindow>
 #include <QLabel>
+#include <QMainWindow>
 #include <QProcess>
 #include <QSignalMapper>
+#include <QStatusBar>
 
-namespace ScIDE
-{
+namespace ScIDE {
 
 class Main;
 class MultiEditor;
 class ToolBox;
 class TextFindReplacePanel;
-class PostDock;
-class DocumentsDock;
-class StatusLabel;
+class GoToLineTool;
+class PostDocklet;
+class DocumentsDocklet;
+class HelpBrowserDocklet;
+class CmdLine;
 class Document;
 class DocumentsDialog;
+struct Session;
+class StatusLabel;
+class StatusClockLabel;
+
+namespace Settings { class Manager; }
 
 class MainWindow : public QMainWindow
 {
@@ -50,41 +57,63 @@ public:
         Quit = 0,
         DocNew,
         DocOpen,
+        DocOpenStartup,
         DocSave,
         DocSaveAs,
+        DocSaveAll,
         DocClose,
+        DocCloseAll,
         DocReload,
         ClearRecentDocs,
+
+        // Sessions
+        NewSession,
+        SaveSessionAs,
+        ManageSessions,
+        OpenSessionSwitchDialog,
 
         // Edit
         Find,
         Replace,
 
         // View
-        ShowDocList,
         ShowCmdLine,
+        ShowGoToLineTool,
         CloseToolBox,
-
-        // Language
-        EvaluateCurrentFile,
-        EvaluateRegion,
+        ShowFullScreen,
+        FocusPostWindow,
 
         // Settings
         ShowSettings,
 
+        // Language
+        LookupImplementation,
+        LookupImplementationForCursor,
+        LookupReferences,
+        LookupReferencesForCursor,
+
         // Help
-        BrowseHelp,
-        SearchHelp,
-        HelpForSelection,
+        Help,
+        LookupDocumentationForCursor,
+        LookupDocumentation,
+        ShowAbout,
+        ShowAboutQT,
 
         ActionCount
     };
 
-    MainWindow(Main *);
+    explicit MainWindow(Main *);
 
     QAction *action( ActionRole );
 
     bool quit();
+
+    void saveWindowState();
+    void restoreWindowState();
+    void focusCodeEditor();
+    bool promptSaveDocs();
+
+    HelpBrowserDocklet * helpBrowserDocklet() { return mHelpBrowserDocklet; }
 
     static MainWindow *instance() { return mInstance; }
 
@@ -93,62 +122,102 @@ public:
     static bool reload( Document * );
 
 public Q_SLOTS:
-    void toggleComandLineFocus();
-    void showSettings();
+    void newSession();
+    void saveCurrentSessionAs();
+    void openSessionsDialog();
+
     void newDocument();
     void openDocument();
+    void openStartupFile();
     void saveDocument();
     void saveDocumentAs();
+    void saveAllDocuments();
     void reloadDocument();
     void closeDocument();
+    void closeAllDocuments();
 
     void showCmdLine();
     void showFindTool();
     void showReplaceTool();
+    void showGoToLineTool();
     void hideToolBox();
+
+    void showSettings();
 
 signals:
     void evaluateCode( const QString &, bool silent = true );
 
+public Q_SLOTS:
+    void showStatusMessage( QString const & string );
+
 private Q_SLOTS:
-    void evaluateRegion();
-    void evaluateCurrentFile();
-    void helpForSelection();
+    void switchSession( Session *session );
+    void saveSession( Session *session );
     void onInterpreterStateChanged( QProcess::ProcessState );
+    void onServerStatusReply(int ugens, int synths, int groups, int synthDefs, float avgCPU, float peakCPU);
+    void onServerRunningChanged( bool running, QString const & hostName, int port );
     void onQuit();
     void onCurrentDocumentChanged( Document * );
     void onDocumentChangedExternally( Document * );
     void onDocDialogFinished();
     void updateRecentDocsMenu();
     void onRecentDocAction( QAction * );
+    void onOpenSessionAction( QAction * );
+    void updateWindowTitle();
+    void toggleFullScreen();
+    void lookupImplementation();
+    void lookupImplementationForCursor();
+    void lookupReferences();
+    void lookupReferencesForCursor();
+    void openHelp();
+    void lookupDocumentationForCursor();
+    void lookupDocumentation();
+    void applySettings( Settings::Manager * );
+    void storeSettings( Settings::Manager * );
+    void showSwitchSessionDialog();
+    void showAbout();
+    void showAboutQT();
 
 protected:
     virtual void closeEvent(QCloseEvent *event);
+    virtual void dragEnterEvent( QDragEnterEvent * );
+    virtual void dropEvent( QDropEvent * );
 
 private:
     void createActions();
     void createMenus();
-    QWidget *cmdLine();
+    template <class T> void saveWindowState(T * settings);
+    template <class T> void restoreWindowState(T * settings);
+    void updateSessionsMenu();
+    void updateClockWidget( bool isFullScreen );
+    void openSession( QString const & sessionName );
+    bool checkFileExtension( const QString & fpath );
+    void toggleInterpreterActions( bool enabled);
 
     Main *mMain;
 
     QAction * mActions[ActionCount];
     QMenu * mRecentDocsMenu;
+    QMenu * mSessionsMenu;
 
     MultiEditor *mEditors;
 
     // Tools
     ToolBox *mToolBox;
-    QWidget *mCmdLine;
+    CmdLine *mCmdLine;
+    GoToLineTool *mGoToLineTool;
     TextFindReplacePanel *mFindReplaceTool;
 
     // Status bar
+    QStatusBar  *mStatusBar;
     StatusLabel *mLangStatus;
-    StatusLabel *mSynthStatus;
+    StatusLabel *mServerStatus;
+    StatusClockLabel *mClockLabel;
 
     // Docks
-    PostDock * mPostDock;
-    DocumentsDock *mDocListDock;
+    PostDocklet * mPostDocklet;
+    DocumentsDocklet *mDocumentsDocklet;
+    HelpBrowserDocklet *mHelpBrowserDocklet;
 
     QSignalMapper mCodeEvalMapper;
     DocumentsDialog * mDocDialog;
@@ -162,6 +231,18 @@ public:
     StatusLabel(QWidget *parent = 0);
     void setBackground(const QBrush &);
     void setTextColor(const QColor &);
+};
+
+class StatusClockLabel : public StatusLabel
+{
+public:
+    StatusClockLabel (QWidget * parent = 0);
+    ~StatusClockLabel();
+
+private:
+    void timerEvent(QTimerEvent *);
+    void updateTime();
+    int mTimerId;
 };
 
 } // namespace ScIDE

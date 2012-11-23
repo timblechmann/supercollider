@@ -323,7 +323,7 @@ OSCdef : OSCFunc {
 	printOn { arg stream; stream << this.class.name << "(" <<* [key, path, srcID, recvPort, argTemplate] << ")" }
 
 	*freeAll {
-		var objs = all.shallowCopy;
+		var objs = all.copy;
 		objs.do(_.free)
 	}
 }
@@ -453,20 +453,73 @@ MIDIMessageDispatcherNV : MIDIMessageDispatcher {
 	}
 }
 
+// for \sysex
+MIDISysexDispatcher : MIDIMessageDispatcher {
+
+	getKeysForFuncProxy {|funcProxy| ^(funcProxy.srcID ? \all)} // chan
+
+	value {|srcID, data|
+		active[srcID].value(data, srcID);
+		active[\all].value(data, srcID);
+	}
+
+	wrapFunc {|funcProxy|
+		var func, srcID, argTemplate;
+		func = funcProxy.func;
+		srcID = funcProxy.srcID;
+		argTemplate = funcProxy.argTemplate;
+		if(argTemplate.notNil, { func = MIDIValueMatcher(argTemplate, func)});
+		^func;
+	}
+}
+
 
 MIDIFunc : AbstractResponderFunc {
-	classvar <>defaultDispatchers;
+	classvar <>defaultDispatchers, traceFuncs, traceRunning = false;
 	var <chan, <msgNum, <msgType, <argTemplate;
 
 	*initClass {
 		defaultDispatchers = IdentityDictionary.new;
+		traceFuncs = IdentityDictionary.new;
 		[\noteOn, \noteOff, \control, \polytouch].do({|type|
 			defaultDispatchers[type] = MIDIMessageDispatcher(type);
+			traceFuncs[type] = {|src, chan, num, val|
+				"MIDI Message Received:\n\ttype: %\n\tsrc: %\n\tchan: %\n\tnum: %\n\tval: %\n\n".postf(type, src, chan, num, val);
+			};
+		});
+		[\sysex, \sysrt].do({|type|
+			defaultDispatchers[type] = MIDISysexDispatcher(type);
+			traceFuncs[type] = {|src, data|
+				"MIDI Message Received:\n\ttype: %\n\tsrc: %\n\tdata: %\n\n".postf(type, src, data);
+			};
 		});
 		[\touch, \program, \bend].do({|type|
 			defaultDispatchers[type] = MIDIMessageDispatcherNV(type);
+			traceFuncs[type] = {|src, chan, num|
+				"MIDI Message Received:\n\ttype: %\n\tsrc: %\n\tchan: %\n\tnum: %\n\n".postf(type, src, chan, num);
+			};
 		});
 	}
+
+	*trace {|bool = true|
+		if(bool, {
+			if(traceRunning.not, {
+				[\noteOn, \noteOff, \control, \polytouch, \touch, \program, \bend, \sysex].do({|type|
+					MIDIIn.addFuncTo(type, traceFuncs[type]);
+				});
+				CmdPeriod.add(this);
+				traceRunning = true;
+			});
+		}, {
+			[\noteOn, \noteOff, \control, \polytouch, \touch, \program, \bend, \sysex].do({|type|
+				MIDIIn.removeFuncFrom(type, traceFuncs[type]);
+			});
+			CmdPeriod.remove(this);
+			traceRunning = false;
+		});
+	}
+
+	*cmdPeriod { this.trace(false) }
 
 	*new { arg func, msgNum, chan, msgType, srcID, argTemplate, dispatcher;
 		^super.new.init(func, msgNum, chan, msgType, srcID, argTemplate, dispatcher ? defaultDispatchers[msgType]);
@@ -499,6 +552,15 @@ MIDIFunc : AbstractResponderFunc {
 	*program { arg func, chan, srcID, argTemplate, dispatcher;
 		^this.new(func, nil, chan, \program, srcID, argTemplate, dispatcher);
 	}
+
+	*sysex { arg func, srcID, argTemplate, dispatcher;
+		^this.new(func, nil, nil, \sysex, srcID, argTemplate, dispatcher);
+	}
+
+	*sysrt { arg func, index, srcID, argTemplate, dispatcher;
+		^this.new(func, index, nil, \sysrt, srcID, argTemplate, dispatcher);
+	}
+
 
 	init {|argfunc, argmsgNum, argchan, argType, argsrcID, argtempl, argdisp|
 		msgNum = argmsgNum ? msgNum;
@@ -568,6 +630,14 @@ MIDIdef : MIDIFunc {
 		^this.new(key, func, nil, chan, \program, srcID, argTemplate, dispatcher);
 	}
 
+	*sysex { arg key, func, srcID, argTemplate, dispatcher;
+		^this.new(key, func, nil, nil, \sysex, srcID, argTemplate, dispatcher);
+	}
+
+	*sysrt { arg key, func, index, srcID, argTemplate, dispatcher;
+		^this.new(key, func, index, nil, \sysrt, srcID, argTemplate, dispatcher);
+	}
+
 	addToAll {|argkey| key = argkey; all.put(key, this) }
 
 	free { all[key] = nil; super.free; }
@@ -576,7 +646,7 @@ MIDIdef : MIDIFunc {
 	printOn { arg stream; stream << this.class.name << "(" <<* [key, msgType, msgNum, chan, argTemplate] << ")" }
 
 	*freeAll {
-		var objs = all.shallowCopy;
+		var objs = all.copy;
 		objs.do(_.free)
 	}
 }
@@ -595,7 +665,7 @@ MIDIFuncSrcMessageMatcher : AbstractMessageMatcher {
 	}
 }
 
-// if you need to test for srcID func gets wrapped in this
+// if you need to test for chan func gets wrapped in this
 MIDIFuncChanMessageMatcher : AbstractMessageMatcher {
 	var chan;
 

@@ -163,13 +163,13 @@ GeneralHIDDevice{
 	ungrab{
 		device.ungrab;
 	}
-	
+
 	hidDeviceAction_{ |func|
-		device.hidDeviceAction = func;	
+		device.hidDeviceAction = func;
 	}
 
 	hidDeviceAction{
-		^device.hidDeviceAction;	
+		^device.hidDeviceAction;
 	}
 
 	// spec support
@@ -178,11 +178,28 @@ GeneralHIDDevice{
 	}
 
 	setSpec{ |name|
-		spec.fromFile( name );
+		if ( name.isKindOf( Array ) ){
+			spec.fromFile( name.first )
+		}{
+			spec.fromFile( name );
+		}
+	}
+
+	hasSlot{ |slotid|
+		if ( slots.at( slotid[0] ).notNil ){
+			if ( slots[ slotid[0] ].at( slotid[1] ).notNil ){
+				^true;
+			}
+		};
+		^false;
 	}
 
 	add{ |key, slot|
-		spec.add( key, slot );
+		if ( this.hasSlot( slot ) ){
+			spec.add( key, slot );
+		}{
+			"slot does not exist!".warn;
+		}
 	}
 
 	at{ |key|
@@ -228,8 +245,6 @@ GeneralHIDDevice{
 	makeGui{
 		^GeneralHIDDeviceGUI.new( this );
 	}
-
-
 }
 
 GeneralHIDSlot{
@@ -336,5 +351,4 @@ GeneralHIDSlot{
 		this.createBus;
 		^In.kr( bus );
 	}
-
 }

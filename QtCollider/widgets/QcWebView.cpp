@@ -20,15 +20,17 @@
 ************************************************************************/
 
 #include "QcWebView.h"
+#include "web_page.hpp"
 #include "../QcWidgetFactory.h"
 #include <QWebPage>
 #include <QWebFrame>
+#include <QWebElement>
 #include <QAction>
+#include <QMenu>
 #include <QShortcut>
 #include <QKeyEvent>
 #include <QApplication>
 #include <QStyle>
-#include <QClipboard>
 
 QC_DECLARE_QWIDGET_FACTORY(WebView);
 
@@ -46,10 +48,8 @@ WebView::WebView( QWidget *parent ) :
   // get in the way of rendering web pages
   setPalette( style()->standardPalette() );
 
-  QShortcut *scutCopy = new QShortcut( QKeySequence::Copy, this );
-  scutCopy->setContext( Qt::WidgetWithChildrenShortcut );
-  connect( scutCopy, SIGNAL(activated()),
-           pageAction(QWebPage::Copy), SLOT(trigger()) );
+  page->action( QWebPage::Copy )->setShortcut( QKeySequence::Copy );
+  page->action( QWebPage::Paste )->setShortcut( QKeySequence::Paste );
 
   connect( this, SIGNAL(linkClicked(QUrl)), this, SLOT(onLinkClicked(QUrl)) );
   connect( page->action(QWebPage::Reload), SIGNAL(triggered(bool)),
@@ -142,40 +142,50 @@ void WebView::onPageReload()
   Q_EMIT( reloadTriggered( url() ) );
 }
 
+void WebView::contextMenuEvent ( QContextMenuEvent * event )
+{
+    QMenu menu;
+
+    QPoint pos = event->pos();
+
+    QWebHitTestResult hitTest = page()->mainFrame()->hitTestContent( pos );
+
+    if (!hitTest.linkElement().isNull()) {
+        menu.addAction( pageAction(QWebPage::CopyLinkToClipboard) );
+        menu.addSeparator();
+    }
+
+    if (hitTest.isContentEditable() || hitTest.isContentSelected()) {
+        menu.addAction( pageAction(QWebPage::Copy) );
+        if (hitTest.isContentEditable())
+            menu.addAction( pageAction(QWebPage::Paste) );
+        menu.addSeparator();
+    }
+
+    menu.addAction( pageAction(QWebPage::Back) );
+    menu.addAction( pageAction(QWebPage::Forward) );
+    menu.addAction( pageAction(QWebPage::Reload) );
+
+    menu.exec( event->globalPos() );
+}
+
 void WebView::keyPressEvent( QKeyEvent *e )
 {
-  if( _interpretSelection && e->modifiers() & (Qt::ControlModifier|Qt::ShiftModifier)
-      && ( e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter ) )
-  {
-    QString selection = selectedText();
-    if( !selection.isEmpty() ) {
-      Q_EMIT( interpret( selection ) );
-      return;
+    int key = e->key();
+    int mods = e->modifiers();
+
+    if( _interpretSelection &&
+            ( key == Qt::Key_Enter ||
+              ( key == Qt::Key_Return && mods & (Qt::ControlModifier|Qt::ShiftModifier) ) ) )
+    {
+        QString selection = selectedText();
+        if( !selection.isEmpty() ) {
+            Q_EMIT( interpret( selection ) );
+            return;
+        }
     }
-  }
 
-  QWebView::keyPressEvent( e );
-}
-
-
-void WebPage::triggerAction ( WebAction action, bool checked )
-{
-  switch ( action ) {
-    case QWebPage::Reload:
-      if( _delegateReload ) return;
-      break;
-    case QWebPage::Copy:
-      QApplication::clipboard()->setText( selectedText() );
-      return;
-    default: ;
-  }
-
-  QWebPage::triggerAction( action, checked );
-}
-
-void WebPage::javaScriptConsoleMessage ( const QString & msg, int line, const QString & src )
-{
-  Q_EMIT( jsConsoleMsg(msg,line,src) );
+    QWebView::keyPressEvent( e );
 }
 
 } // namespace QtCollider

@@ -28,7 +28,7 @@
 
 #include "audio_backend_common.hpp"
 #include "utilities/branch_hints.hpp"
-
+#include "cpu_time_info.hpp"
 
 namespace nova {
 
@@ -39,11 +39,11 @@ template <typename engine_functor,
           typename sample_type = float,
           bool blocking = false>
 class portaudio_backend:
-    public detail::audio_delivery_helper<sample_type, float, blocking, false>,
+    public detail::audio_backend_base<sample_type, float, blocking, false>,
     public detail::audio_settings_basic,
     protected engine_functor
 {
-    typedef detail::audio_delivery_helper<sample_type, float, blocking, false> super;
+    typedef detail::audio_backend_base<sample_type, float, blocking, false> super;
 
 public:
     portaudio_backend(void):
@@ -218,6 +218,12 @@ public:
         return stream;
     }
 
+    void get_cpuload(float & peak, float & average) const
+    {
+        cpu_time_accumulator.get(peak, average);
+    }
+
+
 private:
     int perform(const void *inputBuffer, void *outputBuffer, unsigned long frames,
                 const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags)
@@ -249,6 +255,7 @@ private:
             processed += blocksize_;
         }
 
+        cpu_time_accumulator.update(Pa_GetStreamCpuLoad(stream));
         return paContinue;
     }
 
@@ -262,6 +269,7 @@ private:
     PaStream *stream;
     uint32_t blocksize_;
     bool callback_initialized;
+    cpu_time_info cpu_time_accumulator;
 };
 
 } /* namespace nova */

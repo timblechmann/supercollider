@@ -234,11 +234,10 @@ void sc_ugen_factory::load_plugin_folder (boost::filesystem::path const & path)
 void sc_ugen_factory::load_plugin ( boost::filesystem::path const & path )
 {
     using namespace std;
+
     void * handle = dlopen(path.string().c_str(), RTLD_NOW | RTLD_LOCAL);
-    if (handle == NULL) {
-        cerr << "Cannot open plugin: " << dlerror() << endl;
+    if (handle == NULL)
         return;
-    }
 
     typedef int (*info_function)();
 
@@ -253,8 +252,16 @@ void sc_ugen_factory::load_plugin ( boost::filesystem::path const & path )
         return;
     }
 
+    info_function supernova_check = reinterpret_cast<info_function>(dlsym(handle, "server_type"));
+    if (!supernova_check || (*supernova_check)() == sc_server_scsynth) {
+        // silently ignore
+        dlclose(handle);
+        return;
+    }
+
     void * load_symbol = dlsym(handle, "load");
     if (!load_symbol) {
+        cerr << "Problem when loading plugin: \"load\" function undefined" << path << endl;
         dlclose(handle);
         return;
     }
@@ -271,7 +278,7 @@ void sc_ugen_factory::close_handles(void)
 {
 #if 0
     /* closing the handles has some unwanted side effects, so we leave them open */
-    foreach(void * handle, open_handles)
+    for(void * handle : open_handles)
         dlclose(handle);
 #endif
 }
@@ -279,6 +286,60 @@ void sc_ugen_factory::close_handles(void)
 #else
 void sc_ugen_factory::load_plugin ( boost::filesystem::path const & path )
 {
+    //std::cout << "try open plugin: " << path << std::endl;
+    const char * filename = path.string().c_str();
+    HINSTANCE hinstance = LoadLibrary( path.string().c_str() );
+    if (!hinstance) {
+        char *s;
+        DWORD lastErr = GetLastError();
+        FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+                       0, lastErr , 0, (char*)&s, 1, 0 );
+
+        std::cerr << "Cannot open plugin: " << path << s << std::endl;
+        LocalFree( s );
+        return;
+    }
+
+    typedef int (*info_function)();
+    info_function api_version = reinterpret_cast<info_function>(GetProcAddress( hinstance, "api_version" ));
+
+    if ((*api_version)() != sc_api_version) {
+        std::cerr << "API Version Mismatch: " << filename << std::endl;
+        FreeLibrary(hinstance);
+        return;
+    }
+
+    typedef int (*info_function)();
+    info_function server_type = reinterpret_cast<info_function>(GetProcAddress( hinstance, "server_type" ));
+    if (!server_type) {
+        FreeLibrary(hinstance);
+        return;
+    }
+
+    if ((*server_type)() != sc_server_supernova) {
+        FreeLibrary(hinstance);
+        return;
+    }
+
+    void *ptr = (void *)GetProcAddress( hinstance, "load" );
+    if (!ptr) {
+        char *s;
+        FormatMessage( FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+                       0, GetLastError(), 0, (char*)&s, 1, 0 );
+
+        std::cerr << "*** ERROR: GetProcAddress err " << s << std::endl;
+        LocalFree( s );
+
+        FreeLibrary(hinstance);
+        return;
+    }
+
+    LoadPlugInFunc loadFunc = (LoadPlugInFunc)ptr;
+    (*loadFunc)(&sc_interface);
+
+    // FIXME: at the moment we never call FreeLibrary() on a loaded plugin
+
+    return;
 }
 
 void sc_ugen_factory::close_handles(void)

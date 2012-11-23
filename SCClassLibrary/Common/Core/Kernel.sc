@@ -181,7 +181,7 @@ Class {
 Process {
 	// A Process is a runtime environment.
 	var classVars, <interpreter;
-	var curThread, mainThread;
+	var curThread, <mainThread;
 	var schedulerQueue;
 	var <>nowExecutingPath;
 
@@ -558,12 +558,15 @@ Interpreter {
 	}
 
 	interpretPrintCmdLine {
-		var res, func, code = cmdLine, doc = Document.current;
-		"\n".post;
+		var res, func, code = cmdLine, doc = Document.current, ideClass = \ScIDE.asClass;
 		preProcessor !? { cmdLine = preProcessor.value(cmdLine, this) };
 		func = this.compile(cmdLine);
-		if(doc.tryPerform(\dataptr).notNil) {
-			thisProcess.nowExecutingPath = doc.tryPerform(\path);
+		if (ideClass.notNil) {
+			thisProcess.nowExecutingPath = ideClass.currentPath
+		} {
+			if(doc.tryPerform(\dataptr).notNil) {
+				thisProcess.nowExecutingPath = doc.tryPerform(\path);
+			}
 		};
 		res = func.value;
 		thisProcess.nowExecutingPath = nil;

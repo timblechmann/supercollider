@@ -2,9 +2,12 @@ include_directories(${CMAKE_SOURCE_DIR}/include/common
                     ${CMAKE_SOURCE_DIR}/include/lang
                     ${CMAKE_SOURCE_DIR}/include/plugin_interface
                     ${CMAKE_SOURCE_DIR}/include/server
-                    ${CMAKE_SOURCE_DIR}/external_libraries/boost_lockfree
+                    ${CMAKE_SOURCE_DIR}/common
+
+                    ${YAMLCPP_INCLUDE_DIR}
+
+                    ${CMAKE_SOURCE_DIR}/external_libraries/boost-lockfree
                     ${CMAKE_SOURCE_DIR}/external_libraries/threadpool
-                    ${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.3.0/include
                     ${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src
                     LangSource/Bison)
 
@@ -49,7 +52,6 @@ set(sclang_sources
 	LangSource/DumpParseNode.cpp
 	LangSource/GC.cpp
 	LangSource/InitAlloc.cpp
-	LangSource/PyrFileUtils.cpp
 	LangSource/PyrInterpreter3.cpp
 	LangSource/PyrLexer.cpp
 	LangSource/PyrMathOps.cpp
@@ -60,7 +62,7 @@ set(sclang_sources
 	LangSource/PyrSignal.cpp
 	LangSource/PyrSymbolTable.cpp
 	LangSource/SC_LanguageClient.cpp
-	LangSource/SC_LibraryConfig.cpp
+	LangSource/SC_LanguageConfig.cpp
 	LangSource/SC_TerminalClient.cpp
 	LangSource/Samp.cpp
 	LangSource/SimpleStack.cpp
@@ -75,13 +77,15 @@ set(sclang_sources
 	${CMAKE_SOURCE_DIR}/common/SC_StandAloneInfo_Darwin.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_StringBuffer.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_StringParser.cpp
+	${CMAKE_SOURCE_DIR}/common/SC_TextUtils.cpp
+
 	${CMAKE_SOURCE_DIR}/common/scsynthsend.cpp
 	${CMAKE_SOURCE_DIR}/common/sc_popen.cpp
 )
 
 if (NOT Boost_FOUND)
 	file(GLOB boost_system_sources ../external_libraries/boost/libs/system/src/*cpp)
-	file(GLOB boost_fs_sources ../external_libraries/boost/libs/filesystem/v3/src/*cpp)
+	file(GLOB boost_fs_sources ../external_libraries/boost/libs/filesystem/src/*cpp)
 	file(GLOB boost_regex_sources ../external_libraries/boost/libs/regex/src/*cpp)
 	list(APPEND sclang_sources ${boost_fs_sources} ${boost_system_sources} ${boost_regex_sources})
 endif()
@@ -161,7 +165,7 @@ if (SC_WII OR APPLE)
 			include_directories(${CWIID_INCLUDE_DIRS} ${BLUETOOTH_INCLUDE_DIRS})
 			message(STATUS "Compiling with WiiMote support")
 		else()
-			message(SEND_ERROR "Cannot find libcwiid or libbluetooth")
+			message(SEND_ERROR "Cannot find libcwiid or libbluetooth.\n (If Wii support is not required, then set SC_WII=no)")
 		endif()
 	elseif(APPLE)
 		add_definitions(-DHAVE_WII)
@@ -274,7 +278,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 	target_link_libraries(libsclang rt)
 endif()
 
-target_link_libraries(libsclang ${PTHREADS_LIBRARY} yaml)
+target_link_libraries(libsclang ${PTHREADS_LIBRARY} ${YAMLCPP_LIBRARY})
 
 if(SC_QT)
 	target_link_libraries(libsclang ${QT_COLLIDER_LIBS})
@@ -290,7 +294,7 @@ endif()
 
 set_property(TARGET sclang
 	APPEND
-	PROPERTY COMPILE_DEFINITIONS USE_SC_TERMINAL_CLIENT)
+	PROPERTY COMPILE_DEFINITIONS USE_SC_TERMINAL_CLIENT BUILDING_SUPERCOLLIDER)
 
 if(LTO)
 	set_property(TARGET sclang libsclang

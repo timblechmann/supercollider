@@ -85,12 +85,14 @@ struct PyrObjectHdr {
 
 	int scratch1;
 
-	int SizeClass() { return obj_sizeclass; }
+	int SizeClass()          { return obj_sizeclass; }
 
-	void SetMark() { obj_flags |= obj_marked; }
-	void ClearMark() { obj_flags &= ~obj_marked; }
-	bool IsMarked() { return ((obj_flags & obj_marked) != 0); } // BG2004-10-09 : the previous version did execute some hidden code in int -> bool conversion
-	bool IsPermanent() { return gc_color == obj_permanent; }
+	void SetMark()           { obj_flags |= obj_marked; }
+	void ClearMark()         { obj_flags &= ~obj_marked; }
+	bool IsMarked() const    { return obj_flags & obj_marked; }
+	bool IsPermanent() const { return gc_color == obj_permanent; }
+	bool IsImmutable() const { return obj_flags & obj_immutable; }
+	bool IsMutable() const   { return !IsImmutable(); }
 };
 
 struct PyrObject : public PyrObjectHdr {
@@ -236,14 +238,13 @@ void dumpObjectSlot(PyrSlot *slot);
 bool respondsTo(PyrSlot *slot, PyrSymbol *selector);
 bool isSubclassOf(struct PyrClass *classobj, struct PyrClass *testclass);
 
-const int kFloatTagIndex = 11;
 extern struct PyrClass* gTagClassTable[16];
 
 inline struct PyrClass* classOfSlot(PyrSlot *slot)
 {
 	PyrClass *classobj;
 	int tag;
-	if (IsFloat(slot)) classobj = gTagClassTable[kFloatTagIndex];
+	if (IsFloat(slot)) classobj = class_float;
 	else if ((tag = GetTag(slot) & 0xF) == 1) classobj = slotRawObject(slot)->classptr;
 	else classobj = gTagClassTable[tag];
 
@@ -280,12 +281,12 @@ void getIndexedSlot(struct PyrObject *obj, PyrSlot *a, int index);
 int putIndexedSlot(struct VMGlobals *g, struct PyrObject *obj, PyrSlot *c, int index);
 int putIndexedFloat(PyrObject *obj, double val, int index);
 
-inline int ARRAYMAXINDEXSIZE(PyrObjectHdr* obj)
+inline long ARRAYMAXINDEXSIZE(PyrObjectHdr* obj)
 {
 	return (1L << obj->obj_sizeclass);
 }
 
-inline int MAXINDEXSIZE(PyrObjectHdr* obj)
+inline long MAXINDEXSIZE(PyrObjectHdr* obj)
 {
 	return ((1L << obj->obj_sizeclass) * gFormatElemCapc[ obj->obj_format ]);
 }

@@ -20,6 +20,10 @@
 */
 
 #include "cmd_line.hpp"
+#include "main_window.hpp"
+#include "util/gui_utilities.hpp"
+#include "../core/main.hpp"
+#include "../core/settings/manager.hpp"
 
 #include <QHBoxLayout>
 #include <QLabel>
@@ -27,17 +31,39 @@
 
 namespace ScIDE {
 
+QString CmdLineEdit::symbolUnderCursor()
+{
+    if (hasSelectedText())
+        return selectedText();
+    else {
+        int position = cursorPosition();
+        return wordInStringAt( position, text() );
+    }
+}
+
+bool CmdLineEdit::openDocumentation()
+{
+    return Main::openDocumentation(symbolUnderCursor());
+}
+
+void CmdLineEdit::openDefinition()
+{
+    return Main::openDefinition(symbolUnderCursor(), MainWindow::instance());
+}
+
+void CmdLineEdit::findReferences()
+{
+    return Main::findReferences(symbolUnderCursor(), MainWindow::instance());
+}
+
+
 CmdLine::CmdLine( const QString &text, int maxHist ) :
     curHistory( -1 ),
     maxHistory( qMax(1,maxHist) )
 {
     QLabel *lbl = new QLabel(text);
 
-    expr = new QLineEdit;
-    QFont f( expr->font() );
-    f.setFamily("monospace");
-    f.setStyleHint(QFont::TypeWriter);
-    expr->setFont(f);
+    expr = new CmdLineEdit;
 
     QHBoxLayout *l = new QHBoxLayout;
     l->setContentsMargins(0,0,0,0);
@@ -47,6 +73,14 @@ CmdLine::CmdLine( const QString &text, int maxHist ) :
 
     expr->installEventFilter( this );
     setFocusProxy(expr);
+
+    applySettings( Main::settings() );
+}
+
+void CmdLine::applySettings( Settings::Manager *settings )
+{
+    QFont codeFont = settings->codeFont();
+    expr->setFont( codeFont );
 }
 
 bool CmdLine::eventFilter( QObject *, QEvent *e )

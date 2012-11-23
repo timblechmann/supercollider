@@ -32,7 +32,7 @@ Requirements:
  * Mac OS X 10.4.9 or greater
  * Cmake 2.7 or greater
  * Xcode Tools 2.4.1 or greater
- * Qt 4: http://qt.nokia.com/downloads/qt-for-open-source-cpp-development-on-mac-os-x/
+ * Qt libraries 4.7 or greater: http://qt-project.org/downloads
 
 To build SuperCollider with Cmake, it is recommended to create a "build"
 folder (to keep the built files neatly all together) in the root of the 
@@ -77,6 +77,31 @@ For the BIG universal binary (on 10.6), use:
 
 	cmake -DCMAKE_OSX_ARCHITECTURES='i386;x86_64' ..
 
+cmake -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/ -DCMAKE_OSX_DEPLOYMENT_TARGET=10.6 -GXcode
+**** 10.8 warning ****
+
+On 10.8 you need to:
+
+compile against the 10.7 SDK
+build with the Xcode generator (add -GXcode to your cmake flags).
+
+Then, build the install target in Xcode.
+
+I started working on the bluetooth issues today actually, but the changes aren't trivial.
+
+For some reason, the 10.7 SDK choice doesn't seem to percolate into the makefile version created by cmake. You can either build with an Xcode file:
+
+(an example from josh on 10.8 with Xcode 4.5: cmake -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/ -DCMAKE_OSX_DEPLOYMENT_TARGET=10.6 -GXcode )
+
+your build will be in the "Install" folder in the build directory.
+
+or add the following flags for isysroot:
+
+	-DCMAKE_CXX_FLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/" -DCMAKE_C_FLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/" 
+
+Finally - a cmake command that builds on 10.8 currently:
+
+cmake -DCMAKE_OSX_SYSROOT=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/ -DCMAKE_OSX_DEPLOYMENT_TARGET=10.7 -DCMAKE_CXX_FLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/"  -DCMAKE_C_FLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.7.sdk/" -DCMAKE_BUILD_TYPE="Release"  ..
 
 Qt GUI:
 -------
@@ -118,78 +143,6 @@ i386 and PPC Mac. The reasons for this are described here:
 
 Because of this, libsndfile is included with the source as a precompiled
 universal binary. This UB contains ppc, i386 and x86_64 archs.
-
-
-------------------------------------------------------------------------
-Building - 10.6 and 64-bit scsynth and plugins
-------------------------------------------------------------------------
-
-*** THIS IS OUTDATED, cmake on 10.6 will build 64-bit by default ***
-
-You will need to do the following to build a 64-bit scsynth and plugins.
- * Open the XCode projects for Synth AND Plugins
- * Double-click each target, and change the
-	 * Architectures setting to 'Standard (32-bit/64-bit Universal)'
-	 * Base-SDK to 10.5
-	 * (optional and recommended): Compiler to GCC 4.2 (if available)
-
-This definitely works in Mac OS 10.6, probably 10.5, and these builds will NOT 
-support 10.4.
-
-XCode in 10.6 uses the GCC 4.2 compiler by default, and this compiler will NOT 
-work with the 10.4 SDK (the default SDK). You will need to either set your build 
-SDK to 10.5 or 10.6 inside each XCode project, or inspect (double-click) each 
-target and set GCC 4.0 as your compiler.
-
-UPDATE - There is now a Deployment32-64 build style that should build 
-SuperCollider from source out of the box on 10.6. You can also use the compile.sh 
-script and pass in ARCHS=32_64 as a flag:
-    ./compile.sh ARCHS=32_64
-This should build a 32/64 bit version of scsynth and the plugins and a 32-bit 
-SuperCollider.app. This build style should use the 10.5 SDK by default.
-
-The 10.6 SDK still has some problems. If you are on 10.6, please make sure you 
-have installed the optional 10.5 SDK, installed with the Apple Developer Tools.
-
-
-------------------------------------------------------------------------
-Building SuperCollider THE OLD WAY (no cmake - just xcode required)
-------------------------------------------------------------------------
-
-*** THIS IS OUTDATED, instructions below will not work, use cmake instead ***
-
-Requirements:
- * Mac OS X 10.4.9 or greater
- * Xcode Tools 2.4.1 or greater.
-
-The easy way:
-	cd mac
-	./clean-compile.sh
-	cd ../../package
-	./package.sh
-
-Your build will be placed in a directory named "SuperCollider".
-
-If you run into problems building the most likely cause is that you are
-not running the correct version of the Xcode tools. You must be running
-2.4.1 or above!
-
-Building within Xcode:
-	There are three projects that should be BUILT IN THIS ORDER:
-
-	Synth
-	 - the synthesis server application
-
-	Plugins
-	 - the UGens and plugins
-
-	Language
-	 - the OS X application with text editor, language interpreter,
-	   event scheduling etc.
-
-The package.sh script does several maintenance tasks (fixing creator
-codes, exporting from svn, etc) and creates a ready-to-distribute zip of
-SuperCollider.
 
 
 ------------------------------------------------------------------------

@@ -21,6 +21,8 @@
 
 #include "SC_PlugIn.h"
 
+#include <boost/utility/enable_if.hpp>
+
 #ifdef NOVA_SIMD
 #include "simd_unary_arithmetic.hpp"
 #include "simd_binary_arithmetic.hpp"
@@ -51,6 +53,75 @@ using nova::wrap_argument;
 		nova::NOVANAME##_vec_simd<64>(OUT(0), IN(0));                   \
 	}
 
+struct sc_distort_functor
+{
+	template <typename FloatType>
+	inline FloatType operator()(FloatType arg) const
+	{
+		return sc_distort(arg);
+	}
+
+	template <typename FloatType>
+	inline nova::vec<FloatType> operator()(nova::vec<FloatType> arg) const
+	{
+		nova::vec<FloatType> one (1.f);
+		return arg * reciprocal(one + abs(arg));
+	}
+};
+
+struct sc_scurve_functor
+{
+	template <typename FloatType>
+	inline FloatType operator()(FloatType arg) const
+	{
+		return sc_scurve(arg);
+	}
+
+	template <typename FloatType>
+	inline nova::vec<FloatType> operator()(nova::vec<FloatType> arg) const
+	{
+		return perform(arg);
+	}
+
+	template <typename VecType>
+	inline typename boost::disable_if_c<VecType::has_compare_bitmask, VecType >::type
+	perform(VecType arg) const
+	{
+		typedef VecType vec;
+
+		vec result;
+		for (int i = 0; i != result.size; ++i)
+			result.set(i, sc_scurve(arg.get(i)));
+		return result;
+	}
+
+	template <typename VecType>
+	inline typename boost::enable_if_c<VecType::has_compare_bitmask, VecType >::type
+	perform(VecType arg) const
+	{
+		typedef VecType vec;
+		vec one   (1.f);
+		vec zero  (0.f);
+		vec two   (2.f);
+		vec three (3.f);
+
+		vec result = (arg * arg) * ( three - (two * arg));
+
+		vec boundLow  = mask_lt(arg, zero);
+		vec boundHigh = mask_gt(arg, one);
+
+		result = select(result, zero, boundLow);
+		result = select(result, one, boundHigh);
+
+		return result;
+	}
+};
+
+
+namespace nova {
+NOVA_SIMD_DEFINE_UNARY_WRAPPER (distort, sc_distort_functor)
+NOVA_SIMD_DEFINE_UNARY_WRAPPER (scurve, sc_scurve_functor)
+}
 #endif
 
 using namespace std; // for math functions
@@ -254,23 +325,17 @@ FLATTEN void abs_nova_64(UnaryOpUGen *unit, int inNumSamples)
 }
 #endif
 
-template <typename F>
-inline F sc_recip(F x)
-{
-	return (F)1. / x;
-}
-
-DEFINE_UNARY_OP_FUNCS(recip, sc_recip)
+DEFINE_UNARY_OP_FUNCS(recip, sc_reciprocal)
 
 #ifdef NOVA_SIMD
 FLATTEN void recip_nova(UnaryOpUGen *unit, int inNumSamples)
 {
-	nova::over_vec_simd(OUT(0), 1.f, IN(0), inNumSamples);
+	nova::reciprocal_vec_simd(OUT(0), IN(0), inNumSamples);
 }
 
 FLATTEN void recip_nova_64(UnaryOpUGen *unit, int inNumSamples)
 {
-	nova::over_vec_simd<64>(OUT(0), 1.f, IN(0));
+	nova::reciprocal_vec_simd<64>(OUT(0), IN(0));
 }
 #endif
 
@@ -372,23 +437,7 @@ NOVA_WRAPPER_CT_UNROLL(sign, sgn)
 DEFINE_UNARY_OP_FUNCS(distort, sc_distort)
 
 #ifdef NOVA_SIMD
-void distort_a_nova(UnaryOpUGen *unit, int inNumSamples)
-{
-	float *out = OUT(0);
-	float *a = IN(0);
-	using namespace nova;
-
-	int vs = vec<float>::size;
-	int len = inNumSamples / vs;
-	vec<float> one(1.f);
-
-	for (int i=0; i<len; ++i) {
-		vec<float> arg; arg.load_aligned(a);
-		vec<float> result = arg / (one + abs(arg));
-		result.store_aligned(out);
-		out += vs; a += vs;
-	}
-}
+NOVA_WRAPPER_CT_UNROLL(distort, distort)
 #endif
 
 DEFINE_UNARY_OP_FUNCS(distortneg, sc_distortneg)
@@ -404,6 +453,10 @@ DEFINE_UNARY_OP_FUNCS(welwindow, sc_welwindow)
 DEFINE_UNARY_OP_FUNCS(triwindow, sc_triwindow)
 
 DEFINE_UNARY_OP_FUNCS(scurve, sc_scurve)
+#ifdef NOVA_SIMD
+NOVA_WRAPPER_CT_UNROLL(scurve, scurve)
+#endif
+
 DEFINE_UNARY_OP_FUNCS(ramp, sc_ramp)
 
 
@@ -658,7 +711,7 @@ static UnaryOpFunc ChooseNovaSimdFunc(UnaryOpUGen *unit)
 		case opCosH : func = &cosh_a; break;
 		case opTanH : func = &tanh_nova; break;
 
-		case opDistort : func = &distort_a_nova; break;
+		case opDistort : func = &distort_nova_64; break;
 		case opSoftClip : func = &softclip_nova_64; break;
 
 		case opRectWindow : func = &rectwindow_a; break;
@@ -666,7 +719,7 @@ static UnaryOpFunc ChooseNovaSimdFunc(UnaryOpUGen *unit)
 		case opWelchWindow : func = &welwindow_a; break;
 		case opTriWindow : func = &triwindow_a; break;
 
-		case opSCurve : func = &scurve_a; break;
+		case opSCurve : func = &scurve_nova_64; break;
 		case opRamp : return &ramp_nova_64;
 
 		default : return &thru_nova_64;
@@ -708,7 +761,7 @@ static UnaryOpFunc ChooseNovaSimdFunc(UnaryOpUGen *unit)
 		case opCosH : func = &cosh_a; break;
 		case opTanH : func = &tanh_nova; break;
 
-		case opDistort : func = &distort_a_nova; break;
+		case opDistort : func = &distort_nova; break;
 		case opSoftClip : func = &softclip_nova; break;
 
 		case opRectWindow : func = &rectwindow_a; break;
@@ -716,7 +769,7 @@ static UnaryOpFunc ChooseNovaSimdFunc(UnaryOpUGen *unit)
 		case opWelchWindow : func = &welwindow_a; break;
 		case opTriWindow : func = &triwindow_a; break;
 
-		case opSCurve : func = &scurve_a; break;
+		case opSCurve : func = &scurve_nova; break;
 		case opRamp : func = &ramp_nova; break;
 
 		default : func = &thru_nova; break;

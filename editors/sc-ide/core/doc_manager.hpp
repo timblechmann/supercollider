@@ -21,18 +21,21 @@
 #ifndef SCIDE_DOC_MANAGER_HPP_INCLUDED
 #define SCIDE_DOC_MANAGER_HPP_INCLUDED
 
-#include <QObject>
-#include <QTextDocument>
-#include <QUuid>
-#include <QHash>
-#include <QFileSystemWatcher>
 #include <QDateTime>
+#include <QFileSystemWatcher>
+#include <QHash>
+#include <QList>
+#include <QMetaType>
+#include <QObject>
 #include <QStringList>
+#include <QTextDocument>
+#include <QPlainTextDocumentLayout>
+#include <QUuid>
 
-namespace ScIDE
-{
+namespace ScIDE {
 
 namespace Settings { class Manager; }
+class SyntaxHighlighter;
 
 class Main;
 class DocumentManager;
@@ -44,16 +47,30 @@ class Document : public QObject
     friend class DocumentManager;
 
 public:
-    Document() :
-        mId( QUuid::createUuid().toString().toAscii() ),
-        mDoc( new QTextDocument(this) ),
-        mTitle( "Untitled" )
-    {}
+    Document( bool isPlainText );
 
     QTextDocument *textDocument() { return mDoc; }
     const QByteArray & id() { return mId; }
     const QString & filePath() { return mFilePath; }
     const QString & title() { return mTitle; }
+
+    QFont defaultFont() const { return mDoc->defaultFont(); }
+    void setDefaultFont( const QFont & font );
+
+    int indentWidth() const { return mIndentWidth; }
+    void setIndentWidth( int numSpaces );
+
+    void deleteTrailingSpaces();
+
+    bool isPlainText() const { return mHighlighter == NULL; }
+    bool isModified() const  { return mDoc->isModified(); }
+
+public slots:
+    void applySettings( Settings::Manager * );
+    void resetDefaultFont();
+
+signals:
+    void defaultFontChanged();
 
 private:
     QByteArray mId;
@@ -61,6 +78,8 @@ private:
     QString mFilePath;
     QString mTitle;
     QDateTime mSaveTime;
+    int mIndentWidth;
+    SyntaxHighlighter * mHighlighter;
 };
 
 class DocumentManager : public QObject
@@ -68,8 +87,9 @@ class DocumentManager : public QObject
     Q_OBJECT
 
 public:
+    typedef QList< Document * > DocumentList;
 
-    DocumentManager( Main * );
+    DocumentManager( Main *, Settings::Manager * );
     QList<Document*> documents() {
         return mDocHash.values();
     }
@@ -83,17 +103,15 @@ public:
 
 public slots:
     // initialCursorPosition -1 means "don't change position if already open"
-    void open( const QString & path, int initialCursorPosition = -1 );
+    Document * open( const QString & path, int initialCursorPosition = -1, int selectionLength = 0, bool addToRecent = true );
     void clearRecents();
-    void applySettings( Settings::Manager * );
     void storeSettings( Settings::Manager * );
 
 Q_SIGNALS:
-
-    void opened( Document *, int );
+    void opened( Document *, int cursorPosition, int selectionLength );
     void closed( Document * );
     void saved( Document * );
-    void showRequest( Document *, int pos = -1 );
+    void showRequest( Document *, int pos = -1, int selectionLength = 0 );
     void changedExternally( Document * );
     void recentsChanged();
 
@@ -101,8 +119,12 @@ private slots:
     void onFileChanged( const QString & path );
 
 private:
+    Document * createDocument( bool isPlainText );
     bool doSaveAs( Document *, const QString & path );
     void addToRecent( Document * );
+    void loadRecentDocuments( Settings::Manager * );
+    void closeSingleUntitledIfUnmodified();
+
 
     typedef QHash<QByteArray, Document*>::iterator DocIterator;
 
@@ -110,11 +132,11 @@ private:
     QFileSystemWatcher mFsWatcher;
 
     QStringList mRecent;
-
     static const int mMaxRecent = 10;
 };
 
 } // namespace ScIDE
 
+Q_DECLARE_METATYPE( ScIDE::Document* )
 
 #endif // SCIDE_DOC_MANAGER_HPP_INCLUDED

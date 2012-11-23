@@ -21,10 +21,10 @@
 
 #include <cmath>
 #include <string>
+#include <thread>
 
 #include <boost/atomic.hpp>
-#include <boost/lockfree/ringbuffer.hpp>
-#include <boost/thread.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 
 #include <sndfile.hh>
 
@@ -33,8 +33,7 @@
 
 #include "audio_backend_common.hpp"
 
-namespace nova
-{
+namespace nova {
 
 /** sndfile backend
  *
@@ -46,11 +45,11 @@ template <typename engine_functor,
           bool blocking = false
          >
 class sndfile_backend:
-    public detail::audio_delivery_helper<sample_type, float, blocking, false>,
+    public detail::audio_backend_base<sample_type, float, blocking, false>,
     public detail::audio_settings_basic,
     private engine_functor
 {
-    typedef detail::audio_delivery_helper<sample_type, float, blocking, false> super;
+    typedef detail::audio_backend_base<sample_type, float, blocking, false> super;
     typedef std::size_t size_t;
 
 public:
@@ -58,23 +57,20 @@ public:
         read_frames(65536), write_frames(65536), running(false), reader_running(false), writer_running(false)
     {}
 
-    ~sndfile_backend(void)
-    {}
-
     size_t get_audio_blocksize(void)
     {
-        return 64;
+        return block_size_;
     }
 
 public:
     void open_client(std::string const & input_file_name, std::string const & output_file_name,
-                     float samplerate, int format, uint32_t output_channel_count)
+                     float samplerate, int format, uint32_t output_channel_count, size_t block_size)
     {
         output_channels = output_channel_count;
         samplerate_ = samplerate = std::floor(samplerate);
+        block_size_ = block_size;
 
-        if (!input_file_name.empty())
-        {
+        if (!input_file_name.empty()) {
             input_file = SndfileHandle(input_file_name.c_str(), SFM_READ);
             if (!input_file)
                 throw std::runtime_error("cannot open input file");
@@ -92,6 +88,9 @@ public:
         output_file = SndfileHandle(output_file_name.c_str(), SFM_WRITE, format, output_channel_count, samplerate);
         if (!output_file)
             throw std::runtime_error("cannot open output file");
+
+        output_file.command(SFC_SET_CLIPPING, NULL, SF_TRUE);
+
         super::output_samples.resize(output_channel_count);
 
         temp_buffer.reset(calloc_aligned<float>(std::max(input_channels, output_channels) * 64));
@@ -121,11 +120,11 @@ public:
         if (input_file)
         {
             reader_running.store(true);
-            reader_thread = boost::thread(boost::bind(&sndfile_backend::sndfile_read_thread, this));
+            reader_thread = std::thread(std::bind(&sndfile_backend::sndfile_read_thread, this));
         }
 
         writer_running.store(true);
-        writer_thread = boost::thread(boost::bind(&sndfile_backend::sndfile_write_thread, this));
+        writer_thread = std::thread(std::bind(&sndfile_backend::sndfile_write_thread, this));
     }
 
     void deactivate_audio(void)
@@ -154,7 +153,7 @@ private:
 
             read_semaphore.wait();
             do {
-                remaining -= read_frames.dequeue(temp_buffer.get(), remaining);
+                remaining -= read_frames.pop(temp_buffer.get(), remaining);
 
                 if (unlikely(read_frames.empty() &&
                              !reader_running.load(boost::memory_order_acquire)))
@@ -190,8 +189,7 @@ private:
         const size_t frames_per_tick = get_audio_blocksize();
         sized_array<sample_type, aligned_allocator<sample_type> > data_to_read(input_channels * frames_per_tick, 0.f);
 
-        for (;;)
-        {
+        for (;;) {
             if (unlikely(reader_running.load(boost::memory_order_acquire) == false))
                 return;
 
@@ -208,7 +206,7 @@ private:
                 size_t remaining = item_to_enqueue;
 
                 do {
-                    remaining -= read_frames.enqueue(data_to_read.c_array(), remaining);
+                    remaining -= read_frames.push(data_to_read.c_array(), remaining);
                 } while(remaining);
                 read_semaphore.post();
             }
@@ -220,8 +218,7 @@ private:
     /* write output fifo from rt context */
     void write_output_buffers(size_t frames_per_tick)
     {
-        for (size_t frame = 0; frame != frames_per_tick; ++frame)
-        {
+        for (size_t frame = 0; frame != frames_per_tick; ++frame) {
             for (uint16_t channel = 0; channel != output_channels; ++channel)
                 temp_buffer.get()[frame * output_channels + channel] = super::output_samples[channel].get()[frame];
         }
@@ -231,7 +228,7 @@ private:
 
         size_t count = total_samples;
         do {
-            size_t consumed = write_frames.enqueue(buffer, count);
+            size_t consumed = write_frames.push(buffer, count);
             count -= consumed;
             buffer += consumed;
             write_semaphore.post();
@@ -243,12 +240,10 @@ private:
         const size_t frames_per_tick = get_audio_blocksize();
         sized_array<sample_type, aligned_allocator<sample_type> > data_to_write(output_channels * frames_per_tick, 0.f);
 
-        for (;;)
-        {
+        for (;;) {
             write_semaphore.wait();
-            for (;;)
-            {
-                size_t dequeued = write_frames.dequeue(data_to_write.c_array(), data_to_write.size());
+            for (;;) {
+                size_t dequeued = write_frames.pop(data_to_write.c_array(), data_to_write.size());
 
                 if (dequeued == 0)
                     break;
@@ -278,11 +273,12 @@ public:
 private:
     SndfileHandle input_file, output_file;
     std::size_t read_position;
+    int block_size_;
 
     aligned_storage_ptr<sample_type> temp_buffer;
 
-    boost::thread reader_thread, writer_thread;
-    boost::lockfree::ringbuffer< sample_type, 0 > read_frames, write_frames;
+    std::thread reader_thread, writer_thread;
+    boost::lockfree::spsc_queue< sample_type > read_frames, write_frames;
     nova::semaphore read_semaphore, write_semaphore;
     boost::atomic<bool> running, reader_running, writer_running;
 };

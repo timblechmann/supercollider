@@ -19,65 +19,50 @@
 */
 
 #include "editor.hpp"
-#include "highlighter.hpp"
+#include "line_indicator.hpp"
+#include "../util/gui_utilities.hpp"
+#include "../../core/main.hpp"
 #include "../../core/doc_manager.hpp"
 #include "../../core/settings/manager.hpp"
 
+#include <QApplication>
+#include <QDebug>
+#include <QGraphicsView>
+#include <QKeyEvent>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QTextBlock>
-#include <QKeyEvent>
+#include <QTextDocumentFragment>
+#include <QUrl>
 #include <QScrollBar>
 
-namespace ScIDE
-{
+namespace ScIDE {
 
-LineIndicator::LineIndicator( CodeEditor *editor )
-: QWidget( editor ), mEditor(editor)
-{}
-
-void LineIndicator::setLineCount( int count )
-{
-    mLineCount = count;
-    setFixedWidth( widthForLineCount(count) );
-    Q_EMIT( widthChanged() );
-}
-
-void LineIndicator::changeEvent( QEvent *e )
-{
-    if( e->type() == QEvent::FontChange ) {
-        setFixedWidth( widthForLineCount(mLineCount) );
-        Q_EMIT( widthChanged() );
-    }
-    else
-        QWidget::changeEvent(e);
-}
-
-void LineIndicator::paintEvent( QPaintEvent *e )
-{ mEditor->paintLineIndicator(e); }
-
-int LineIndicator::widthForLineCount( int lineCount )
-{
-    int digits = 2;
-    while( lineCount >= 100 ) {
-        lineCount /= 10;
-        ++digits;
-    }
-
-    return 6 + fontMetrics().width('9') * digits;
-}
-
-CodeEditor::CodeEditor( QWidget *parent ) :
+GenericCodeEditor::GenericCodeEditor( Document *doc, QWidget *parent ):
     QPlainTextEdit( parent ),
-    mLineIndicator( new LineIndicator(this) ),
-    mDoc(0),
-    mIndentWidth(4),
-    mSpaceIndent(true),
-    mShowWhitespace(false),
-    mMouseBracketMatch(false),
-    mOverlay( new QGraphicsScene(this) )
+    mDoc(doc)
 {
+    Q_ASSERT(mDoc != 0);
+
+    setFrameShape( QFrame::NoFrame );
+
+    mLineIndicator = new LineIndicator(this);
     mLineIndicator->move( contentsRect().topLeft() );
+
+    mOverlay = new QGraphicsScene(this);
+
+    QGraphicsView *overlayView = new QGraphicsView(mOverlay, this);
+    overlayView->setFrameShape( QFrame::NoFrame );
+    overlayView->setBackgroundBrush( Qt::NoBrush );
+    overlayView->setStyleSheet("background: transparent");
+    overlayView->setFocusPolicy( Qt::NoFocus );
+    overlayView->setAttribute(Qt::WA_TransparentForMouseEvents, true);
+    overlayView->setSceneRect(QRectF(0,0,1,1));
+    overlayView->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+    mOverlayWidget = overlayView;
+
+    connect( mDoc, SIGNAL(defaultFontChanged()), this, SLOT(onDocumentFontChanged()) );
 
     connect( this, SIGNAL(blockCountChanged(int)),
              mLineIndicator, SLOT(setLineCount(int)) );
@@ -88,52 +73,86 @@ CodeEditor::CodeEditor( QWidget *parent ) :
     connect( this, SIGNAL(updateRequest(QRect,int)),
              this, SLOT(updateLineIndicator(QRect,int)) );
 
-    connect( this, SIGNAL(cursorPositionChanged()),
-             this, SLOT(matchBrackets()) );
+    connect( this, SIGNAL(selectionChanged()),
+             mLineIndicator, SLOT(update()) );
 
-    connect( mOverlay, SIGNAL(changed(const QList<QRectF>&)),
-             this, SLOT(onOverlayChanged(const QList<QRectF>&)) );
+    connect( Main::instance(), SIGNAL(applySettingsRequest(Settings::Manager*)),
+             this, SLOT(applySettings(Settings::Manager*)) );
 
-    mLineIndicator->setLineCount(1);
-}
-
-void CodeEditor::setDocument( Document *doc )
-{
     QTextDocument *tdoc = doc->textDocument();
-    new SyntaxHighlighter(tdoc);
-
-    QFontMetricsF fm(font());
-
-    QTextOption opt;
-    opt.setTabStop( fm.width(' ') * mIndentWidth );
-    if(mShowWhitespace)
-        opt.setFlags( QTextOption::ShowTabsAndSpaces );
-
-    tdoc->setDefaultTextOption(opt);
-    tdoc->setDefaultFont(font());
-    tdoc->setDocumentLayout( new QPlainTextDocumentLayout(tdoc) );
-
     QPlainTextEdit::setDocument(tdoc);
+    onDocumentFontChanged();
+    mLineIndicator->setLineCount(blockCount());
 
-    mLineIndicator->setLineCount( tdoc->blockCount() );
-
-    mDoc = doc;
+    applySettings( Main::settings() );
 }
 
-void CodeEditor::setIndentWidth( int width )
+void GenericCodeEditor::applySettings( Settings::Manager *settings )
 {
-    mIndentWidth = width;
+    settings->beginGroup("IDE/editor");
 
-    QTextDocument *tdoc = QPlainTextEdit::document();
+    bool lineWrap = settings->value("lineWrap").toBool();
 
-    QFontMetricsF fm(font());
+    QPalette palette;
 
-    QTextOption opt;
-    opt.setTabStop( fm.width(' ') * mIndentWidth );
-    if(mShowWhitespace)
-        opt.setFlags( QTextOption::ShowTabsAndSpaces );
+    settings->beginGroup("colors");
 
-    tdoc->setDefaultTextOption(opt);
+    if (settings->contains("text")) {
+        QTextCharFormat format = settings->value("text").value<QTextCharFormat>();
+        QBrush bg = format.background();
+        QBrush fg = format.foreground();
+        if (bg.style() != Qt::NoBrush)
+            palette.setBrush(QPalette::Base, bg);
+        if (fg.style() != Qt::NoBrush)
+            palette.setBrush(QPalette::Text, fg);
+    }
+
+    if (settings->contains("lineNumbers")) {
+        // NOTE: the line number widget will inherit the palette from the editor
+        QTextCharFormat format = settings->value("lineNumbers").value<QTextCharFormat>();
+        QBrush bg = format.background();
+        QBrush fg = format.foreground();
+        if (bg.style() != Qt::NoBrush)
+            palette.setBrush(QPalette::Mid, bg);
+        if (fg.style() != Qt::NoBrush)
+            palette.setBrush(QPalette::ButtonText, fg);
+    }
+
+    if (settings->contains("selection")) {
+        QTextCharFormat format = settings->value("selection").value<QTextCharFormat>();
+        QBrush bg = format.background();
+        QBrush fg = format.foreground();
+        if (bg.style() != Qt::NoBrush)
+            palette.setBrush(QPalette::Highlight, bg);
+        if (fg.style() != Qt::NoBrush)
+            palette.setBrush(QPalette::HighlightedText, fg);
+    }
+
+    mSearchResultTextFormat = settings->value("searchResult").value<QTextCharFormat>();
+
+    settings->endGroup(); // colors
+
+    settings->endGroup(); // IDE/editor
+
+    setLineWrapMode( lineWrap ? QPlainTextEdit::WidgetWidth : QPlainTextEdit::NoWrap );
+    setPalette(palette);
+}
+
+bool GenericCodeEditor::showWhitespace()
+{
+    QTextOption options( textDocument()->defaultTextOption() );
+    return options.flags().testFlag( QTextOption::ShowTabsAndSpaces );
+}
+
+void GenericCodeEditor::setShowWhitespace(bool show)
+{
+    QTextDocument *doc = textDocument();
+    QTextOption opt( doc->defaultTextOption() );
+    if( show )
+        opt.setFlags( opt.flags() | QTextOption::ShowTabsAndSpaces );
+    else
+        opt.setFlags( opt.flags() & ~QTextOption::ShowTabsAndSpaces );
+    doc->setDefaultTextOption(opt);
 }
 
 static bool findInBlock(QTextDocument *doc, const QTextBlock &block, const QRegExp &expr, int offset,
@@ -175,7 +194,7 @@ static bool findInBlock(QTextDocument *doc, const QTextBlock &block, const QRegE
     return true;
 }
 
-bool CodeEditor::find( const QRegExp &expr, QTextDocument::FindFlags options )
+bool GenericCodeEditor::find( const QRegExp &expr, QTextDocument::FindFlags options )
 {
     // Although QTextDocument provides a find() method, we implement
     // our own, because the former one is not adequate.
@@ -246,8 +265,7 @@ bool CodeEditor::find( const QRegExp &expr, QTextDocument::FindFlags options )
         }
     }
 
-    if(!cursor.isNull())
-    {
+    if(!cursor.isNull()) {
         setTextCursor(cursor);
         return true;
     }
@@ -255,17 +273,17 @@ bool CodeEditor::find( const QRegExp &expr, QTextDocument::FindFlags options )
         return false;
 }
 
-int CodeEditor::findAll( const QRegExp &expr, QTextDocument::FindFlags options )
+int GenericCodeEditor::findAll( const QRegExp &expr, QTextDocument::FindFlags options )
 {
     mSearchSelections.clear();
 
     if(expr.isEmpty()) {
-        updateExtraSelections();
+        this->updateExtraSelections();
         return 0;
     }
 
     QTextEdit::ExtraSelection selection;
-    selection.format.setBackground(Qt::yellow);
+    selection.format = mSearchResultTextFormat;
 
     QTextDocument *doc = QPlainTextEdit::document();
     QTextBlock block = doc->begin();
@@ -274,16 +292,19 @@ int CodeEditor::findAll( const QRegExp &expr, QTextDocument::FindFlags options )
     while (block.isValid()) {
         int blockPos = block.position();
         int offset = 0;
-        while(findInBlock(doc, block, expr, offset, options, cursor))
-        {
+        while(findInBlock(doc, block, expr, offset, options, cursor)) {
             offset = cursor.selectionEnd() - blockPos;
-            selection.cursor = cursor;
-            mSearchSelections.append(selection);
+
+            if (cursor.hasSelection()) {
+                selection.cursor = cursor;
+                mSearchSelections.append(selection);
+            } else
+                offset += 1;
         }
         block = block.next();
     }
 
-    updateExtraSelections();
+    this->updateExtraSelections();
 
     return mSearchSelections.count();
 }
@@ -335,7 +356,7 @@ static QString resolvedReplacement( const QString &replacement, const QRegExp &e
     return str;
 }
 
-bool CodeEditor::replace( const QRegExp &expr, const QString &replacement, QTextDocument::FindFlags options )
+bool GenericCodeEditor::replace( const QRegExp &expr, const QString &replacement, QTextDocument::FindFlags options )
 {
     if(expr.isEmpty()) return true;
 
@@ -351,7 +372,7 @@ bool CodeEditor::replace( const QRegExp &expr, const QString &replacement, QText
     return find(expr, options);
 }
 
-int CodeEditor::replaceAll( const QRegExp &expr, const QString &replacement, QTextDocument::FindFlags options )
+int GenericCodeEditor::replaceAll( const QRegExp &expr, const QString &replacement, QTextDocument::FindFlags options )
 {
     mSearchSelections.clear();
     updateExtraSelections();
@@ -388,70 +409,7 @@ int CodeEditor::replaceAll( const QRegExp &expr, const QString &replacement, QTe
     return replacements;
 }
 
-QTextCursor CodeEditor::currentRegion()
-{
-    QTextCursor c(textCursor());
-    QTextBlock b(c.block());
-
-    int pos = c.position() - b.position();
-    BracketIterator start;
-    BracketIterator end;
-    int topLevel = 0;
-    int level = 0;
-
-    // search unmatched opening bracket
-    BracketIterator it = BracketIterator::leftOf( b, pos );
-    while(it.isValid())
-    {
-        char chr = it->character;
-        if(chr == '(') {
-            ++level;
-            if(level > topLevel) {
-                topLevel = level;
-                start = it;
-            }
-        }
-        else if(chr == ')') {
-            --level;
-        }
-        --it;
-    }
-
-    if(topLevel < 1)
-        // no unmatched opening bracket
-        return QTextCursor();
-
-    // match the found opening bracket
-    it = BracketIterator::rightOf( b, pos );
-    while(it.isValid())
-    {
-        char chr = it->character;
-        if(chr == '(')
-            ++topLevel;
-        else if(chr == ')')
-        {
-            --topLevel;
-            if(topLevel == 0)
-            {
-                end = it;
-                break;
-            }
-        }
-        ++it;
-    }
-
-    if(start.isValid() && end.isValid())
-    {
-        QTextCursor c(QPlainTextEdit::document());
-        c.setPosition(start.position() + 1);
-        c.setPosition(end.position(), QTextCursor::KeepAnchor);
-        return c;
-    }
-
-    return QTextCursor();
-}
-
-void CodeEditor::showPosition( int pos )
+void GenericCodeEditor::showPosition( int pos, int selectionLength )
 {
     if (pos < 0) return;
 
@@ -463,234 +421,211 @@ void CodeEditor::showPosition( int pos )
 
     QTextCursor cursor(doc);
     cursor.setPosition(pos);
+    if (selectionLength)
+        cursor.setPosition(pos + selectionLength, QTextCursor::KeepAnchor);
+
     setTextCursor(cursor);
 }
 
-void CodeEditor::clearSearchHighlighting()
+QString GenericCodeEditor::symbolUnderCursor()
+{
+    QTextCursor cursor = textCursor();
+    if (cursor.hasSelection())
+        return cursor.selectedText();
+    else
+    {
+        QString blockString = cursor.block().text();
+        int position = cursor.positionInBlock();
+        return wordInStringAt( position, blockString );
+    }
+}
+
+bool GenericCodeEditor::event( QEvent * event )
+{
+    switch (event->type()) {
+    case QEvent::ShortcutOverride: {
+        // Prevent overriding certain shortcuts,
+        // as they are useful in our application.
+        QKeyEvent* kevent = static_cast<QKeyEvent*>(event);
+        switch (kevent->key()) {
+        case Qt::Key_Return:
+        case Qt::Key_Enter:
+            event->ignore();
+            return true;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return QPlainTextEdit::event(event);
+}
+
+void GenericCodeEditor::keyPressEvent(QKeyEvent * e)
+{
+    hideMouseCursor(e);
+
+    QTextCursor cursor( textCursor() );
+
+    bool updateCursor = false;
+
+    if (e == QKeySequence::InsertLineSeparator) {
+        // override to avoid entering a "soft" new line
+        cursor.insertBlock();
+        updateCursor = true;
+    }
+    else {
+
+    switch (e->key()) {
+
+    case Qt::Key_Delete:
+        if (e->modifiers() & Qt::META) {
+            cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+            cursor.removeSelectedText();
+        } else
+            QPlainTextEdit::keyPressEvent(e);
+        break;
+
+    case Qt::Key_Backspace:
+        if (e->modifiers() & Qt::META) {
+            cursor.movePosition(QTextCursor::StartOfBlock, QTextCursor::KeepAnchor);
+            cursor.removeSelectedText();
+        } else {
+            QPlainTextEdit::keyPressEvent(e);
+            updateCursor = true;
+        }
+        break;
+
+    case Qt::Key_Down:
+    {
+        if (cursor.block() == textDocument()->lastBlock()) {
+            QTextCursor::MoveMode moveMode = e->modifiers() & Qt::SHIFT ? QTextCursor::KeepAnchor
+                                                                        : QTextCursor::MoveAnchor;
+
+            cursor.movePosition(QTextCursor::EndOfBlock, moveMode);
+            setTextCursor(cursor);
+        } else
+            QPlainTextEdit::keyPressEvent(e);
+        break;
+    }
+
+    case Qt::Key_Up:
+    {
+        if (cursor.block() == textDocument()->firstBlock()) {
+            QTextCursor::MoveMode moveMode = e->modifiers() & Qt::SHIFT ? QTextCursor::KeepAnchor
+                                                                        : QTextCursor::MoveAnchor;
+
+            cursor.movePosition(QTextCursor::StartOfBlock, moveMode);
+            setTextCursor(cursor);
+        } else
+            QPlainTextEdit::keyPressEvent(e);
+        break;
+    }
+
+    default:
+        QPlainTextEdit::keyPressEvent(e);
+
+    } // switch (e->type())
+
+    } // else...
+
+    if (updateCursor) {
+        cursor.setVerticalMovementX(-1);
+        setTextCursor( cursor );
+        ensureCursorVisible();
+    }
+}
+
+void GenericCodeEditor::wheelEvent( QWheelEvent * e )
+{
+    if (e->modifiers() == Qt::ControlModifier) {
+        if (e->delta() > 0)
+            zoomIn();
+        else
+            zoomOut();
+        return;
+    }
+
+    QPlainTextEdit::wheelEvent(e);
+}
+
+void GenericCodeEditor::dragEnterEvent( QDragEnterEvent * event )
+{
+    const QMimeData * data = event->mimeData();
+    if (data->hasUrls()) {
+        // Propagate event to parent.
+        // URL drops are ultimately handled by MainWindow.
+        event->ignore();
+        return;
+    }
+
+    QPlainTextEdit::dragEnterEvent(event);
+}
+
+void GenericCodeEditor::hideMouseCursor(QKeyEvent * event)
+{
+    switch (event->key()) {
+    case Qt::Key_Shift:
+    case Qt::Key_Control:
+    case Qt::Key_Meta:
+    case Qt::Key_Alt:
+    case Qt::Key_Super_L:
+    case Qt::Key_Super_R:
+    case Qt::Key_Hyper_L:
+    case Qt::Key_Hyper_R:
+    case Qt::Key_Menu:
+        return;
+
+    default:
+        hideMouseCursor();
+    }
+}
+
+void GenericCodeEditor::clearSearchHighlighting()
 {
     mSearchSelections.clear();
-    updateExtraSelections();
+    this->updateExtraSelections();
 }
 
-void CodeEditor::zoomIn(int steps)
+void GenericCodeEditor::zoomIn(int steps)
 {
-    QFont f = font();
-    qreal size = f.pointSizeF();
-    if( size != -1 )
-        f.setPointSizeF( size + steps );
-    else
-        f.setPixelSize( f.pixelSize() + steps );
-
-    setFont(f);
+    zoomFont(steps);
 }
 
-void CodeEditor::zoomOut(int steps)
+void GenericCodeEditor::zoomOut(int steps)
 {
-    QFont f = font();
-    qreal size = f.pointSizeF();
-    if( size != -1 )
-        f.setPointSizeF( qMax(1.0, size - steps) );
-    else
-        f.setPixelSize( qMax(1, f.pixelSize() - steps) );
-
-    setFont(f);
+    zoomFont(-steps);
 }
 
-
-void CodeEditor::setShowWhitespace(bool show)
+void GenericCodeEditor::resetFontSize()
 {
-    mShowWhitespace = show;
-
-    QTextDocument *doc = QPlainTextEdit::document();
-    QTextOption opt( doc->defaultTextOption() );
-    if( show )
-        opt.setFlags( opt.flags() | QTextOption::ShowTabsAndSpaces );
-    else
-        opt.setFlags( opt.flags() & ~QTextOption::ShowTabsAndSpaces );
-    doc->setDefaultTextOption(opt);
+    mDoc->resetDefaultFont();
 }
 
-void CodeEditor::applySettings( Settings::Manager *s )
+void GenericCodeEditor::zoomFont(int steps)
 {
-    s->beginGroup("IDE/editor");
-
-    mSpaceIndent = s->value("spaceIndent").toBool();
-
-    setIndentWidth( s->value("indentWidth").toInt() );
-
-    QPalette plt;
-
-    QFont fnt;
-    fnt.fromString( s->value("font").toString() );
-
-    s->beginGroup("colors");
-
-    if (s->contains("background"))
-        plt.setColor(QPalette::Base, s->value("background").value<QColor>());
-
-    if (s->contains("text"))
-        plt.setColor(QPalette::Text, s->value("text").value<QColor>());
-
-    QPalette lineNumPlt;
-    if (s->contains("lineNumbersBackground"))
-        lineNumPlt.setColor(QPalette::Button, s->value("lineNumbersBackground").value<QColor>());
-    if (s->contains("lineNumbers"))
-        lineNumPlt.setColor(QPalette::ButtonText, s->value("lineNumbers").value<QColor>());
-    mLineIndicator->setPalette(lineNumPlt);
-
-    mBracketHighlight = s->value("matchingBrackets").value<QColor>();
-
-    s->endGroup(); // colors
-
-    setPalette(plt);
-    setFont(fnt);
-
-    s->endGroup();
-}
-
-bool CodeEditor::event( QEvent *e )
-{
-    switch (e->type())
-    {
-        case QEvent::KeyPress:
-        {
-            QKeyEvent *ke = static_cast<QKeyEvent*>(e);
-            int key = ke->key();
-            switch (key)
-            {
-                case Qt::Key_Tab:
-                case Qt::Key_Backtab:
-                    indent( key == Qt::Key_Backtab );
-                    e->accept();
-                    return true;
-                default:;
-            }
-            break;
-        }
-        default:;
-    }
-    return QPlainTextEdit::event(e);
-}
-
-void CodeEditor::changeEvent( QEvent *e )
-{
-    if( e->type() == QEvent::FontChange ) {
-        // adjust tab stop to match mIndentWidth * width of space
-        QTextDocument *doc = QPlainTextEdit::document();
-        QFontMetricsF fm(font());
-        QTextOption opt( doc->defaultTextOption() );
-        opt.setTabStop( fm.width(' ') * mIndentWidth );
-        doc->setDefaultTextOption(opt);
-    }
-
-    QPlainTextEdit::changeEvent(e);
-}
-
-void CodeEditor::keyPressEvent( QKeyEvent *e )
-{
-    switch (e->key()) {
-    case Qt::Key_Enter:
-    case Qt::Key_Return:
-    {
-        QTextCursor c(textCursor());
-        QTextBlock b(c.block());
-        int indent = indentedStartOfLine(b);
-        c.insertBlock();
-        if(indent > 0) {
-            QString str(b.text());
-            str.truncate(indent);
-            c.insertText(str);
-        }
-
+    QFont currentFont = mDoc->defaultFont();
+    const int newSize = currentFont.pointSize() + steps;
+    if (newSize <= 0)
         return;
-    }
-    case Qt::Key_Home:
-    {
-        Qt::KeyboardModifiers mods(e->modifiers());
-        if (mods && mods != Qt::ShiftModifier) break;
-
-        QTextCursor::MoveMode mode =
-            mods & Qt::ShiftModifier ? QTextCursor::KeepAnchor : QTextCursor::MoveAnchor;
-
-        QTextCursor c(textCursor());
-        QTextBlock b(c.block());
-
-        int pos = indentedStartOfLine(b);
-        pos += b.position();
-
-        if (c.position() == pos)
-            c.movePosition(QTextCursor::StartOfLine, mode);
-        else
-            c.setPosition(pos, mode);
-
-        setTextCursor(c);
-
-        return;
-    }
-    default:;
-    }
-
-    QPlainTextEdit::keyPressEvent(e);
+    currentFont.setPointSize(newSize);
+    mDoc->setDefaultFont(currentFont);
 }
 
-void CodeEditor::mouseReleaseEvent ( QMouseEvent *e )
+void GenericCodeEditor::onDocumentFontChanged()
 {
-    // Prevent deselection of bracket match:
-    if(!mMouseBracketMatch)
-        QPlainTextEdit::mouseReleaseEvent(e);
-
-    mMouseBracketMatch = false;
+    QFont font = mDoc->defaultFont();
+    setFont(font);
 }
 
-void CodeEditor::mouseDoubleClickEvent ( QMouseEvent *e )
-{
-    QTextCursor c(textCursor());
-    QTextBlock b(c.block());
-
-    BracketMatch m;
-    matchBracket( b, c.position() - b.position(), m );
-    if(m.pos > -1 && m.matchPos > -1)
-    {
-        c.setPosition(qMin(m.pos, m.matchPos));
-        c.setPosition(qMax(m.pos, m.matchPos) + 1, QTextCursor::KeepAnchor);
-        setTextCursor(c);
-        mMouseBracketMatch = true;
-    }
-    else
-    {
-        QPlainTextEdit::mouseDoubleClickEvent(e);
-    }
-}
-
-void CodeEditor::mouseMoveEvent( QMouseEvent *e )
-{
-    // Prevent initiating a text drag:
-    if(!mMouseBracketMatch)
-        QPlainTextEdit::mouseMoveEvent(e);
-}
-
-void CodeEditor::onOverlayChanged ( const QList<QRectF> & region )
-{
-    foreach(QRectF r, region)
-    {
-        viewport()->update(r.toRect());
-    }
-}
-
-void CodeEditor::paintEvent( QPaintEvent *e )
-{
-    QPlainTextEdit::paintEvent(e);
-
-    QPainter p(viewport());
-    mOverlay->render(&p, e->rect(), e->rect());
-}
-
-void CodeEditor::updateLayout()
+void GenericCodeEditor::updateLayout()
 {
     setViewportMargins( mLineIndicator->width(), 0, 0, 0 );
+    mOverlayWidget->setGeometry( viewport()->geometry() );
 }
 
-void CodeEditor::updateLineIndicator( QRect r, int dy )
+void GenericCodeEditor::updateLineIndicator( QRect r, int dy )
 {
     if (dy)
         mLineIndicator->scroll(0, dy);
@@ -698,214 +633,283 @@ void CodeEditor::updateLineIndicator( QRect r, int dy )
         mLineIndicator->update(0, r.y(), mLineIndicator->width(), r.height() );
 }
 
-void CodeEditor::matchBrackets()
-{
-    mBracketSelections.clear();
-
-    QTextCursor cursor(textCursor());
-    QTextBlock block(cursor.block());
-
-    BracketMatch match;
-    matchBracket( block, cursor.position() - block.position(), match );
-
-    if( match.pos != -1 && match.matchPos != -1 )
-    {
-        QTextEdit::ExtraSelection selection;
-        selection.format.setFontWeight(QFont::Bold);
-        selection.format.setBackground(mBracketHighlight);
-
-        cursor.setPosition(match.pos);
-        cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
-        selection.cursor = cursor;
-        mBracketSelections.append(selection);
-
-        cursor.setPosition(match.matchPos);
-        cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::KeepAnchor);
-        selection.cursor = cursor;
-        mBracketSelections.append(selection);
-    }
-
-    updateExtraSelections();
-}
-
-void CodeEditor::matchBracket( const QTextBlock & block, int pos, BracketMatch & match )
-{
-    BracketIterator it = BracketIterator::around( block, pos );
-
-    if( !it.isValid() )
-    {
-        match.pos = match.matchPos = -1;
-        return;
-    }
-
-    char c = it.character();
-    match.pos = it.position();
-
-    static QString lbrackets("([{");
-    static QString rbrackets(")]}");
-
-    int b;
-    if((b = lbrackets.indexOf(c)) != -1)
-    {
-        char cc = rbrackets[b].toAscii();
-        int level = 1;
-        while((++it).isValid())
-        {
-            char chr = it.character();
-            if(chr == cc)
-                --level;
-            else if(chr == c)
-                ++level;
-            if(level == 0) {
-                match.matchPos = it.position();
-                return;
-            }
-        }
-    }
-    else if((b = rbrackets.indexOf(c)) != -1)
-    {
-        char cc = lbrackets[b].toAscii();
-        int level = 1;
-        while((--it).isValid())
-        {
-            char chr = it.character();
-            if(chr == cc)
-                --level;
-            else if(chr == c)
-                ++level;
-            if(level == 0) {
-                match.matchPos = it.position();
-                return;
-            }
-        }
-    }
-
-    match.pos = match.matchPos = -1;
-}
-
-int CodeEditor::indentedStartOfLine( const QTextBlock &b )
-{
-    QString t(b.text());
-    int n = t.size();
-    int i = 0;
-    while (i < n) {
-        QChar c(t[i]);
-        if (c != ' ' && c != '\t')
-            break;
-        ++i;
-    }
-    return i;
-}
-
-void CodeEditor::updateExtraSelections()
+void GenericCodeEditor::updateExtraSelections()
 {
     QList<QTextEdit::ExtraSelection> selections;
-    selections.append(mBracketSelections);
     selections.append(mSearchSelections);
     setExtraSelections(selections);
 }
 
-void CodeEditor::resizeEvent( QResizeEvent *e )
+void GenericCodeEditor::resizeEvent( QResizeEvent *e )
 {
     QPlainTextEdit::resizeEvent( e );
 
     QRect cr = contentsRect();
     mLineIndicator->resize( mLineIndicator->width(), cr.height() );
+
+    mOverlayWidget->setGeometry( viewport()->geometry() );
 }
 
-void CodeEditor::paintLineIndicator( QPaintEvent *e )
+void GenericCodeEditor::paintLineIndicator( QPaintEvent *e )
 {
     QPalette plt( mLineIndicator->palette() );
     QRect r( e->rect() );
     QPainter p( mLineIndicator );
 
-    p.fillRect( r, plt.color( QPalette::Button ) );
-    p.setPen( plt.color(QPalette::ButtonText) );
+    p.fillRect( r, plt.color( QPalette::Mid ) );
+    p.setPen( plt.color(QPalette::Dark) );
     p.drawLine( r.topRight(), r.bottomRight() );
+
+    p.setPen( plt.color(QPalette::ButtonText) );
+
+    QTextDocument *doc = QPlainTextEdit::document();
+    QTextCursor cursor(textCursor());
+    int selStartBlock, selEndBlock;
+    if (cursor.hasSelection()) {
+        selStartBlock = doc->findBlock(cursor.selectionStart()).blockNumber();
+        selEndBlock = doc->findBlock(cursor.selectionEnd()).blockNumber();
+    }
+    else
+        selStartBlock = selEndBlock = -1;
 
     QTextBlock block = firstVisibleBlock();
     int blockNumber = block.blockNumber();
-    int top = (int) blockBoundingGeometry(block).translated(contentOffset()).top();
-    int bottom = top + (int) blockBoundingRect(block).height();
+    qreal top = blockBoundingGeometry(block).translated(contentOffset()).top();
+    qreal bottom = top + blockBoundingRect(block).height();
 
     while (block.isValid() && top <= e->rect().bottom()) {
         if (block.isVisible() && bottom >= e->rect().top()) {
-            QString number = QString::number(blockNumber + 1);
-            p.drawText(0, top, mLineIndicator->width() - 4, fontMetrics().height(),
-                            Qt::AlignRight, number);
+            p.save();
+
+            QRectF numRect( 0, top, mLineIndicator->width() - 1, bottom - top );
+
+            int num = blockNumber;
+            if (num >= selStartBlock && num <= selEndBlock) {
+                num -= selStartBlock;
+                p.setPen(Qt::NoPen);
+                p.setBrush(plt.color(QPalette::Highlight));
+                p.drawRect(numRect);
+                p.setPen(plt.color(QPalette::HighlightedText));
+            }
+
+            QString number = QString::number(num + 1);
+            p.drawText(0, top, mLineIndicator->width() - 4, bottom - top,
+                       Qt::AlignRight, number);
+
+            p.restore();
         }
 
         block = block.next();
         top = bottom;
-        bottom = top + (int) blockBoundingRect(block).height();
+        bottom = top + blockBoundingRect(block).height();
         ++blockNumber;
     }
 }
 
-void CodeEditor::indent( bool less )
+void GenericCodeEditor::copyUpDown(bool up)
 {
-    QTextDocument *doc = QPlainTextEdit::document();
-    QTextCursor c(textCursor());
-    int pos = c.position();
-    int anc = c.anchor();
-    QTextBlock block = doc->findBlock(qMin(pos,anc));
-    QTextBlock endBlock = anc != pos ? doc->findBlock(qMax(pos,anc)) : block;
-    int indent = mIndentWidth;
+    // directly taken from qtcreator
+    // Copyright (c) 2012 Nokia Corporation and/or its subsidiary(-ies).
+    // GNU Lesser General Public License
+    QTextCursor cursor = textCursor();
+    QTextCursor move = cursor;
+    move.beginEditBlock();
 
-    c.beginEditBlock();
+    bool hasSelection = cursor.hasSelection();
 
-    while (true) {
-        QTextCursor c( block );
-        QString text( block.text() );
+    if (hasSelection) {
+        move.setPosition(cursor.selectionStart());
+        move.movePosition(QTextCursor::StartOfBlock);
+        move.setPosition(cursor.selectionEnd(), QTextCursor::KeepAnchor);
+        move.movePosition(move.atBlockStart() ? QTextCursor::Left: QTextCursor::EndOfBlock,
+                          QTextCursor::KeepAnchor);
+    } else {
+        move.movePosition(QTextCursor::StartOfBlock);
+        move.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+    }
 
-        int pos = 0;
-        int spaces = 0;
-        while (true)
-        {
-            QChar chr(text[pos]);
-            if( chr == ' ' )
-                ++spaces;
-            else if( chr == '\t' )
-                spaces += indent;
-            else
-                break;
-            ++pos;
+    QString text = move.selectedText();
+
+    if (up) {
+        move.setPosition(cursor.selectionStart());
+        move.movePosition(QTextCursor::StartOfBlock);
+        move.insertBlock();
+        move.movePosition(QTextCursor::Left);
+    } else {
+        move.movePosition(QTextCursor::EndOfBlock);
+        if (move.atBlockStart()) {
+            move.movePosition(QTextCursor::NextBlock);
+            move.insertBlock();
+            move.movePosition(QTextCursor::Left);
+        } else {
+            move.insertBlock();
         }
+    }
 
-        int tabs = spaces / indent;
-        if (less) {
-            if(tabs * indent == spaces && tabs > 0)
-                --tabs;
-        }
-        else {
-            ++tabs;
-        }
+    int start = move.position();
+    move.clearSelection();
+    move.insertText(text);
+    int end = move.position();
 
-        c.movePosition( QTextCursor::NextCharacter, QTextCursor::KeepAnchor, pos );
+    move.setPosition(start);
+    move.setPosition(end, QTextCursor::KeepAnchor);
 
-        if( tabs == 0 )
-        {
-            c.removeSelectedText();
-        }
-        else if( mSpaceIndent )
-        {
-            spaces = tabs * indent;
-            while(spaces--)
-                c.insertText(" ");
-        }
-        else
-        {
-            while(tabs--)
-                c.insertText("\t");
-        }
+    move.endEditBlock();
 
-        if(block != endBlock)
-            block = block.next();
-        else
+    setTextCursor(move);
+}
+
+
+void GenericCodeEditor::toggleOverwriteMode()
+{
+    setOverwriteMode(!overwriteMode());
+}
+
+
+void GenericCodeEditor::copyLineDown()
+{
+    copyUpDown(false);
+}
+
+void GenericCodeEditor::copyLineUp()
+{
+    copyUpDown(true);
+}
+
+void GenericCodeEditor::moveLineUpDown(bool up)
+{
+    // directly taken from qtcreator
+    // Copyright (c) 2012 Nokia Corporation and/or its subsidiary(-ies).
+    // GNU Lesser General Public License
+    QTextCursor cursor = textCursor();
+    QTextCursor move = cursor;
+
+    move.setVisualNavigation(false); // this opens folded items instead of destroying them
+
+    move.beginEditBlock();
+
+    bool hasSelection = cursor.hasSelection();
+
+    if (cursor.hasSelection()) {
+        move.setPosition(cursor.selectionStart());
+        move.movePosition(QTextCursor::StartOfBlock);
+        move.setPosition(cursor.selectionEnd(), QTextCursor::KeepAnchor);
+        move.movePosition(move.atBlockStart() ? QTextCursor::Left: QTextCursor::EndOfBlock,
+                          QTextCursor::KeepAnchor);
+    } else {
+        move.movePosition(QTextCursor::StartOfBlock);
+        move.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+    }
+    QString text = move.selectedText();
+
+    move.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor);
+    move.removeSelectedText();
+
+    if (up) {
+        move.movePosition(QTextCursor::PreviousBlock);
+        move.insertBlock();
+        move.movePosition(QTextCursor::Left);
+    } else {
+        move.movePosition(QTextCursor::EndOfBlock);
+        if (move.atBlockStart()) { // empty block
+            move.movePosition(QTextCursor::NextBlock);
+            move.insertBlock();
+            move.movePosition(QTextCursor::Left);
+        } else {
+            move.insertBlock();
+        }
+    }
+
+    int start = move.position();
+    move.clearSelection();
+    move.insertText(text);
+    int end = move.position();
+
+    if (hasSelection) {
+        move.setPosition(start);
+        move.setPosition(end, QTextCursor::KeepAnchor);
+    }
+
+    move.endEditBlock();
+
+    setTextCursor(move);
+}
+
+void GenericCodeEditor::moveLineUp()
+{
+    moveLineUpDown(true);
+}
+
+void GenericCodeEditor::moveLineDown()
+{
+    moveLineUpDown(false);
+}
+
+void GenericCodeEditor::gotoPreviousEmptyLine()
+{
+    gotoEmptyLineUpDown(true);
+}
+
+void GenericCodeEditor::gotoNextEmptyLine()
+{
+    gotoEmptyLineUpDown(false);
+}
+
+void GenericCodeEditor::gotoEmptyLineUpDown(bool up)
+{
+    static const QRegExp whiteSpaceLine("^\\s*$");
+
+    const QTextCursor::MoveOperation direction = up ? QTextCursor::PreviousBlock
+                                                    : QTextCursor::NextBlock;
+
+    QTextCursor cursor = textCursor();
+    cursor.beginEditBlock();
+
+    bool cursorMoved = false;
+
+    // find first non-whitespace line
+    while ( cursor.movePosition(direction) ) {
+        if ( !whiteSpaceLine.exactMatch(cursor.block().text()) )
             break;
     }
 
-    c.endEditBlock();
+    // find first whitespace line
+    while ( cursor.movePosition(direction) ) {
+        if ( whiteSpaceLine.exactMatch(cursor.block().text()) ) {
+            setTextCursor(cursor);
+            cursorMoved = true;
+            break;
+        }
+    }
+
+    if (!cursorMoved) {
+        const QTextCursor::MoveOperation startOrEnd = up ? QTextCursor::Start
+                                                         : QTextCursor::End;
+
+        cursor.movePosition(startOrEnd);
+        setTextCursor(cursor);
+    }
+
+    cursor.endEditBlock();
+}
+
+void GenericCodeEditor::hideMouseCursor()
+{
+#ifdef Q_OS_MAC
+    return; // LATER: for some reason this crashes on osx. we should try to figure out why
+#endif
+    QCursor * overrideCursor = QApplication::overrideCursor();
+    if (!overrideCursor || overrideCursor->shape() != Qt::BlankCursor)
+        QApplication::setOverrideCursor( Qt::BlankCursor );
+}
+
+QMimeData *GenericCodeEditor::createMimeDataFromSelection() const
+{
+    // Here, we bundle up just the plaintext (not HTML, as is the default) of
+    // the editor's selected contents.
+    QMimeData *data = new QMimeData;
+    data->setText(textCursor().selection().toPlainText());
+    return data;
 }
 
 } // namespace ScIDE

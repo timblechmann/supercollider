@@ -20,7 +20,6 @@
 #define AUDIO_BACKEND_AUDIO_BACKEND_COMMON_HPP
 
 #include <boost/mpl/if.hpp>
-#include <boost/static_assert.hpp>
 
 #include "nova-simd/simd_memory.hpp"
 #include "nova-tt/dummy_mutex.hpp"
@@ -34,59 +33,19 @@ namespace nova   {
 namespace detail {
 
 template <typename sample_type, typename io_sample_type, bool blocking, bool managed_memory = true>
-class audio_delivery_helper:
+class audio_backend_base:
     boost::mpl::if_c<blocking, spin_lock, dummy_mutex>::type
 {
     typedef typename boost::mpl::if_c<blocking, spin_lock, dummy_mutex>::type lock_t;
     typedef std::size_t size_t;
 
 public:
-    /* to be called from the audio callback */
-    /* @{  */
-    void deliver_dac_output(const sample_type * source, size_t channel, size_t frames)
-    {
-        assert(channel < output_samples.size());
-        typename lock_t::scoped_lock lock(*this);
-        addvec_simd(output_samples[channel].get(), source, frames);
-    }
-
-    void deliver_dac_output_64(const sample_type * source, size_t channel)
-    {
-        assert(channel < output_samples.size());
-        typename lock_t::scoped_lock lock(*this);
-        addvec_simd<64>(output_samples[channel].get(), source);
-    }
-
-    void copy_dac_output(const sample_type * source, size_t channel, size_t frames)
-    {
-        assert(channel < output_samples.size());
-        copyvec_simd(output_samples[channel].get(), source, frames);
-    }
-
-    void copy_dac_output_64(const sample_type * source, size_t channel)
-    {
-        assert(channel < output_samples.size());
-        typename lock_t::scoped_lock lock(*this);
-        copyvec_simd<64>(output_samples[channel].get(), source);
-    }
-
-    void fetch_adc_input(sample_type * destination, size_t channel, size_t frames)
-    {
-        copyvec_simd(destination, input_samples[channel].get(), frames);
-    }
-
-    void fetch_adc_input_64(sample_type * destination, size_t channel)
-    {
-        copyvec_simd<64>(destination, input_samples[channel].get());
-    }
-    /* @} */
-
     /* @{ */
     /** buffers can be directly mapped to the io regions of the host application */
     template <typename Iterator>
     void input_mapping(Iterator const & buffer_begin, Iterator const & buffer_end)
     {
-        BOOST_STATIC_ASSERT(!managed_memory);
+        static_assert(!managed_memory, "audio_backend_common: managed_memory == true");
 
         size_t input_count = buffer_end - buffer_begin;
 
@@ -97,7 +56,7 @@ public:
     template <typename Iterator>
     void output_mapping(Iterator const & buffer_begin, Iterator const & buffer_end)
     {
-        BOOST_STATIC_ASSERT(!managed_memory);
+        static_assert(!managed_memory, "audio_backend_common: managed_memory == true");
 
         size_t output_count = buffer_end - buffer_begin;
 
@@ -121,12 +80,12 @@ protected:
 
     void prepare_helper_buffers(size_t input_channels, size_t output_channels, size_t frames)
     {
-        BOOST_STATIC_ASSERT(managed_memory);
+        static_assert(managed_memory, "audio_backend_common: managed_memory == false");
 
         input_samples.resize(input_channels);
         output_samples.resize(output_channels);
-        std::generate(input_samples.begin(), input_samples.end(), boost::bind(calloc_aligned<sample_type>, frames));
-        std::generate(output_samples.begin(), output_samples.end(), boost::bind(calloc_aligned<sample_type>, frames));
+        std::generate(input_samples.begin(), input_samples.end(), std::bind(calloc_aligned<sample_type>, frames));
+        std::generate(output_samples.begin(), output_samples.end(), std::bind(calloc_aligned<sample_type>, frames));
     }
 
     void fetch_inputs(const float ** inputs, size_t frames, int input_channels)

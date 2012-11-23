@@ -19,17 +19,11 @@
 #ifndef DSP_THREAD_QUEUE_DSP_THREAD_HPP
 #define DSP_THREAD_QUEUE_DSP_THREAD_HPP
 
+#include <cstdint>
 #include <iostream>
+#include <thread>
 
-#include <boost/bind.hpp>
-#include <boost/cstdint.hpp>
-#include <boost/foreach.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-#include <boost/thread/thread.hpp>
-
-#ifndef foreach
-#define foreach BOOST_FOREACH
-#endif
 
 #include "dsp_thread_queue.hpp"
 #include "../utilities/malloc_aligned.hpp"
@@ -37,7 +31,7 @@
 
 namespace nova {
 
-using boost::uint16_t;
+using std::uint16_t;
 
 struct nop_thread_init
 {
@@ -63,7 +57,6 @@ template <typename runnable,
           typename Alloc = std::allocator<void*>
          >
 class dsp_thread:
-    public boost::noncopyable,
     public thread_init_functor
 {
     typedef nova::dsp_queue_interpreter<runnable, Alloc> dsp_queue_interpreter;
@@ -78,11 +71,14 @@ public:
             if (stack_ == NULL)
                 throw std::bad_alloc();
             // touch stack to avoid page faults
-            for (int i = 0; i != stack_size; ++i)
+            for (size_t i = 0; i != stack_size; ++i)
                 stack_[i] = 0;
             mlock(stack_, stack_size);
         }
     }
+
+    dsp_thread(dsp_thread const &) = delete;
+    dsp_thread& operator=(dsp_thread const &) = delete;
 
     ~dsp_thread(void)
     {
@@ -157,14 +153,10 @@ public:
     typedef typename dsp_queue_interpreter::node_count_t node_count_t;
     typedef typename dsp_queue_interpreter::thread_count_t thread_count_t;
 
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
     typedef std::unique_ptr<dsp_thread_queue<runnable, Alloc> > dsp_thread_queue_ptr;
-#else
-    typedef std::auto_ptr<dsp_thread_queue<runnable, Alloc> > dsp_thread_queue_ptr;
-#endif
 
     dsp_threads(thread_count_t count, thread_init_functor const & init_functor = thread_init_functor()):
-        interpreter(std::min(count, (thread_count_t)boost::thread::hardware_concurrency()))
+        interpreter(std::min(count, (thread_count_t)std::thread::hardware_concurrency()))
     {
         set_dsp_thread_count(interpreter.get_thread_count(), init_functor);
     }
@@ -182,18 +174,11 @@ public:
      *
      *  don't call, if threads are currently accessing the queue
      * */
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
     dsp_thread_queue_ptr reset_queue(dsp_thread_queue_ptr && new_queue)
     {
         dsp_thread_queue_ptr ret = interpreter.reset_queue(std::move(new_queue));
         return std::move(ret);
     }
-#else
-    dsp_thread_queue_ptr reset_queue(dsp_thread_queue_ptr & new_queue)
-    {
-        return interpreter.reset_queue(new_queue);
-    }
-#endif
 
     dsp_thread_queue_ptr release_queue(void)
     {
@@ -213,7 +198,7 @@ private:
 
         void join_all(void)
         {
-            foreach(pthread_t & thread, thread_group_) {
+            for(pthread_t & thread : thread_group_) {
                 void * ret;
                 int err = pthread_join(thread, &ret);
                 if (err)
@@ -226,7 +211,7 @@ private:
 
     void start_threads_impl(void)
     {
-        foreach(dsp_thread & thread, threads) {
+        for(dsp_thread & thread : threads) {
             pthread_attr_t attr;
             pthread_attr_init(&attr);
             int err = pthread_attr_setstack(&attr, thread.stack(), stack_size);
@@ -242,13 +227,23 @@ private:
         }
     }
 #else
+    struct thread_group
+    {
+        void join_all(void)
+        {
+            for (std::thread & thread : threads)
+                thread.join();
+        }
+
+        std::vector<std::thread> threads;
+    };
+
     static const int stack_size = 0;
-    typedef boost::thread_group thread_group;
 
     void start_threads_impl(void)
     {
-        foreach(dsp_thread & thread, threads)
-            thread_group_.create_thread(boost::bind(&dsp_thread::run, boost::ref(thread)));
+        for(dsp_thread & thread : threads)
+            thread_group_.threads.push_back(std::move(std::thread(std::bind(&dsp_thread::run, std::ref(thread)))));
     }
 
 #endif
@@ -270,7 +265,7 @@ public:
 
     void terminate_threads(void)
     {
-        foreach(dsp_thread & thread, threads)
+        for (dsp_thread & thread : threads)
             thread.terminate();
 
         thread_group_.join_all();

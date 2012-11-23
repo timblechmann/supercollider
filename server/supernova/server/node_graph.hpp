@@ -29,8 +29,7 @@
 
 #include "dsp_thread_queue/dsp_thread_queue.hpp"
 
-namespace nova
-{
+namespace nova {
 
 typedef nova::dsp_queue_node<rt_pool_allocator<void*> > queue_node;
 typedef nova::dsp_thread_queue<dsp_queue_node<rt_pool_allocator<void*> >,
@@ -83,11 +82,7 @@ public:
         return &root_group_/* .get() */;
     }
 
-#ifdef __GXX_EXPERIMENTAL_CXX0X__
     typedef std::unique_ptr<dsp_thread_queue> dsp_thread_queue_ptr;
-#else
-    typedef std::auto_ptr<dsp_thread_queue> dsp_thread_queue_ptr;
-#endif
 
     dsp_thread_queue_ptr generate_dsp_queue(void);
 
@@ -134,8 +129,14 @@ public:
 
     bool group_free_all(abstract_group * group)
     {
-        size_t synths, groups;
-        boost::tie(synths, groups) = group->child_count_deep();
+        size_t synths = 0, groups = 0;
+        group->apply_deep_on_children([&](server_node & node) {
+            release_node_id(&node);
+            if (node.is_synth())
+                synths += 1;
+            else
+                groups += 1;
+        });
 
         group->free_children();
         synth_count_ -= synths;
@@ -145,12 +146,22 @@ public:
 
     bool group_free_deep(abstract_group * group)
     {
-        size_t synths, groups;
-        boost::tie(synths, groups) = group->child_count_deep();
+        size_t synths;
+        group->apply_deep_on_children([&](server_node & node) {
+             if (node.is_synth()) {
+                 release_node_id(&node);
+                 synths += 1;
+             }
+        });
 
         group->free_synths_deep();
         synth_count_ -= synths;
         return true;
+    }
+
+    void release_node_id(server_node * node)
+    {
+        node_set.erase(*node);
     }
 
 private:

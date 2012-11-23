@@ -737,14 +737,20 @@ Plotter {
 
 + ArrayedCollection {
 	plot { |name, bounds, discrete=false, numChannels, minval, maxval|
-		var array = this.as(Array);
-		var plotter = Plotter(name, bounds);
+		var array, plotter;
+		array = this.as(Array);
+
+		if(array.maxDepth > 3) {
+			"Cannot currently plot an array with more than 3 dimensions".warn;
+			^nil
+		};
+		plotter = Plotter(name, bounds);
 		if(discrete) { plotter.plotMode = \points };
 
 		numChannels !? { array = array.unlace(numChannels) };
 		array = array.collect {|elem|
 			if (elem.isKindOf(Env)) {
-				elem.asSignal
+				elem.asMultichannelSignal.flop
 			} {
 				elem
 			}
@@ -829,14 +835,18 @@ Plotter {
 				var numChan = buf.numChannels;
 				{
 					plotter.domainSpecs = ControlSpec(0, duration, units: "s");
-					minval !? { plotter.minval = minval; };
-					maxval !? { plotter.maxval = maxval };
 					plotter.setValue(
 						array.unlace(buf.numChannels).collect(_.drop(-1)),
-						findSpecs: minval.isNil and: { maxval.isNil },
-						refresh: true
+						findSpecs: true,
+						refresh: false
 					);
-
+					if(minval.isNumber && maxval.isNumber,{
+						plotter.specs = [minval, maxval].asSpec
+					},{
+						minval !? { plotter.minval = minval };
+						maxval !? { plotter.maxval = maxval };
+					});
+					plotter.refresh;
 				}.defer
 			})
 		};
@@ -860,18 +870,19 @@ Plotter {
 		);
 		this.loadToFloatArray(action: { |array, buf|
 			{
+				plotter.domainSpecs = ControlSpec(0.0, buf.numFrames, units:"frames");
+				plotter.setValue(
+					array.unlace(buf.numChannels),
+					findSpecs: true,
+					refresh: false
+				);
 				if(minval.isNumber && maxval.isNumber,{
 					plotter.specs = [minval, maxval].asSpec
 				},{
 					minval !? { plotter.minval = minval };
 					maxval !? { plotter.maxval = maxval };
 				});
-				plotter.domainSpecs = ControlSpec(0.0, buf.numFrames, units:"frames");
-				plotter.setValue(
-					array.unlace(buf.numChannels),
-					findSpecs: false,
-					refresh: true
-				);
+				plotter.refresh;
 			}.defer
 		});
 		^plotter
@@ -879,10 +890,17 @@ Plotter {
 }
 
 + Env {
-	plot { |size = 400, bounds, minval, maxval|
-		var plotter = this.asSignal(size)
-			.plot("envelope plot", bounds, minval: minval, maxval: maxval);
-		plotter.domainSpecs = this.times.sum.asArray.collect(ControlSpec(0, _, units: "s"));
+	plot { |size = 400, bounds, minval, maxval, name|
+		var plotLabel = if (name.isNil) { "envelope plot" } { name };
+		var plotter = [this.asMultichannelSignal(size).flop]
+			.plot(name, bounds, minval: minval, maxval: maxval);
+
+		var duration     = this.duration.asArray;
+		var channelCount = duration.size;
+
+		var totalDuration = if (channelCount == 1) { duration } { duration.maxItem ! channelCount };
+
+		plotter.domainSpecs = totalDuration.collect(ControlSpec(0, _, units: "s"));
 		plotter.setProperties(\labelX, "time");
 		plotter.refresh;
 		^plotter

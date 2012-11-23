@@ -30,9 +30,11 @@
 
 #include <QThread>
 #include <QFileOpenEvent>
+#include <QKeyEvent>
 #include <QIcon>
 
 extern bool compiledOK;
+extern const char * gIdeName;
 
 QcApplication * QcApplication::_instance = 0;
 QMutex QcApplication::_mutex;
@@ -56,12 +58,16 @@ static bool QtColliderUseGui(void)
 #endif
 }
 
+// undefine some interfering X11 definitions
+#undef KeyPress
+
 QcApplication::QcApplication( int & argc, char ** argv )
 : QApplication( argc, argv, QtColliderUseGui() )
 {
   _mutex.lock();
   _instance = this;
   _mutex.unlock();
+
   qRegisterMetaType<VariantList>();
   qRegisterMetaType<QcTreeWidget::ItemPtr>();
   qRegisterMetaType< QVector<double> >();
@@ -75,6 +81,8 @@ QcApplication::QcApplication( int & argc, char ** argv )
     icon.addFile(":/icons/sc-cube-16");
     setWindowIcon(icon);
   }
+
+  _handleCmdPeriod = strcmp(gIdeName, "scapp") != 0;
 }
 
 QcApplication::~QcApplication()
@@ -105,15 +113,40 @@ void QcApplication::interpret( const QString &str, bool print )
   QtCollider::unlockLang();
 }
 
-bool QcApplication::event( QEvent *e )
+bool QcApplication::event( QEvent *event )
 {
-  if( e->type() == QEvent::FileOpen ) {
-    // open the file dragged onto the application icon on Mac
-    QFileOpenEvent *fe = static_cast<QFileOpenEvent*>(e);
-    interpret( QString("Document.open(\"%1\")").arg(fe->file()), false );
+    switch (event->type()) {
+    case QEvent::FileOpen: {
+        // open the file dragged onto the application icon on Mac
+        QFileOpenEvent *fe = static_cast<QFileOpenEvent*>(event);
+        interpret( QString("Document.open(\"%1\")").arg(fe->file()), false );
+        event->accept();
+        return true;
+    }
+    default:
+        break;
+    }
 
-    return true;
-  }
+    return QApplication::event( event );
+}
 
-  return QApplication::event( e );
+bool QcApplication::notify( QObject * object, QEvent * event )
+{
+    switch (event->type()) {
+    case QEvent::KeyPress: {
+        QKeyEvent *kevent = static_cast<QKeyEvent*>(event);
+        if ( _handleCmdPeriod &&
+             (kevent->key() == Qt::Key_Period) &&
+             (kevent->modifiers() & Qt::ControlModifier) )
+        {
+            static QString cmdPeriodCommand("CmdPeriod.run");
+            interpret(cmdPeriodCommand, false);
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    return QApplication::notify( object, event );
 }

@@ -31,6 +31,7 @@ PatternProxy : Pattern {
 		if (obj.isNil) { pat = this.class.default };
 		pattern = pat;
 		source = obj; // keep original here.
+		this.changed(\source, obj);
 	}
 
 	setSourceLikeInPbind { arg obj;
@@ -38,6 +39,7 @@ PatternProxy : Pattern {
 		if (obj.isNil) { pat = this.class.default };
 		pattern = pat.fin(inf);
 		source = obj; // keep original here.
+		this.changed(\source, obj);
 	}
 
 	defaultEvent {
@@ -46,10 +48,10 @@ PatternProxy : Pattern {
 	}
 
 	convertFunction { arg func;
-			^Prout {
-				var inval = func.def.prototypeFrame !? { inval = this.defaultEvent };
-				func.value( inval ).embedInStream(inval)
-			};
+		^Prout {
+			var inval = func.def.prototypeFrame !? { inval = this.defaultEvent };
+			func.value( inval ).embedInStream(inval)
+		}
 	}
 
 	*parallelise { arg list; ^Ptuple(list) }
@@ -66,10 +68,14 @@ PatternProxy : Pattern {
 	set { arg ... args;
 		if(envir.isNil) { this.envir = this.class.event };
 		args.pairsDo { arg key, val; envir.put(key, val) };
+		this.changed(\set, args);
 	}
 
 	unset { arg ... args;
-		if(envir.notNil) { args.do { arg key; envir.removeAt(key) } };
+		if(envir.notNil) {
+			args.do { arg key; envir.removeAt(key) };
+			this.changed(\unset, args);
+		}
 	}
 
 	get { arg key;
@@ -271,7 +277,8 @@ Pdefn : PatternProxy {
 
 	map { arg ... args;
 		if(envir.isNil) { this.envir = () };
-		args.pairsDo { |key, name| envir.put(key, Pdefn(name)) }
+		args.pairsDo { |key, name| envir.put(key, Pdefn(name)) };
+		this.changed(\map, args);
 	}
 
 	storeArgs { ^[key] } // assume it was created globally
@@ -280,7 +287,7 @@ Pdefn : PatternProxy {
 		key = argKey;
 		all.put(argKey, this);
 	}
-	
+
 	*hasGlobalDictionary { ^true }
 
 }
@@ -295,22 +302,23 @@ TaskProxy : PatternProxy {
 	storeArgs { ^[source] }
 
 	source_ { arg obj;
-			pattern = if(obj.isKindOf(Function)) { this.convertFunction(obj) }{ obj };
-			if (obj.isNil) { pattern = this.class.default; source = obj; };
-			this.wakeUp;
-			source = obj;
+		pattern = if(obj.isKindOf(Function)) { this.convertFunction(obj) }{ obj };
+		if (obj.isNil) { pattern = this.class.default; source = obj; };
+		this.wakeUp;
+		source = obj;
+		this.changed(\source, obj);
 	}
 
 	convertFunction { arg func;
-			^Prout { |inevent|
-					var inval = func.def.prototypeFrame !? { this.defaultEvent };
-					if(inevent.isNumber or: {inevent.isNil} or: { inval.isNil }) {
-						inevent = inval
-					} {
-						inevent.copy.parent_(inval);
-					};
-					func.value(inevent)
-			}
+		^Prout { |inevent|
+			var inval = func.def.prototypeFrame !? { this.defaultEvent };
+			if(inevent.isNumber or: {inevent.isNil} or: { inval.isNil }) {
+				inevent = inval
+			} {
+				inevent.copy.parent_(inval);
+			};
+			func.value(inevent)
+		}
 	}
 
 
@@ -356,7 +364,7 @@ TaskProxy : PatternProxy {
 		}
 	}
 	wakeUp {
-			if(this.isPlaying) { this.play(quant:playQuant) }	}
+		if(this.isPlaying) { this.play(quant:playQuant) }	}
 	asProtected {
 		^Pprotect(this, { if(this.player.notNil) { this.player.streamError } })
 	}
@@ -410,7 +418,7 @@ Tdef : TaskProxy {
 		key = argKey;
 		all.put(argKey, this);
 	}
-	
+
 	*hasGlobalDictionary { ^true }
 
 
@@ -436,6 +444,7 @@ EventPatternProxy : TaskProxy {
 		envir !? { pattern = pattern <> envir };
 		this.wakeUp;
 		source = obj;
+		this.changed(\source, obj);
 	}
 
 	envir_ { arg dict;
@@ -630,7 +639,7 @@ Pdef : EventPatternProxy {
 		key = argKey;
 		all.put(argKey, this);
 	}
-	
+
 	*hasGlobalDictionary { ^true }
 
 	*initClass {
@@ -805,7 +814,7 @@ Pbindef : Pdef {
 	storeArgs { ^[key]++pattern.storeArgs }
 	repositoryArgs { ^this.storeArgs }
 	quant_ { arg val; super.quant = val; source.quant = val }
-	
+
 	*hasGlobalDictionary { ^true }
 
 

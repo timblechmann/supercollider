@@ -73,7 +73,7 @@ extern PyrSymbol *s_scview;
 {
 }
 
-- (void)setSCView: (struct SCCocoaTextView*)inObject
+- (void)setSCView: (class SCCocoaTextView*)inObject
 {
 	mSCViewObject = inObject;
 }
@@ -82,15 +82,15 @@ extern PyrSymbol *s_scview;
 - (IBAction) executeSelection: (id) sender
 {
 	if(enterExecutesSelection)
-    [self sendSelection: "interpretPrintCmdLine" ];
+    [self sendSelection: @"interpretPrintCmdLine" ];
 }
 
-- (void)sendSelection: (char*) methodName
+- (void)sendSelection: (NSString*) nsmethodName
 {
     if (!compiledOK) {
         return;
     }
-
+	const char *methodName = [nsmethodName UTF8String];
 	NSRange selectedRange;
 	SCTextView * txtView = mSCViewObject->getTextView();
 	NSString* selection = [txtView currentlySelectedTextOrLine: &selectedRange];
@@ -194,7 +194,7 @@ extern PyrSymbol *s_scview;
 		if([link hasPrefix:@"SC://"] || [link hasPrefix:@"sc://"]) { // this means search immediately
 			NSString *helpPath = pathOfHelpFileFor([[[link substringFromIndex:5] stringByDeletingPathExtension] stringByDeletingPathExtension]);
 			if(!helpPath) {
-				post("WARNING:\nInvalid hyperlink: '%s' Please repair this.\n", [link cString]);
+				post("WARNING:\nInvalid hyperlink: '%s' Please repair this.\n", [link cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 				return YES;
 			}
 			desiredURL = [NSURL URLWithString: helpPath];
@@ -206,7 +206,7 @@ extern PyrSymbol *s_scview;
 		if([[link scheme] isEqualToString: @"SC"] || [[link scheme] isEqualToString:@"sc"]) { // this means search immediately
 			NSString *helpPath = pathOfHelpFileFor([[[[link relativeString] substringFromIndex:5] stringByDeletingPathExtension] stringByDeletingPathExtension]);
 			if(!helpPath) {
-				post("WARNING:\nInvalid hyperlink: '%s' Please repair this.\n", [[link relativeString] cString]);
+				post("WARNING:\nInvalid hyperlink: '%s' Please repair this.\n", [[link relativeString] cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 				return YES;
 			}
 			desiredURL = [NSURL fileURLWithPath: helpPath];
@@ -240,12 +240,12 @@ extern PyrSymbol *s_scview;
 		}
         if (!doc && result) {
 			// it's a bad file:// URL, post a warning and search
-			post("WARNING:\nInvalid hyperlink: '%s' Please repair this.\nSearching help directories for alternative.\n", [[desiredURL path] cString]);
+			post("WARNING:\nInvalid hyperlink: '%s' Please repair this.\nSearching help directories for alternative.\n", [[desiredURL path] cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 			// delete extension twice in case something.help.rtf
 			NSString *desiredHelpName = [[[[desiredURL path] lastPathComponent] stringByDeletingPathExtension] stringByDeletingPathExtension];
 			NSString *helpPath = pathOfHelpFileFor(desiredHelpName);
 			if(!helpPath) {
-				post("Can't find Help File Document for: '%s'\n", [desiredHelpName cString]);
+				post("Can't find Help File Document for: '%s'\n", [desiredHelpName cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 				return YES;
 			}
 			desiredURL = [NSURL fileURLWithPath: helpPath];
@@ -253,7 +253,7 @@ extern PyrSymbol *s_scview;
 				if(!loadLinkInView) {
 					doc = (MyDocument*)[docctl documentForURL: [desiredURL absoluteURL]];
 				}
-			} else post("file doesn't exist at path: '%s'\n", [[desiredURL path] cString]);
+			} else post("file doesn't exist at path: '%s'\n", [[desiredURL path] cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 			if (!doc) {
 				if(!loadLinkInView) {
 					doc = [docctl openDocumentWithContentsOfURL: desiredURL display: true];
@@ -261,7 +261,7 @@ extern PyrSymbol *s_scview;
 					result = mSCViewObject->open(helpPath);
 				}
 				if(!doc && result) {
-					post("Can't open Help File Document: '%s'\n", [[desiredURL path] cString]);
+					post("Can't open Help File Document: '%s'\n", [[desiredURL path] cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 					return YES;
 				}
 			}
@@ -561,7 +561,7 @@ const int circDiam = 20;
 		nsstring = label;
 	} else if (slot) {
         PyrClass *classobj = classOfSlot(slot);
-        nsstring = [NSString stringWithCString: slotRawSymbol(&classobj->name)->name];
+        nsstring = [NSString stringWithCString: slotRawSymbol(&classobj->name)->name encoding:[NSString defaultCStringEncoding]];
         if (!nsstring) return 0;
     } else {
         nsstring = @"No Data!";
@@ -656,7 +656,6 @@ const int circDiam = 20;
     [pboard setData: data forType: sSCObjType];
     [pboard setString: string forType: NSStringPboardType];
 
-    NSSize imageSize = [image size];
     where.x -= circDiam / 2;
     where.y += circDiam / 4;
 
@@ -686,7 +685,7 @@ const int circDiam = 20;
 //    return;
 //}
 
-- (void)setSCView: (struct SCTextField*)inObject
+- (void)setSCView: (class SCTextField*)inObject
 {
 	mSCViewObject = inObject;
 }
@@ -758,7 +757,7 @@ const int circDiam = 20;
 		pthread_mutex_lock (&gLangMutex);
 		PyrSymbol *method = getsym("doAction");
 		PyrObject *mObj;
-		if (mObj = mSCViewObject->GetSCObj()) {
+		if ((mObj = mSCViewObject->GetSCObj())) {
 			VMGlobals *g = gMainVMGlobals;
 			g->canCallOS = true;
 			++g->sp;  SetObject(g->sp, mObj);
@@ -1097,12 +1096,12 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 	enterExecutesSelection = YES;
 }
 
-- (void)setSCObject: (struct SCWebView*)inObject
+- (void)setSCObject: (class SCWebView*)inObject
 {
     mSCWebView = inObject;
 }
 
-- (struct SCWebView*)getSCObject
+- (class SCWebView*)getSCObject
 {
     return mSCWebView;
 }
@@ -1149,7 +1148,7 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 	NSLog(@"didFailProvisionalLoadWithError: %@",[error localizedDescription]);
 	if ([error code] == NSURLErrorCancelled) return; // this is Error -999
 	if (mSCWebView) {
-		post("SCWebView load request failed: '%s'\n", [[error localizedDescription] cString]);
+		post("SCWebView load request failed: '%s'\n", [[error localizedDescription] cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 		SEL selector = @selector(doFailAction);
 		NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
 									[sender methodSignatureForSelector: selector]];
@@ -1179,7 +1178,7 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 	NSLog(@"didFailLoadWithError: %@",[error localizedDescription]);
 	if ([error code] == NSURLErrorCancelled) return; // this is Error -999
 	if (mSCWebView) {
-		post("SCWebView load request failed: '%s'\n", [[error localizedDescription] cString]);
+		post("SCWebView load request failed: '%s'\n", [[error localizedDescription] cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 		SEL selector = @selector(doFailAction);
 		NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:
 									[sender methodSignatureForSelector: selector]];
@@ -1286,8 +1285,9 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 	enterExecutesSelection = flag;
 }
 
-- (void)sendSelection: (char*) methodName
+- (void)sendSelection: (NSString*) nsmethodName
 {
+	const char * methodName = [nsmethodName UTF8String];
     if (!compiledOK) {
         return;
     }
@@ -1311,32 +1311,32 @@ void QDDrawBevelRect(CGContextRef cgc, CGRect bounds, float width, bool inout);
 
 - (IBAction)openCode:(id)sender
 {
-    [self sendSelection: "openCodeFile"];
+    [self sendSelection: @"openCodeFile"];
 }
 
 - (IBAction) showHelpFor: (id) sender
 {
-	[self sendSelection: "showHelp"];
+	[self sendSelection: @"showHelp"];
 }
 
 - (IBAction)showHelpSearch:(id)sender {
-	[self sendSelection: "showHelpSearch"];
+	[self sendSelection: @"showHelpSearch"];
 }
 
 - (IBAction)methodTemplates: (id)sender
 {
-    [self sendSelection: "methodTemplates"];
+    [self sendSelection: @"methodTemplates"];
 }
 
 - (IBAction)methodReferences: (id)sender
 {
-    [self sendSelection: "methodReferences"];
+    [self sendSelection: @"methodReferences"];
 }
 
 - (IBAction)executeSelection: (id) sender
 {
 	if(enterExecutesSelection)
-		[self sendSelection: "interpretPrintCmdLine" ];
+		[self sendSelection: @"interpretPrintCmdLine" ];
 }
 
 // workaround for plaintext copy
@@ -1571,12 +1571,12 @@ int SCCocoaTextView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		PyrString* pstring = slotRawString(slot);
 		if(!pstring) return errNone;
 		NSRange selectedRange = [mTextView selectedRange];
-		NSString *string = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *string = [NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]];
+		string = [string substringToIndex: pstring->size];
 		if ([mTextView shouldChangeTextInRange: selectedRange replacementString: string]) {
 			[mTextView replaceCharactersInRange: selectedRange withString: string];
 			[mTextView didChangeText];
 		}
-		[string release];
 		return errNone;
 	}
 
@@ -1584,12 +1584,10 @@ int SCCocoaTextView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(!isKindOfSlot(slot, class_string)) return errWrongType;
 		PyrString* pstring = slotRawString(slot);
 		if(!pstring) return errNone;
-		NSRange selectedRange = [mTextView selectedRange];
-		NSString *path = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
-
+		NSString *path = [NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]];
+		path = [path substringToIndex: pstring->size];
 		int result = open(path);
 
-		[path release];
 		return result;
 	}
 
@@ -1657,7 +1655,8 @@ int SCCocoaTextView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if (err) return err;
 
 		PyrString *pstring = slotRawString(nameSlot);
-		NSString *fontName = [NSString stringWithCString: pstring->s length: pstring->size];
+		NSString *fontName = [NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]];
+		fontName = [fontName substringToIndex: pstring->size];
 		if (!fontName) return errFailed;
 		NSFont *font = [NSFont fontWithName: fontName size: size];
 		if (!font) return errFailed;
@@ -1712,7 +1711,8 @@ int SCCocoaTextView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(rangeStart<0) selectedRange =	NSMakeRange(0, length);
 		else selectedRange =	NSMakeRange(rangeStart, rangeSize);
 
-		NSString *string = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *string = [NSString stringWithCString:pstring->s encoding:[NSString defaultCStringEncoding]];
+		string = [string substringToIndex:pstring->size];
 		BOOL editable = [mTextView isEditable];
 		if(!editable) [mTextView setEditable:YES]; //always allow programmatic editing
 
@@ -1722,8 +1722,6 @@ int SCCocoaTextView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		}
 
 		if(!editable) [mTextView setEditable:NO];
-
-		[string release];
 
         return errNone;
 	}
@@ -1970,7 +1968,8 @@ int SCMovieView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(!isKindOfSlot(slot, class_string)) return errWrongType;
 		PyrString* pstring = slotRawString(slot);
 		if(!pstring) return errNone;
-		NSString *string = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *string = [NSString stringWithCString:pstring->s encoding:[NSString defaultCStringEncoding]];
+		string = [string substringToIndex:pstring->size];
 		NSURL * url = [[NSURL alloc] initFileURLWithPath: string];
 		QTMovie *movie = [[QTMovie alloc] initWithURL: url error:nil];
 		if(!movie) return errFailed;
@@ -1980,7 +1979,6 @@ int SCMovieView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(old_movie){
 			[old_movie release];
 		}
-		[string release];
 		[url release];
 		/* QT: */
 		mMovie = movie;
@@ -2205,10 +2203,9 @@ int SCQuartzComposerView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(!isKindOfSlot(slot, class_string)) return errWrongType;
 		PyrString* pstring = slotRawString(slot);
 		if(!pstring) return errNone;
-		NSString *string = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *string = [[NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding] ] substringToIndex: pstring->size];
 		BOOL success = [mQCView loadCompositionFromFile: string];
 		if(!success) return errFailed;
-		[string release];
 		return errNone;
 	}
 
@@ -2304,7 +2301,8 @@ id SCQuartzComposerView::getNSObjectForSCObject(PyrSlot *scobject, int *returnEr
 	} else if(isKindOfSlot(scobject, s_string->u.classobj)) { // it's a string
 		PyrString *string = slotRawString(scobject);
 		if(string->size == 0) { err = errFailed; returnErr = &err; return NULL;}
-		NSString *returnObject =  [NSString stringWithCString: string->s length: string->size];
+		NSString *returnObject = [NSString stringWithCString: string->s encoding:[NSString defaultCStringEncoding]];
+		returnObject = [returnObject substringToIndex: string->size];
 		if(!returnObject) { err = errFailed; returnErr = &err; return NULL;}
 		return returnObject;
 	} else if(isKindOfSlot(scobject, s_color->u.classobj)) { // it's a color
@@ -2327,7 +2325,7 @@ id SCQuartzComposerView::getNSObjectForSCObject(PyrSlot *scobject, int *returnEr
 				PyrSymbol *keysymbol;
 				err = slotSymbolVal(element, &keysymbol);
 				if (err) {returnErr = &err; return NULL;}
-				NSString *key = [[NSString alloc] initWithCString: keysymbol->name encoding: NSASCIIStringEncoding];
+				NSString *key = [NSString  stringWithCString: keysymbol->name encoding: NSASCIIStringEncoding];
 				int innerErr;
 				id innerSCObject = getNSObjectForSCObject(element + 1, &innerErr);
 				if(!innerSCObject) { returnErr = &innerErr; return NULL;}
@@ -2383,9 +2381,8 @@ int SCQuartzComposerView::getProperty(PyrSymbol *symbol, PyrSlot *slot)
 		int err = slotSymbolVal(slot, &keysymbol);
 		if (err) return err;
 
-		NSString *key = [[NSString alloc] initWithCString: keysymbol->name encoding: NSASCIIStringEncoding];
+		NSString *key = [NSString stringWithCString: keysymbol->name encoding: NSASCIIStringEncoding];
 		if(![[mQCView outputKeys] containsObject: key]) {
-			[key release];
 			//post("There is no port with key \"%s\".\n\n", [key cString]);
 			return errFailed;
 		}
@@ -2394,7 +2391,6 @@ int SCQuartzComposerView::getProperty(PyrSymbol *symbol, PyrSlot *slot)
 		NSString *type = [outputAttributes objectForKey:QCPortAttributeTypeKey];
 
 		id nsObject = [mQCView valueForOutputKey: key];
-		[key release];
 		err = getSCObjectForNSObject(slot, nsObject, type);
 		if (err) return err;
 		return errNone;
@@ -2404,9 +2400,8 @@ int SCQuartzComposerView::getProperty(PyrSymbol *symbol, PyrSlot *slot)
 		int err = slotSymbolVal(slot, &keysymbol);
 		if (err) return err;
 
-		NSString *key = [[NSString alloc] initWithCString: keysymbol->name encoding: NSASCIIStringEncoding];
+		NSString *key = [NSString stringWithCString: keysymbol->name encoding: NSASCIIStringEncoding];
 		if(![[mQCView inputKeys] containsObject: key]) {
-			[key release];
 			//post("There is no port with key \"%s\".\n\n", [key cString]);
 			return errFailed;
 		}
@@ -2415,7 +2410,6 @@ int SCQuartzComposerView::getProperty(PyrSymbol *symbol, PyrSlot *slot)
 		NSString *type = [inputAttributes objectForKey:QCPortAttributeTypeKey];
 
 		id nsObject = [mQCView valueForInputKey: key];
-		[key release];
 		err = getSCObjectForNSObject(slot, nsObject, type);
 		if (err) return err;
 		return errNone;
@@ -2537,7 +2531,7 @@ int SCQuartzComposerView::getSCObjectForNSObject(PyrSlot *slot, id nsObject, NSS
 				if(err) return err;
 
 				PyrSlot outKey;
-				SetSymbol(&outKey, getsym([key cString]));
+				SetSymbol(&outKey, getsym([key cStringUsingEncoding:[NSString defaultCStringEncoding]]));
 				err = identDictPut(g, dict, &outKey, &innerSlot);
 				if(err) return err;
 			}
@@ -2723,7 +2717,7 @@ int SCWebView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		PyrString* pstring = slotRawString(slot);
 		if(!pstring) return errFailed;
 		[mWebView resetLoadCount];
-		NSString *path = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *path = [[NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]] substringToIndex: pstring->size];
 		[[mWebView mainFrame] loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:path]]];
 		return errNone;
 	}
@@ -2789,7 +2783,7 @@ int SCWebView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		PyrString* pstring = slotRawString(slot);
 		if(!pstring) return errFailed;
 		[mWebView resetLoadCount];
-		NSString *html = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *html = [[NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]] substringToIndex: pstring->size];
 		[[mWebView mainFrame] loadHTMLString:html baseURL:nil];
 		return errNone;
 	}
@@ -2813,7 +2807,7 @@ int SCWebView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(!isKindOfSlot(stringSlot, class_string)) return errWrongType;
 		PyrString* pstring = slotRawString(stringSlot);
 		if(!pstring) return errFailed;
-		NSString *searchText = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *searchText = [[NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding] ] substringToIndex: pstring->size];
 		
 		PyrSlot *dir = slots+1;
 		bool goesForward = IsFalse(dir);
@@ -2836,7 +2830,7 @@ int SCWebView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(!pstring) return errFailed;
 
 		PyrSymbol *genericFont = slotRawSymbol(slots+0);
-		NSString *specificFont = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *specificFont = [[NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]] substringToIndex: pstring->size];
 
 		if (genericFont == getsym("standard"))
 			[[mWebView preferences] setStandardFontFamily: specificFont];
@@ -2850,8 +2844,6 @@ int SCWebView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 			[[mWebView preferences] setCursiveFontFamily: specificFont];
 		else if (genericFont == getsym("fantasy"))
 			[[mWebView preferences] setFantasyFontFamily: specificFont];
-
-		[specificFont release];
 
 		return errNone;
 	}
@@ -3022,9 +3014,8 @@ int SCTextField::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 		if(!isKindOfSlot(slot, class_string)) return errWrongType;
 		PyrString* pstring = slotRawString(slot);
 		if(!pstring) return errNone;
-		NSString *string = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+		NSString *string = [[NSString stringWithCString: pstring->s encoding: [NSString defaultCStringEncoding] ] substringToIndex: pstring->size];
 		[mTextField setStringValue: string];
-		[string release];
 		return errNone;
 	}
 
@@ -3055,7 +3046,8 @@ int SCTextField::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 			}
 
 			PyrString *pstring = slotRawString(nameSlot);
-			NSString *fontName = [NSString stringWithCString: pstring->s length: pstring->size];
+			NSString *fontName = [NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]];
+			fontName = [fontName substringToIndex: pstring->size];
 			if (!fontName) return errFailed;
 			font = [NSFont fontWithName: fontName size: size];
 			if (!font) return errFailed;
@@ -3086,7 +3078,6 @@ int SCTextField::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 	}
 
 	if (strcmp(name, "align")==0) {
-		int align;
 		if (IsSym(slot)) {
 			[[mTextField window] endEditingFor:mTextField];
 			if (slotRawSymbol(slot)->name[0] == 'l')      [mTextField setAlignment: NSLeftTextAlignment];
@@ -3269,7 +3260,9 @@ void SCTextField::beginDrag(SCPoint where)
 		slotCopy(&slot, &g->classvars->slots[classVarIndex]);
 		slotCopy(&stringSlot, &g->classvars->slots[classVarIndex+1]);
 		if (isKindOfSlot(&stringSlot, class_string)) {
-			string = [NSString stringWithCString: slotRawString(&stringSlot)->s length: slotRawString(&stringSlot)->size];
+			PyrString *pstring = slotRawString(&stringSlot);
+			string = [NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]];
+			string = [string substringToIndex: pstring->size];
 		}
 		if(mDragLabel) label = mDragLabel;
 	}

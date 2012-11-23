@@ -1,12 +1,15 @@
 QFont {
-  classvar defaultSansFace, defaultSerifFace, defaultMonoFace;
+  classvar <defaultSansFace, <defaultSerifFace, <defaultMonoFace;
+
   var <>name, <size, <>bold, <>italic, <hasPointSize=false;
   /* ----------------- class -------------------*/
 
   *implementsClass {^'Font'}
 
   *initClass {
-
+    defaultSansFace = this.prDefaultFamilyForStyle(0);
+    defaultSerifFace = this.prDefaultFamilyForStyle(1);
+    defaultMonoFace = this.prDefaultFamilyForStyle(2);
   }
 
   *new { arg name, size, bold = false, italic = false, usePointSize = false;
@@ -23,20 +26,16 @@ QFont {
   *smoothing_ { arg flag;
   }
 
-  *defaultSansFace {
-    ^"sans-serif";
-  }
-
-  *defaultSerifFace {
-    ^"serif";
-  }
-
-  *defaultMonoFace {
-    ^"monospace";
-  }
-
   *default {
     ^QFont();
+  }
+
+  *default_ { arg font;
+    this.setDefault(font);
+  }
+
+  *setDefault { arg font, class;
+    this.prSetDefault(font, class !? {class.qtClass});
   }
 
   *monospace {|size, bold = false, italic = false, usePointSize = false|
@@ -53,7 +52,8 @@ QFont {
 
   /* ------------------instance------------------*/
 
-  setDefault {
+  setDefault { arg class;
+    QFont.setDefault(this, class);
   }
 
   boldVariant {
@@ -91,4 +91,13 @@ QFont {
 
   /* ------------------ private -----------------*/
 
+  *prSetDefault { arg font, className;
+    _QFont_SetDefaultFont
+    ^this.primitiveFailed;
+  }
+
+  *prDefaultFamilyForStyle { arg style = -1;
+    _QFont_DefaultFamilyForStyle
+    ^this.primitiveFailed;
+  }
 }

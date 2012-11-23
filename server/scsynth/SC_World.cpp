@@ -146,6 +146,11 @@ void* zalloc(size_t n, size_t size)
 	return zalloc_(n, size);
 }
 
+void zfree(void * ptr)
+{
+	return free(ptr);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -536,6 +541,8 @@ SC_DLLEXPORT_C void World_NonRealTimeSynthesis(struct World *world, WorldOptions
 		inOptions->mNonRealTimeOutputHeaderFormat, inOptions->mNonRealTimeOutputSampleFormat);
 
 	world->hw->mNRTOutputFile = sf_open(inOptions->mNonRealTimeOutputFilename, SFM_WRITE, &outputFileInfo);
+	sf_command(world->hw->mNRTOutputFile, SFC_SET_CLIPPING, NULL, SF_TRUE);
+
 	if (!world->hw->mNRTOutputFile)
 		throw std::runtime_error("Couldn't open non real time output file.\n");
 
@@ -646,9 +653,9 @@ SC_DLLEXPORT_C void World_NonRealTimeSynthesis(struct World *world, WorldOptions
 
 				PerformOSCBundle(world, &packet);
 				if (nextOSCPacket(cmdFile, &packet, schedTime)) { run = false; break; }
-	if(inOptions->mVerbosity >= 0) {
-        printf("nextOSCPacket %g\n", schedTime * oscToSeconds);
-	}
+				if(inOptions->mVerbosity >= 0) {
+					printf("nextOSCPacket %g\n", schedTime * oscToSeconds);
+				}
 				if (schedTime < prevTime) {
 					scprintf("ERROR: Packet time stamps out-of-order.\n");
 					run = false;
@@ -663,23 +670,23 @@ SC_DLLEXPORT_C void World_NonRealTimeSynthesis(struct World *world, WorldOptions
 			float *outBus = outputBuses;
 			for (int j=0; j<numOutputChannels; ++j, outBus += bufLength) {
 				float *outFileBufPtr = outBufPos + j;
-                                if (outputTouched[j] == bufCounter) {
-                                    for (int k=0; k<bufLength; ++k) {
-                                            *outFileBufPtr = outBus[k];
-                                            outFileBufPtr += numOutputChannels;
-                                    }
-                                } else {
-                                    for (int k=0; k<bufLength; ++k) {
-                                            *outFileBufPtr = 0.f;
-                                            outFileBufPtr += numOutputChannels;
-                                    }
-                                }
+				if (outputTouched[j] == bufCounter) {
+					for (int k=0; k<bufLength; ++k) {
+						*outFileBufPtr = outBus[k];
+						outFileBufPtr += numOutputChannels;
+					}
+				} else {
+					for (int k=0; k<bufLength; ++k) {
+						*outFileBufPtr = 0.f;
+						outFileBufPtr += numOutputChannels;
+					}
+				}
 			}
 			bufFramesCalculated += bufLength;
 			inBufPos += inBufStep;
 			outBufPos += outBufStep;
 			world->mBufCounter++;
-                        oscTime = nextTime;
+			oscTime = nextTime;
 		}
 
 Bail:
@@ -687,14 +694,14 @@ Bail:
 		sf_writef_float(world->hw->mNRTOutputFile, outputFileBuf, bufFramesCalculated);
 	}
 
-        if (cmdFile != stdin) fclose(cmdFile);
+	if (cmdFile != stdin) fclose(cmdFile);
 	sf_close(world->hw->mNRTOutputFile);
-        world->hw->mNRTOutputFile = 0;
+	world->hw->mNRTOutputFile = 0;
 
 	if (world->hw->mNRTInputFile) {
-            sf_close(world->hw->mNRTInputFile);
-            world->hw->mNRTInputFile = 0;
-        }
+		sf_close(world->hw->mNRTInputFile);
+		world->hw->mNRTInputFile = 0;
+	}
 
 	World_Cleanup(world);
 }
@@ -932,7 +939,7 @@ void World_Start(World *inWorld)
 	for (uint32 i=0; i<inWorld->mNumAudioBusChannels; ++i) inWorld->mAudioBusTouched[i] = -1;
 	for (uint32 i=0; i<inWorld->mNumControlBusChannels; ++i) inWorld->mControlBusTouched[i] = -1;
 
-	inWorld->hw->mWireBufSpace = (float*)malloc(inWorld->hw->mMaxWireBufs * inWorld->mBufLength * sizeof(float));
+	inWorld->hw->mWireBufSpace = (float*)sc_malloc(inWorld->hw->mMaxWireBufs * inWorld->mBufLength * sizeof(float));
 
 	inWorld->hw->mTriggers.MakeEmpty();
 	inWorld->hw->mNodeMsgs.MakeEmpty();
@@ -954,7 +961,7 @@ SC_DLLEXPORT_C void World_Cleanup(World *world)
 
 	world->mDriverLock->Lock(); // never unlock..
 	if (hw) {
-		free(hw->mWireBufSpace);
+		sc_free(hw->mWireBufSpace);
 		delete hw->mAudioDriver;
 		hw->mAudioDriver = 0;
 	}

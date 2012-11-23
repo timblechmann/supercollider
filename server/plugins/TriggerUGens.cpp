@@ -838,7 +838,6 @@ void SendReply_next_aka(SendReply *unit, int inNumSamples)
 {
 	float *trig = IN(0);
 	float prevtrig = unit->m_prevtrig;
-	float *invalues = IN(unit->m_valueOffset);
 	float *values = unit->m_values;
 	int valueSize = unit->m_valueSize;
 	int valueOffset = unit->m_valueOffset;
@@ -879,7 +878,7 @@ void Poll_Ctor(Poll* unit)
 		};
 	unit->m_id_string[(int)unit->m_id] = '\0';
 
-	unit->m_mayprint = unit->mWorld->mVerbosity >= 0;
+	unit->m_mayprint = unit->mWorld->mVerbosity >= -1;
 
 	Poll_next_kk(unit, 1);
 }

@@ -349,19 +349,6 @@ SoundFile {
 		^outFile
 	}
 
-		// diskIn synthdefs are now created on demand in SoundFile:cue
-//	*initClass {
-//		StartUp.add {
-//			(1..16).do { | i |
-//				SynthDef("diskIn" ++ i, { | out, amp = 1, bufnum, sustain, ar = 0, dr = 0.01 gate = 1 |
-//					Out.ar(out, DiskIn.ar(i, bufnum)
-//					* Linen.kr(gate, ar, 1, dr, 2)
-//					* EnvGen.kr(Env.linen(ar, sustain - ar - dr max: 0 ,dr),1, doneAction: 2) * amp)
-//				}).store
-//			}
-//		};
-//	}
-
 	info { | path |
 		var flag = this.openRead;
 		if (flag) {
@@ -384,10 +371,12 @@ SoundFile {
 		if (server.serverRunning) {
 			^SoundFile.collect(path)
 				.collect { |  sf |
-					Buffer(server, sf.numFrames, sf.numChannels).allocRead(sf.path)
+					Buffer(server, sf.numFrames, sf.numChannels)
+					.allocRead(sf.path)
+					.sampleRate_(sf.sampleRate);
 				}
 		} {
-			"the server must be running to collection soundfiles into buffers ".error
+			"the server must be running to collect soundfiles into buffers".error
 		}
 	}
 
@@ -411,8 +400,8 @@ SoundFile {
 		^buffer
 	}
 
-	cue { | ev, playNow = false |
-		var server, packet, defname = "diskIn" ++ numChannels, condition;
+	cue { | ev, playNow = false, closeWhenDone = false |
+		var server, packet, defname = "diskIn" ++ numChannels, condition, onClose;
 		ev = ev ? ();
 		if (this.numFrames == 0) { this.info };
 		fork {
@@ -440,13 +429,10 @@ SoundFile {
 							["/b_free", ev[\bufnum] ]  )
 				};
 				~setwatchers = { |ev|
-					OSCpathResponder(server.addr, ["/n_end", ev[\id][0]],
-					{ | time, resp, msg |
+					OSCFunc({
 						server.sendBundle(server.latency, ["/b_close", ev[\bufnum]],
-						["/b_read", ev[\bufnum], path, ev[\firstFrame], ev[\bufferSize], 0, 1]);
-						resp.remove;
-					}
-					).add;
+							["/b_read", ev[\bufnum], path, ev[\firstFrame], ev[\bufferSize], 0, 1]);
+					}, "/n_end", server.addr, nil, ev[\id][0]).oneShot;
 				};
 				if (playNow) {
 					packet = server.makeBundle(false, {ev.play})[0];
@@ -459,6 +445,13 @@ SoundFile {
 							["/b_read", ~bufnum, path, ~firstFrame, ~bufferSize, 0, 1, packet]
 						]);
 			};
+		};
+		if (closeWhenDone) {
+			onClose = SimpleController(ev).put(\n_end, {
+				ev.close;
+				onClose.remove;
+			});
+			ev.addDependant(onClose)
 		};
 		^ev;
 	}
@@ -523,5 +516,4 @@ SoundFile {
 
 		action.value(outpath);
 	}
-
 }

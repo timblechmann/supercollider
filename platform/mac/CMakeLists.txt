@@ -23,16 +23,18 @@ include_directories(
 	${CMAKE_SOURCE_DIR}/include/lang
 	${CMAKE_SOURCE_DIR}/include/plugin_interface
 	${CMAKE_SOURCE_DIR}/include/server
+	${CMAKE_SOURCE_DIR}/common
 	${CMAKE_SOURCE_DIR}/editors/scapp/include
 	${CMAKE_SOURCE_DIR}/editors/scapp/include/SMLAdvancedFind
 	${CMAKE_SOURCE_DIR}/editors/scapp/include/SMLAdvancedFind/ICU
 	${CMAKE_SOURCE_DIR}/external_libraries/icu/
 	${CMAKE_SOURCE_DIR}/external_libraries/icu/unicode/
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/${HID_UTIL_DIR}
-	${CMAKE_SOURCE_DIR}/external_libraries/boost_lockfree
+	${CMAKE_SOURCE_DIR}/external_libraries/boost-lockfree
 	${CMAKE_SOURCE_DIR}/external_libraries/boost
 	${CMAKE_SOURCE_DIR}/external_libraries/threadpool
-	${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.3.0/include
+	${YAMLCPP_INCLUDE_DIR}
+
 	${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src
 	)
 
@@ -63,7 +65,6 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/lang/LangSource/DumpParseNode.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/GC.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/InitAlloc.cpp
-	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrFileUtils.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrInterpreter3.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrLexer.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrMathOps.cpp
@@ -73,7 +74,7 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrParseNode.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrSignal.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrSymbolTable.cpp
-	${CMAKE_SOURCE_DIR}/lang/LangSource/SC_LibraryConfig.cpp
+	${CMAKE_SOURCE_DIR}/lang/LangSource/SC_LanguageConfig.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/Samp.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/SimpleStack.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/VMGlobals.cpp
@@ -95,6 +96,8 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/common/SC_StandAloneInfo_Darwin.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_StringBuffer.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_StringParser.cpp
+	${CMAKE_SOURCE_DIR}/common/SC_TextUtils.cpp
+
 	${CMAKE_SOURCE_DIR}/common/scsynthsend.cpp
 	${CMAKE_SOURCE_DIR}/common/sc_popen.cpp
 
@@ -131,7 +134,7 @@ set(scapp_sources
 	)
 
 file(GLOB boost_system_sources ${CMAKE_SOURCE_DIR}/external_libraries/boost/libs/system/src/*cpp)
-file(GLOB boost_fs_sources ${CMAKE_SOURCE_DIR}/external_libraries/boost/libs/filesystem/v3/src/*cpp)
+file(GLOB boost_fs_sources ${CMAKE_SOURCE_DIR}/external_libraries/boost/libs/filesystem/src/*cpp)
 file(GLOB boost_regex_sources ${CMAKE_SOURCE_DIR}/external_libraries/boost/libs/regex/src/*cpp)
 list(APPEND scapp_sources ${boost_fs_sources} ${boost_system_sources} ${boost_regex_sources})
 
@@ -230,7 +233,7 @@ if (Boost_FOUND)
 else()
 	target_link_libraries(${scappbundlename} boost_thread)
 endif()
-target_link_libraries(${scappbundlename} yaml)
+target_link_libraries(${scappbundlename} ${YAMLCPP_LIBRARY})
 
 target_link_libraries(${scappbundlename} "-framework ApplicationServices")
 target_link_libraries(${scappbundlename} "-framework Carbon")

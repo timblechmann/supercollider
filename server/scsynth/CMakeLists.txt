@@ -9,7 +9,7 @@ if (FFT_GREEN)
 elseif (APPLE)
 	add_definitions("-DSC_FFT_VDSP")
 else()
-	find_package(FFTW3f)
+	find_package(FFTW3f 3.3)
 
 	if (FFTW3F_FOUND)
 		add_definitions("-DSC_FFT_FFTW")
@@ -18,6 +18,9 @@ else()
 	endif()
 endif()
 
+if(NOVA_SIMD)
+	add_definitions(-DNOVA_SIMD)
+endif()
 
 if (NO_AVAHI)
 
@@ -207,16 +210,20 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 	target_link_libraries(libscsynth rt)
 endif()
 
+file(GLOB_RECURSE all_headers ../../*hpp)
 
-add_executable(scsynth scsynth_main.cpp)
+add_executable(scsynth scsynth_main.cpp ${all_headers})
 target_link_libraries(scsynth libscsynth ${PTHREADS_LIBRARY})
 
 if(LTO)
     set_property(TARGET scsynth libscsynth
                  APPEND PROPERTY COMPILE_FLAGS "-flto -flto-report")
 
-    set_property(TARGET scsynth libscsynth
+    set_property(TARGET scsynth
                  APPEND PROPERTY LINK_FLAGS "-flto -flto-report -fwhole-program")
+
+    set_property(TARGET libscsynth
+                 APPEND PROPERTY LINK_FLAGS "-flto -flto-report")
 endif()
 
 if (LIBSCSYNTH)

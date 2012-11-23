@@ -25,6 +25,7 @@
 #include "SC_UnitDef.h"
 #include "SC_BufGen.h"
 #include "SC_World.h"
+#include "SC_WorldOptions.h"
 #include "SC_StringParser.h"
 #include "SC_InterfaceTable.h"
 #include "SC_DirUtils.h"
@@ -255,6 +256,16 @@ bool checkAPIVersion(void * f, const char * filename)
 	return false;
 }
 
+bool checkServerVersion(void * f, const char * filename)
+{
+	if (f) {
+		InfoFunction fn = (InfoFunction)f;
+		if ((*fn)() == 1)
+			return false;
+	}
+	return true;
+}
+
 static bool PlugIn_Load(const char *filename)
 {
 #ifdef _WIN32
@@ -272,6 +283,12 @@ static bool PlugIn_Load(const char *filename)
 
 	void *apiVersionPtr = (void *)GetProcAddress( hinstance, "api_version" );
 	if (!checkAPIVersion(apiVersionPtr, filename)) {
+		FreeLibrary(hinstance);
+		return false;
+	}
+
+	void *serverCheckPtr = (void *)GetProcAddress( hinstance, "server_type" );
+	if (!checkServerVersion(serverCheckPtr , filename)) {
 		FreeLibrary(hinstance);
 		return false;
 	}
@@ -307,6 +324,12 @@ static bool PlugIn_Load(const char *filename)
 
 	void *apiVersionPtr = (void *)dlsym( handle, "api_version" );
 	if (!checkAPIVersion(apiVersionPtr, filename)) {
+		dlclose(handle);
+		return false;
+	}
+
+	void *serverCheckPtr = (void *)dlsym( handle, "server_type" );
+	if (!checkServerVersion(serverCheckPtr , filename)) {
 		dlclose(handle);
 		return false;
 	}

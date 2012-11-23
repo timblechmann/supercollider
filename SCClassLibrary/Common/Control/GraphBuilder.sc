@@ -141,7 +141,7 @@ NamedControl {
 		};
 
 		^if(lags.notNil) {
-			res.control.lag(lags.asArray)
+			res.control.lag(lags.asArray).unbubble
 		} {
 			res.control
 		}
@@ -169,7 +169,7 @@ NamedControl {
 					control = TrigControl.kr(values.flat.unbubble);
 				} {
 					if(prefix == $i or: {rate === \scalar}) {
-						buildSynthDef.addIr(name, values);
+						buildSynthDef.addIr(name, values.unbubble);
 						control = Control.ir(values.flat.unbubble);
 					} {
 						buildSynthDef.addKr(name, values.unbubble);

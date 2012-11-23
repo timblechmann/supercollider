@@ -21,109 +21,89 @@
 #ifndef SCIDE_WIDGETS_CODE_EDITOR_EDITOR_HPP_INCLUDED
 #define SCIDE_WIDGETS_CODE_EDITOR_EDITOR_HPP_INCLUDED
 
-#include <QGraphicsScene>
 #include <QPlainTextEdit>
-#include <QTextBlock>
+#include <QGraphicsScene>
+#include <QList>
 
-namespace ScIDE
-{
+namespace ScIDE {
 
 namespace Settings { class Manager; }
 
 class Document;
-class CodeEditor;
 
-class LineIndicator : public QWidget
-{
-    Q_OBJECT
-
-public:
-    LineIndicator( CodeEditor *editor );
-Q_SIGNALS:
-    void widthChanged();
-public Q_SLOTS:
-    void setLineCount( int );
-protected:
-    virtual void changeEvent( QEvent * );
-    virtual void paintEvent( QPaintEvent *e );
-private:
-    int widthForLineCount( int lineCount );
-
-    CodeEditor *mEditor;
-    int mLineCount;
-};
-
-class CodeEditor : public QPlainTextEdit
+class GenericCodeEditor : public QPlainTextEdit
 {
     Q_OBJECT
 
     friend class LineIndicator;
 
 public:
-    CodeEditor( QWidget *parent = 0 );
+    GenericCodeEditor (Document *, QWidget * parent = NULL);
+
     Document *document() { return mDoc; }
+    QTextDocument *textDocument() { return QPlainTextEdit::document(); }
     void setDocument( Document * );
-    bool showWhitespace() { return mShowWhitespace; }
-    void setIndentWidth( int );
+    bool showWhitespace();
     bool find( const QRegExp &expr, QTextDocument::FindFlags options = 0);
     bool replace( const QRegExp &expr, const QString &replacement, QTextDocument::FindFlags options = 0);
     int findAll( const QRegExp &expr, QTextDocument::FindFlags options = 0 );
     int replaceAll( const QRegExp &expr, const QString &replacement,
                     QTextDocument::FindFlags options = 0 );
-    QTextCursor currentRegion();
-    void blinkCode( const QTextCursor & c );
-    void showPosition( int );
 
-public Q_SLOTS:
-    void zoomIn(int steps = 1);
-    void zoomOut(int steps = 1);
-    void indentMore() { indent(false); }
-    void indentLess() { indent(true); }
-    void setSpaceIndent(bool on) { mSpaceIndent = on; }
-    void setShowWhitespace(bool);
-    void clearSearchHighlighting();
-    void applySettings( Settings::Manager * );
+    void showPosition( int charPosition, int selectionLength );
+    QString symbolUnderCursor();
 
 protected:
     virtual bool event( QEvent * );
-    virtual void changeEvent( QEvent * );
     virtual void keyPressEvent( QKeyEvent * );
-    virtual void mouseReleaseEvent ( QMouseEvent * );
-    virtual void mouseDoubleClickEvent ( QMouseEvent * );
-    virtual void mouseMoveEvent( QMouseEvent * );
-    virtual void paintEvent( QPaintEvent * );
+    virtual void wheelEvent( QWheelEvent * );
+    virtual void dragEnterEvent( QDragEnterEvent * );
+    void hideMouseCursor(QKeyEvent *);
+    virtual QMimeData *createMimeDataFromSelection() const;
 
-private Q_SLOTS:
+public slots:
+    void applySettings( Settings::Manager * );
+    void zoomIn(int steps = 1);
+    void zoomOut(int steps = 1);
+    void resetFontSize();
+    void setShowWhitespace(bool);
+    void clearSearchHighlighting();
+    void toggleOverwriteMode();
+    void copyLineUp();
+    void copyLineDown();
+    void moveLineUp();
+    void moveLineDown();
+    void gotoPreviousEmptyLine();
+    void gotoNextEmptyLine();
+
+protected slots:
     void updateLayout();
     void updateLineIndicator( QRect, int );
-    void matchBrackets();
-    void onOverlayChanged ( const QList<QRectF> & region );
+    void onDocumentFontChanged();
 
-private:
-    struct BracketMatch {
-        int pos;
-        int matchPos;
-    };
-
+protected:
     void resizeEvent( QResizeEvent * );
     void paintLineIndicator( QPaintEvent * );
-    void indent( bool less );
-    void matchBracket( const QTextBlock & block, int pos, BracketMatch & match );
-    int indentedStartOfLine( const QTextBlock & );
-    void updateExtraSelections();
+    virtual void updateExtraSelections();
+    virtual void indentCurrentRegion() {}
 
-    LineIndicator *mLineIndicator;
-    Document *mDoc;
-    int mIndentWidth;
-    bool mSpaceIndent;
-    bool mShowWhitespace;
-    QColor mBracketHighlight;
+    void zoomFont(int steps);
 
-    QList<QTextEdit::ExtraSelection> mBracketSelections;
-    QList<QTextEdit::ExtraSelection> mSearchSelections;
-    bool mMouseBracketMatch;
+    void copyUpDown(bool up);
+    void moveLineUpDown(bool up);
+    void gotoEmptyLineUpDown(bool up);
 
+    void hideMouseCursor();
+
+    class LineIndicator *mLineIndicator;
     QGraphicsScene *mOverlay;
+    QWidget *mOverlayWidget;
+
+    Document *mDoc;
+
+    QTextCharFormat mSearchResultTextFormat;
+
+    QList<QTextEdit::ExtraSelection> mSearchSelections;
 };
 
 } // namespace ScIDE

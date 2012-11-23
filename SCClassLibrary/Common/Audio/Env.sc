@@ -3,12 +3,12 @@ Env {
 	var <releaseNode;	// index of release level, if nil then ignore release
 	var <loopNode;	// index of loop start level, if nil then does not loop
 	var <offset; 		// an offset to all time values (only works in IEnvGen)
-	
+
 	var <array;		// cache for osc-conform data
 	classvar <shapeNames;
 
-	
-	*new { arg levels = #[0,1,0], times = #[1,1], curve = \lin, releaseNode, loopNode, offset;
+
+	*new { arg levels = #[0,1,0], times = #[1,1], curve = \lin, releaseNode, loopNode, offset = 0;
 		times = times.asArray.wrapExtend(levels.size - 1);
 		^super.newCopyArgs(levels, times, curve ? \lin, releaseNode, loopNode, offset)
 	}
@@ -34,6 +34,7 @@ Env {
 			\cub -> 7,
 			\cubed -> 7
 		];
+		shapeNames.freeze;
 	}
 
 	kr { arg doneAction = 0, gate = 1.0, timeScale = 1.0, mul = 1.0, add = 0.0;
@@ -70,11 +71,16 @@ Env {
 	}
 
 	duration_ { arg dur;
-		times = times.normalizeSum * dur
+		times = times * this.totalDuration.reciprocal * dur
 	}
 
 	duration {
 		^times.sum
+	}
+
+	totalDuration {
+		var duration = times.sum;
+		^duration.asArray.maxItem;
 	}
 
 	range { arg lo = 0.0, hi = 1.0;
@@ -196,15 +202,25 @@ Env {
 		^releaseNode.notNil
 	}
 
-	asSignal { arg length = 400;
-		^this.asMultichannelArray.collect { |chan|
-			var duration, signal, ratio;
-			duration = chan[5, 9 ..].sum;
-			ratio = duration / (length - 1);
-			signal = Signal(length);
+	asMultichannelSignal { arg length = 400, class = (Signal);
+		var multiChannelArray = this.asMultichannelArray;
+		var channelCount = multiChannelArray.size;
+
+		var totalDur = this.totalDuration;
+
+		length = max(length, levels.size);
+
+		^multiChannelArray.collect { |chan|
+			var signal, ratio;
+			ratio = totalDur / (length - 1);
+			signal = class.new(length);
 			length.do { arg i; signal.add(chan.envAt(i * ratio)) };
 			signal
-		}.unbubble
+		}
+	}
+
+	asSignal { arg length = 400;
+		^this.asMultichannelSignal(length).unbubble
 	}
 
 	discretize { arg n = 1024;
@@ -223,6 +239,7 @@ Env {
 
 	at { arg time;
 		var data = this.asMultichannelArray;
+		time = (time - offset).max(0);
 		^if(time.isSequenceableCollection) {
 			if(data.size <= 1) {
 				data = data[0];
@@ -379,7 +396,7 @@ Env {
 		contents.add(size);
 		contents.add(releaseNode.asUGenInput ? -99);
 		contents.add(loopNode.asUGenInput ? -99);
-		
+
 		size.do { arg i;
 			contents.add(levelArray.at(i+1));
 			contents.add(timeArray.at(i));
@@ -389,6 +406,6 @@ Env {
 
 		^contents.flop;
 	}
-	
-	
+
+
 }

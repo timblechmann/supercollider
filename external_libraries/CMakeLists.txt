@@ -26,8 +26,8 @@ if(NOT Boost_FOUND) # we compile boost ourselves
 		aux_source_directory(boost/libs/system/src/ boost_system )
 		add_library(boost_system STATIC ${boost_system})
 
-		aux_source_directory(boost/libs/filesystem/v3/src boost_filesystem_v3)
-		add_library(boost_filesystem STATIC ${boost_filesystem_v2} ${boost_filesystem_v3})
+		aux_source_directory(boost/libs/filesystem/src boost_filesystem_src)
+		add_library(boost_filesystem STATIC ${boost_filesystem_src})
 
 		if(LTO)
 			set_property(TARGET boost_program_options boost_system boost_filesystem
@@ -36,10 +36,6 @@ if(NOT Boost_FOUND) # we compile boost ourselves
 			set_property(TARGET boost_program_options boost_system boost_filesystem
 						 APPEND PROPERTY LINK_FLAGS "-flto -flto-report")
 		endif()
-	endif()
-
-	if (${DSO_VISIBILITY})
-		remove_definitions(-fvisibility=hidden)
 	endif()
 
 	add_library(boost_thread STATIC ${boost_thread_src} ${boost_thread_platform})
@@ -70,9 +66,13 @@ if (SUPERNOVA)
 	endif()
 endif()
 
-# yaml-cpp
-include_directories(${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.3.0/include)
-aux_source_directory(${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.3.0/src yaml_src)
-CREATE_FINAL_FILE(${CMAKE_CURRENT_BINARY_DIR}/libyamlcpp.cpp ${yaml_src})
+if(NOT YAMLCPP_FOUND)
+  message(STATUS "using bundled libyaml-cpp")
 
-add_library(yaml STATIC ${CMAKE_CURRENT_BINARY_DIR}/libyamlcpp.cpp)
+  # yaml-cpp
+  include_directories(${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.3.0/include)
+  aux_source_directory(${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.3.0/src yaml_src)
+  CREATE_FINAL_FILE(${CMAKE_CURRENT_BINARY_DIR}/libyamlcpp.cpp ${yaml_src})
+
+  add_library(yaml STATIC ${CMAKE_CURRENT_BINARY_DIR}/libyamlcpp.cpp)
+endif()

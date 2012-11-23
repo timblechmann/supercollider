@@ -22,9 +22,8 @@
 #define SCIDE_WIDGETS_MULTI_EDITOR_HPP_INCLUDED
 
 #include <QWidget>
-#include <QTabWidget>
+#include <QTabBar>
 #include <QAction>
-#include <QSignalMapper>
 #include <QPushButton>
 #include <QToolButton>
 #include <QLineEdit>
@@ -32,13 +31,18 @@
 #include <QLabel>
 #include <QGridLayout>
 #include <QTextDocument>
+#include <QSplitter>
+#include <QSignalMapper>
 
 namespace ScIDE {
 
-class Main;
+class CodeEditorBox;
 class Document;
 class DocumentManager;
-class CodeEditor;
+class GenericCodeEditor;
+class Main;
+class MultiSplitter;
+class Session;
 class SignalMultiplexer;
 
 namespace Settings { class Manager; }
@@ -57,69 +61,116 @@ public:
         Cut,
         Copy,
         Paste,
-        IndentMore,
-        IndentLess,
+        IndentLineOrRegion,
+        TriggerAutoCompletion,
+        TriggerMethodCallAid,
+        ToggleComment,
+        ToggleOverwriteMode,
+
+        CopyLineUp,
+        CopyLineDown,
+        MoveLineUp,
+        MoveLineDown,
+
+        GotoPreviousBlock,
+        GotoNextBlock,
+        GotoPreviousRegion,
+        GotoNextRegion,
+        GotoPreviousEmptyLine,
+        GotoNextEmptyLine,
+
+        SelectRegion,
 
         // View
         EnlargeFont,
         ShrinkFont,
+        ResetFontSize,
         ShowWhitespace,
+        IndentWithSpaces,
 
-        // Browse
-        OpenClassDefinition,
+        NextDocument,
+        PreviousDocument,
+        SwitchDocument,
+
+        SplitHorizontally,
+        SplitVertically,
+        RemoveCurrentSplit,
+        RemoveAllSplits,
+
+        // Language
+        EvaluateCurrentDocument,
+        EvaluateRegion,
+        EvaluateLine,
 
         ActionRoleCount
     };
 
     MultiEditor( Main *, QWidget * parent = 0 );
 
-    int editorCount() { return mTabs->count(); }
+    int tabCount() { return mTabs->count(); }
+    Document * documentForTab( int index );
+    int tabForDocument( Document * doc );
 
-    CodeEditor *currentEditor()
-        { return editorForTab( mTabs->currentIndex() ); }
+    GenericCodeEditor *currentEditor();
+    CodeEditorBox *currentBox() { return mCurrentEditorBox; }
+    void split( Qt::Orientation direction );
 
     QAction * action( ActionRole role )
         { return mActions[role]; }
 
-    bool stepForwardEvaluation() { return mStepForwardEvaluation; }
+    void saveSession( Session * );
+    void switchSession( Session * );
 
-Q_SIGNALS:
-    void currentChanged( Document * );
+signals:
+    void currentDocumentChanged( Document * );
 
-public Q_SLOTS:
+public slots:
 
     void setCurrent( Document * );
 
-    void applySettings( Settings::Manager * );
+    void showNextDocument();
+    void showPreviousDocument();
+    void switchDocument();
 
-private Q_SLOTS:
+    void splitHorizontally() { split(Qt::Horizontal); }
+    void splitVertically() { split(Qt::Vertical); }
+    void removeCurrentSplit();
+    void removeAllSplits();
 
-    void onOpen( Document *, int initialCursorPosition );
+private slots:
+    void onOpen( Document *, int initialCursorPosition, int selectionLength );
     void onClose( Document * );
-    void show( Document *, int cursorPosition = -1 );
+    void show( Document *, int cursorPosition = -1, int selectionLenght = 0 );
     void update( Document * );
     void onCloseRequest( int index );
-    void onCurrentChanged( int index );
-    void onModificationChanged( QWidget * );
-    void openClassDefinition();
+    void onCurrentTabChanged( int index );
+    void onCurrentEditorChanged( GenericCodeEditor * );
+    void onBoxActivated( CodeEditorBox * );
+    void onDocModified( QObject * );
 
 private:
+    void makeSignalConnections();
+    void breakSignalConnections();
     void createActions();
     void updateActions();
-    CodeEditor * editorForTab( int index );
-    CodeEditor * editorForDocument( Document * );
+    int addTab( Document * );
+    CodeEditorBox *newBox();
+    void setCurrentBox( CodeEditorBox * );
+    void setCurrentEditor( GenericCodeEditor * );
+    void loadBoxState( CodeEditorBox *box, const QVariantList & data, const QList<Document *> & documentList );
+    void loadSplitterState( QSplitter *, const QVariantMap & data, const QList<Document *> & documentList );
 
-    DocumentManager * mDocManager;
-    SignalMultiplexer * mSigMux;
-    QSignalMapper mModificationMapper;
     QAction *mActions[ActionRoleCount];
 
-    // gui
-    QTabWidget *mTabs;
-    QIcon mDocModifiedIcon;
+    SignalMultiplexer * mEditorSigMux;
+    SignalMultiplexer * mBoxSigMux;
+    QSignalMapper mDocModifiedSigMap;
 
-    // settings
-    bool mStepForwardEvaluation;
+    // gui
+    QTabBar *mTabs;
+    CodeEditorBox *mCurrentEditorBox;
+    MultiSplitter *mSplitter;
+    QIcon mDocModifiedIcon;
 };
 
 } // namespace ScIDE

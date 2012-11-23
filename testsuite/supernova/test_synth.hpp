@@ -6,12 +6,17 @@ class test_synth:
     public abstract_synth
 {
 public:
-    test_synth(int node_id, synth_prototype_ptr const & prototype):
+    test_synth(int node_id, synth_definition_ptr const & prototype):
         abstract_synth(node_id, prototype)
     {}
 
     void run(void)
     {}
+
+    virtual float get(slot_index_t slot_id) const
+    {
+        return 0.f;
+    }
 
     virtual void set(slot_index_t slot_id, sample val)
     {}

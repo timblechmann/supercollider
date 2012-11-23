@@ -268,6 +268,11 @@ code::
 (a - clip2(a,b))
 ::
 
+method:: madd
+code::
+this * a + b
+::
+
 subsection:: testing
 method:: isPositive
 Answer if the number is >= 0.
@@ -883,6 +888,15 @@ code::
 75.partition(8, 3);
 75.partition(75, 1);
 ::
+
+
+subsection:: UGen Compatibility Methods
+
+Some methods to ease the development of generic ugen code.
+
+method:: lag, lag2, lag3, lagud, lag2ud, lag3ud, slew, varlag
+
+returns:: code::this::
 
 
 subsection:: misc

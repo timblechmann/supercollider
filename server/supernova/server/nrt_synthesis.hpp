@@ -19,8 +19,8 @@
 #define SERVER_NRT_SYNTHESIS_HPP
 
 #include <iostream>
-#include <string>
 #include <fstream>
+#include <string>
 
 #include <boost/integer/endian.hpp>
 
@@ -29,8 +29,7 @@
 #include "audio_backend/sndfile_backend.hpp"
 #include "sc/sc_plugin_interface.hpp"
 
-namespace nova
-{
+namespace nova {
 
 struct non_rt_functor
 {
@@ -59,7 +58,7 @@ struct non_realtime_synthesis_engine
         if (input_file == string("_"))
             input_file.clear();
 
-        backend.open_client(input_file, args.output_file, args.samplerate, format, args.output_channels);
+        backend.open_client(input_file, args.output_file, args.samplerate, format, args.output_channels, args.blocksize);
 
         command_stream.open(args.command_file.c_str(), std::fstream::in | std::fstream::binary);
 
@@ -84,16 +83,13 @@ struct non_realtime_synthesis_engine
 
     void run(void)
     {
-        backend.activate_audio();
-
-        boost::array<char, 16384> packet_buffer;
-
         using namespace std;
+        array<char, 16384> packet_buffer;
 
         cout << "Starting non-rt synthesis" << endl;
+        backend.activate_audio();
 
-        while (!command_stream.eof())
-        {
+        while (!command_stream.eof()) {
             boost::integer::big32_t packet_size;
             command_stream.read((char*)&packet_size, sizeof(packet_size));
 
@@ -104,12 +100,11 @@ struct non_realtime_synthesis_engine
 
             cout << "Next OSC bundle " << bundle_time.get_secs() << "." << bundle_time.get_nanoseconds() << endl;
 
-            while (instance->current_time() < bundle_time)
-            {
+            while (instance->current_time() < bundle_time) {
                 if (has_inputs)
-                    backend.audio_fn(64);
+                    backend.audio_fn(samples_per_block);
                 else
-                    backend.audio_fn_noinput(64);
+                    backend.audio_fn_noinput(samples_per_block);
             }
         }
         backend.deactivate_audio();

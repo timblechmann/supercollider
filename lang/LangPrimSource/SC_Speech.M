@@ -147,7 +147,6 @@ int prSpeakText(struct VMGlobals *g, int numArgsPushed);
 int prSpeakText(struct VMGlobals *g, int numArgsPushed){
 
 	OSErr theErr = noErr;
-	PyrSlot *obj = g->sp-2;
 	PyrSlot *a = g->sp-1;
 	PyrSlot *str = g->sp;
 
@@ -156,7 +155,6 @@ int prSpeakText(struct VMGlobals *g, int numArgsPushed){
 
 	slotIntVal(a, &chan);
 	chan = sc_clip(chan, 0, kMaxSpeechChannels);
-	PyrString* pyrString = slotRawString(str);
 #ifdef useCarbonSpeech
 	chan = sc_clip(chan, 0, kMaxSpeechChannels);
 	if(speechStrings[chan] != NULL) {
@@ -312,7 +310,6 @@ int prSetSpeechPause(struct VMGlobals *g, int numArgsPushed){
 int prSetSpeechStop(struct VMGlobals *g, int numArgsPushed);
 int prSetSpeechStop(struct VMGlobals *g, int numArgsPushed){
 
-	OSErr theErr = noErr;
 	//PyrSlot *a = g->sp-2;
 	PyrSlot *b = g->sp-1;
 	PyrSlot *c = g->sp;
@@ -380,7 +377,7 @@ int prGetSpeechVoiceNames(struct VMGlobals *g, int numArgsPushed){
 		NSDictionary * dictionaryOfVoiceAttributes = [NSSpeechSynthesizer attributesForVoice:aVoice];
 		NSString *	voiceDisplayName = [dictionaryOfVoiceAttributes objectForKey:NSVoiceName];
 
-		PyrString *namestring = newPyrString(g->gc, [voiceDisplayName cString], 0, true);
+		PyrString *namestring = newPyrString(g->gc, [voiceDisplayName cStringUsingEncoding:[NSString defaultCStringEncoding]], 0, true);
 		SetObject(allVoices->slots+allVoices->size++, namestring);
 		g->gc->GCWrite(allVoices, (PyrObject*) namestring);
 

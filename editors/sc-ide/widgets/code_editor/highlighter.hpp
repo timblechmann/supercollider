@@ -21,7 +21,7 @@
 #ifndef SCIDE_SC_SYNTAX_HIGHLIGHTER_HPP_INCLUDED
 #define SCIDE_SC_SYNTAX_HIGHLIGHTER_HPP_INCLUDED
 
-#include "brackets.hpp"
+#include "../../core/sc_lexer.hpp"
 
 #include <QSyntaxHighlighter>
 #include <QVector>
@@ -49,45 +49,12 @@ enum SyntaxFormat
     FormatCount
 };
 
-struct SyntaxRule
-{
-    enum Type
-    {
-        Identifier,
-        WhiteSpace,
-
-        Keyword,
-        Builtin,
-        Primitive,
-        Class,
-        Symbol,
-        String,
-        Char,
-        RadixFloat,
-        Float,
-        HexInt,
-        EnvVar,
-        SymbolArg,
-
-        SingleLineComment,
-        MultiLineCommentStart,
-
-        None
-    };
-
-    SyntaxRule(): type(None) {}
-    SyntaxRule( Type t, const QString &s ): type(t), expr(s) {}
-
-    Type type;
-    QRegExp expr;
-};
-
 class SyntaxHighlighterGlobals : public QObject
 {
     Q_OBJECT
 
 public:
-    SyntaxHighlighterGlobals( Main * );
+    SyntaxHighlighterGlobals( Main *, Settings::Manager * settings );
 
     inline const QTextCharFormat * formats() const
     {
@@ -110,14 +77,9 @@ Q_SIGNALS:
 private:
     friend class SyntaxHighlighter;
 
-    void initSyntaxRules();
-    void initKeywords();
-    void initBuiltins();
     void applySettings( Settings::Manager*, const QString &key, SyntaxFormat );
 
     QTextCharFormat mFormats[FormatCount];
-    QVector<SyntaxRule> mInCodeRules;
-    QRegExp mInSymbolRegexp, mInStringRegexp;
 
     static SyntaxHighlighterGlobals *mInstance;
 };
@@ -127,24 +89,15 @@ class SyntaxHighlighter:
 {
     Q_OBJECT
 
-    static const int inCode = 0;
-    static const int inString = 1;
-    static const int inSymbol = 2;
-    static const int inComment = 100;
-    // NOTE: Integers higher than inComment are reserved for multi line comments,
-    // and indicate the comment nesting level!
-
 public:
     SyntaxHighlighter(QTextDocument *parent = 0);
 
 private:
     void highlightBlock(const QString &text);
-    void highlightBlockInCode(const QString& text, int & currentIndex, int & currentState);
-    void highlightBlockInString(const QString& text, int & currentIndex, int & currentState);
-    void highlightBlockInSymbol(const QString& text, int & currentIndex, int & currentState);
-    void highlightBlockInComment(const QString& text, int & currentIndex, int & currentState);
-
-    SyntaxRule::Type findMatchingRule(QString const & text, int & currentIndex, int & lengthOfMatch);
+    void highlightBlockInCode(ScLexer & lexer);
+    void highlightBlockInString(ScLexer & lexer);
+    void highlightBlockInSymbol(ScLexer & lexer);
+    void highlightBlockInComment(ScLexer & lexer);
 
     const SyntaxHighlighterGlobals *mGlobals;
 };

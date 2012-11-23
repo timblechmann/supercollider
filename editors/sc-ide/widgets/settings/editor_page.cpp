@@ -28,24 +28,42 @@
 #include <QDebug>
 #include <QListWidgetItem>
 #include <QFontDatabase>
+#include <QApplication>
 
 namespace ScIDE { namespace Settings {
 
 EditorPage::EditorPage(QWidget *parent) :
     QWidget(parent),
-    ui( new Ui::EditorConfigPage ),
-    fontDatabase(new QFontDatabase)
+    fontDatabase(new QFontDatabase),
+    ui( new Ui::EditorConfigPage )
 {
     ui->setupUi(this);
 
-    new SyntaxHighlighter(static_cast<QPlainTextEdit*>(ui->fontPreview)->document());
+    connect( ui->tabs, SIGNAL(currentChanged(int)), this, SLOT(onCurrentTabChanged(int)) );
 
     connect( ui->onlyMonoFonts, SIGNAL(toggled(bool)), this, SLOT(onMonospaceToggle(bool)) );
-    connect( ui->fontList, SIGNAL(currentRowChanged(int)), this, SLOT(onFontFamilyChanged(int)) );
-    connect( ui->fontStyle, SIGNAL(currentRowChanged(int)), this, SLOT(onFontStyleChanged(int)) );
-    connect( ui->fontSize, SIGNAL(valueChanged(double)), this, SLOT(updateFontPreview()) );
-    connect( ui->textFormatList, SIGNAL(customContextMenuRequested(const QPoint&)),
-             this, SLOT(execSyntaxFormatContextMenu(const QPoint&)) );
+    connect( ui->fontCombo, SIGNAL(currentIndexChanged(QString)), this, SLOT(updateFontPreview()) );
+    connect( ui->fontSize, SIGNAL(valueChanged(int)), this, SLOT(updateFontPreview()) );
+    connect( ui->fontAntialias, SIGNAL(stateChanged(int)), this, SLOT(updateFontPreview()) );
+
+    connect( ui->textFormats, SIGNAL(currentItemChanged(QTreeWidgetItem *, QTreeWidgetItem*)),
+             this, SLOT(updateTextFormatEdit()) );
+    connect( ui->fgPicker, SIGNAL(colorPicked(QColor)),
+             this, SLOT(updateTextFormatDisplay()) );
+    connect( ui->bgPicker, SIGNAL(colorPicked(QColor)),
+             this, SLOT(updateTextFormatDisplay()) );
+    connect( ui->italicOption, SIGNAL(clicked()),
+             this, SLOT(updateTextFormatDisplay()) );
+    connect( ui->boldOption, SIGNAL(clicked()),
+             this, SLOT(updateTextFormatDisplay()) );
+    connect( ui->fgClearBtn, SIGNAL(clicked()), ui->fgPicker, SLOT(clear()) );
+    connect( ui->fgClearBtn, SIGNAL(clicked()),
+             this, SLOT(updateTextFormatDisplay()) );
+    connect( ui->bgClearBtn, SIGNAL(clicked()), ui->bgPicker, SLOT(clear()) );
+    connect( ui->bgClearBtn, SIGNAL(clicked()),
+             this, SLOT(updateTextFormatDisplay()) );
+
+    updateTextFormatEdit();
 }
 
 EditorPage::~EditorPage()
@@ -61,60 +79,137 @@ void EditorPage::load( Manager *s )
     ui->spaceIndent->setChecked( s->value("spaceIndent").toBool() );
     ui->indentWidth->setValue( s->value("indentWidth").toInt() );
     ui->stepForwardEvaluation->setChecked( s->value("stepForwardEvaluation").toBool() );
+    ui->editorLineWrap->setChecked( s->value("lineWrap").toBool() );
 
-    QFont f;
-    f.fromString(s->value("font").toString());
-    fontFamily = f.family();
-    fontStyle = fontDatabase->styleString(f);
+    ui->blinkDuration->setValue( s->value("blinkDuration").toInt() );
 
-    ui->fontList->clear();
-    int idx = 0;
-    QStringList fontFamilies = fontDatabase->families();
-    foreach(QString family, fontFamilies)
-    {
-        ui->fontList->addItem(family);
-        if(family.compare(fontFamily, Qt::CaseInsensitive) == 0)
-            idx = ui->fontList->count() - 1;
-    }
-    ui->fontList->setCurrentRow(idx);
-    ui->fontList->scrollToItem(ui->fontList->item(idx));
+    s->beginGroup("font");
+    QString fontFamily = s->value("family").toString();
+    int fontSize = s->value("size").toInt();
+    ui->fontAntialias->setChecked( s->value("antialias").toBool() );
 
-    int c = ui->fontStyle->count();
-    for(int i = 0; i < c; ++i) {
-        QString style = ui->fontStyle->item(i)->text();
-        if(style.compare(fontStyle, Qt::CaseInsensitive)==0) {
-            ui->fontStyle->setCurrentRow(i);
-            break;
-        }
-    }
+    s->endGroup();
 
-    ui->fontSize->setValue( f.pointSizeF() );
+    // Display info about the font that would actually be used:
+    QFont defaultFont = QApplication::font("QPlainTextEdit");
+    defaultFont.setFamily(fontFamily);
+    if (fontSize > 0)
+        defaultFont.setPointSize(fontSize);
+    defaultFont.setStyleHint( QFont::TypeWriter );
+
+    QFontInfo fontInfo( defaultFont );
+    fontFamily = fontInfo.family();
+    fontSize = fontInfo.pointSize();
+
+    populateFontList( ui->onlyMonoFonts->isChecked() );
+    int fontFamilyIndex = ui->fontCombo->findText( fontFamily, Qt::MatchFixedString );
+    ui->fontCombo->setCurrentIndex( fontFamilyIndex );
+
+    ui->fontSize->setValue( fontSize );
+
+    ui->textFormats->clear();
 
     s->beginGroup("colors");
-
-    ui->bgColor->setColor( s->value("background").value<QColor>() );
-    ui->textColor->setColor( s->value("text").value<QColor>() );
-    ui->bracketColor->setColor( s->value("matchingBrackets").value<QColor>() );
-    ui->evalCodeFg->setColor( s->value("evaluatedCodeText").value<QColor>() );
-    ui->evalCodeBg->setColor( s->value("evaluatedCodeBackground").value<QColor>() );
-    ui->lineNumbersFg->setColor( s->value("lineNumbers").value<QColor>() );
-    ui->lineNumbersBg->setColor( s->value("lineNumbersBackground").value<QColor>() );
-
+    loadGeneralTextFormats( s );
     s->endGroup(); // colors
 
     s->beginGroup("highlighting");
-
-    QStringList formatNames;
-    formatNames << "Keyword" << "BuiltIn" << "EnvVar" << "Class" << "Number"
-        << "Symbol" << "String" << "Char" << "Comment" << "Primitive";
-    foreach(const QString &name, formatNames)
-        ui->textFormatList->addFormat(name, s->value(name.toLower()).value<QTextCharFormat>());
-
+    loadSyntaxTextFormats( s );
     s->endGroup(); // highlighting
 
     s->endGroup(); // IDE/editor
 
-    ui->fontPreview->applySettings(s);
+    s->beginGroup("IDE/postWindow");
+    ui->postWindowScrollback->setValue( s->value("scrollback").toInt() );
+    ui->postWindowLineWrap->setChecked( s->value("lineWrap").toBool() );
+    s->endGroup();
+
+    updateFontPreview();
+    updateTextFormatDisplayCommons();
+
+    ui->textFormats->expandAll();
+}
+
+void EditorPage::loadGeneralTextFormats( Manager *settings )
+{
+    mGeneralFormatsItem = new QTreeWidgetItem( ui->textFormats );
+    mGeneralFormatsItem->setText(0, tr("General") );
+
+    // commont text format item is special - don't set foreground and background on the item!
+    mCommonTextFormatItem = new QTreeWidgetItem();
+    mCommonTextFormatItem->setText( 0, tr("Text") );
+    mCommonTextFormatItem->setData( 0, TextFormatConfigKeyRole, "text" );
+    mCommonTextFormatItem->setData( 0, TextFormatRole, settings->value( "text" ) );
+    mGeneralFormatsItem->addChild( mCommonTextFormatItem );
+
+    QPalette palette = QApplication::palette();
+
+    QTextCharFormat lineNumbersDefaultFormat;
+    lineNumbersDefaultFormat.setBackground( palette.brush(QPalette::Mid) );
+    lineNumbersDefaultFormat.setForeground( palette.brush(QPalette::ButtonText) );
+
+    addTextFormat( mGeneralFormatsItem, tr("Line Numbers"), "lineNumbers",
+                   settings->value( "lineNumbers" ).value<QTextCharFormat>(),
+                   lineNumbersDefaultFormat );
+
+    QTextCharFormat selectionDefaultFormat;
+    selectionDefaultFormat.setBackground( palette.brush(QPalette::Highlight) );
+    selectionDefaultFormat.setForeground( palette.brush(QPalette::HighlightedText) );
+
+    addTextFormat( mGeneralFormatsItem, tr("Selected Text"), "selection",
+                   settings->value( "selection" ).value<QTextCharFormat>(),
+                   selectionDefaultFormat );
+
+    static char const * const keys[] = {
+        "searchResult", "matchingBrackets", "mismatchedBrackets", "evaluatedCode"
+    };
+
+    static QStringList strings = QStringList()
+            << tr("Search Result") << tr("Matching Brackets")
+            << tr("Mismatched Brackets") << tr("Evaluated Code");
+
+    static int count = strings.count();
+
+    for (int idx = 0; idx < count; ++idx) {
+        QTextCharFormat format = settings->value( keys[idx] ).value<QTextCharFormat>();
+        addTextFormat( mGeneralFormatsItem, strings[idx], keys[idx], format );
+    }
+}
+
+void EditorPage::loadSyntaxTextFormats( Manager *settings )
+{
+    mSyntaxFormatsItem = new QTreeWidgetItem( ui->textFormats );
+    mSyntaxFormatsItem->setText(0, tr("Syntax Highlighting") );
+
+    static char const * const keys[] = {
+        "keyword", "built-in", "env-var", "class", "number",
+        "symbol", "string", "char", "comment", "primitive"
+    };
+
+    static QStringList strings = QStringList()
+            << tr("Keyword") << tr("Built-in Value") << tr("Environment Variable")
+            << tr("Class") << tr("Number") << tr("Symbol") << tr("String") << tr("Char")
+            << tr("Comment") << tr("Primitive");
+
+    static int count = strings.count();
+
+    for (int idx = 0; idx < count; ++idx) {
+        QTextCharFormat format = settings->value( keys[idx] ).value<QTextCharFormat>();
+        addTextFormat( mSyntaxFormatsItem, strings[idx], keys[idx], format );
+    }
+}
+
+void EditorPage::populateFontList( bool onlyMonospaced )
+{
+    ui->fontCombo->clear();
+    QStringList fontFamilies = fontDatabase->families();
+    foreach(QString family, fontFamilies)
+    {
+        if (onlyMonospaced && !fontDatabase->isFixedPitch(family))
+            continue;
+
+        ui->fontCombo->addItem(family);
+    }
 }
 
 void EditorPage::store( Manager *s )
@@ -124,140 +219,203 @@ void EditorPage::store( Manager *s )
     s->setValue("spaceIndent", ui->spaceIndent->isChecked());
     s->setValue("indentWidth", ui->indentWidth->value());
     s->setValue("stepForwardEvaluation", ui->stepForwardEvaluation->isChecked());
+    s->setValue("lineWrap", ui->editorLineWrap->isChecked());
 
-    QFont f = constructFont();
-    s->setValue("font", f.toString());
+    s->setValue("blinkDuration", ui->blinkDuration->value());
+
+    s->beginGroup("font");
+    QString fontFamily = ui->fontCombo->currentText();
+    if (!fontFamily.isEmpty())
+        s->setValue("family", fontFamily);
+    s->setValue("size", ui->fontSize->value());
+    s->setValue("antialias", ui->fontAntialias->checkState());
+    s->endGroup();
 
     s->beginGroup("colors");
 
-    s->setValue("background", ui->bgColor->color());
-    s->setValue("text", ui->textColor->color());
-    s->setValue("matchingBrackets", ui->bracketColor->color());
-    s->setValue("evaluatedCodeText", ui->evalCodeFg->color());
-    s->setValue("evaluatedCodeBackground", ui->evalCodeBg->color());
-    s->setValue("lineNumbers", ui->lineNumbersFg->color());
-    s->setValue("lineNumbersBackground", ui->lineNumbersBg->color());
+    int generalFormatCount = mGeneralFormatsItem->childCount();
+    for(int i = 0; i < generalFormatCount; ++i)
+    {
+        QTreeWidgetItem *item = mGeneralFormatsItem->child(i);
+        QTextCharFormat fm = item->data( 0, TextFormatRole).value<QTextCharFormat>();
+        QString key = item->data( 0, TextFormatConfigKeyRole ).toString();
+        s->setValue( key, QVariant::fromValue<QTextCharFormat>(fm) );
+    }
 
     s->endGroup(); // colors
 
     s->beginGroup("highlighting");
 
-    int formatCount = ui->textFormatList->count();
-    for(int i = 0; i < formatCount; ++i)
+    int syntaxFormatCount = mSyntaxFormatsItem->childCount();
+    for(int i = 0; i < syntaxFormatCount; ++i)
     {
-        QString name = ui->textFormatList->name(i);
-        QTextCharFormat fm = ui->textFormatList->format(i);
-        s->setValue(name.toLower(), QVariant::fromValue<QTextCharFormat>(fm));
+        QTreeWidgetItem *item =mSyntaxFormatsItem->child(i);
+        QTextCharFormat fm = item->data( 0, TextFormatRole).value<QTextCharFormat>();
+        QString key = item->data( 0, TextFormatConfigKeyRole ).toString();
+        s->setValue( key, QVariant::fromValue<QTextCharFormat>(fm) );
     }
 
     s->endGroup(); // highlighting
 
     s->endGroup();
+
+    s->beginGroup("IDE/postWindow");
+    s->setValue("scrollback", ui->postWindowScrollback->value());
+    s->setValue("lineWrap", ui->postWindowLineWrap->isChecked());
+    s->endGroup();
 }
 
-void EditorPage::onFontFamilyChanged(int idx)
+void EditorPage::onCurrentTabChanged(int)
 {
-    if(idx < 0) return;
-
-    Q_ASSERT(fontDatabase);
-
-    fontFamily = ui->fontList->item(idx)->text();
-
-    QStringList styles = fontDatabase->styles(fontFamily);
-    ui->fontStyle->clear();
-    int styleIdx = 0;
-    foreach(QString style, styles) {
-        ui->fontStyle->addItem(style);
-        if( style.compare("Regular", Qt::CaseInsensitive) == 0
-            || style.compare("Normal", Qt::CaseInsensitive) == 0
-        )
-            styleIdx = ui->fontStyle->count()-1;
-    }
-
-    ui->fontStyle->setCurrentRow(styleIdx);
-    updateFontPreview();
+    if (ui->tabs->currentWidget() == ui->colorsTab)
+        updateFontPreview();
 }
 
-void EditorPage::onFontStyleChanged(int idx)
+void EditorPage::onMonospaceToggle(bool onlyMonospaced)
 {
-    updateFontPreview();
-}
-
-void EditorPage::onMonospaceToggle(bool on)
-{
-    int c = ui->fontList->count();
-    for(int i = 0; i < c; ++i)
-    {
-        QListWidgetItem *item = ui->fontStyle->currentItem();
-        QString style;
-        if(item) style = item->text();
-
-        item = ui->fontList->item(i);
-        QString family = item->text();
-
-        item->setHidden(on && !fontDatabase->isFixedPitch(family, style));
-    }
+    populateFontList( onlyMonospaced );
 }
 
 void EditorPage::updateFontPreview()
 {
-    ui->fontPreview->setFont(constructFont());
+    if (ui->tabs->currentWidget() == ui->colorsTab)
+        ui->textFormats->setFont( constructFont() );
 }
 
 QFont EditorPage::constructFont()
 {
-    QString family, style;
-    double size;
+    QString family = ui->fontCombo->currentText();
+    int size = ui->fontSize->value();
+    bool antialias = (ui->fontAntialias->checkState() == Qt::Checked);
 
-    QListWidgetItem *item = ui->fontList->currentItem();
-    if(item)
-        family = item->text();
+    QFont font(family, size);
+    font.setStyleHint( QFont::TypeWriter );
 
-    item = ui->fontStyle->currentItem();
-    if(item)
-        style = item->text();
+    if (!antialias)
+        font.setStyleStrategy(QFont::StyleStrategy(font.styleStrategy() | QFont::NoAntialias));
 
-    size = ui->fontSize->value();
-
-    QFont f = fontDatabase->font(family, style, size);
-    f.setPointSizeF(size);
-
-    return f;
+    return font;
 }
 
-void EditorPage::execSyntaxFormatContextMenu(const QPoint &pos)
+QTreeWidgetItem * EditorPage::addTextFormat
+( QTreeWidgetItem * parent, const QString & name, const QString &key,
+  const QTextCharFormat & format, const QTextCharFormat &defaultFormat )
 {
-    int i = ui->textFormatList->currentIndex();
-    if (i < 0) return;
+    QTreeWidgetItem *item = new QTreeWidgetItem();
+    item->setText( 0, name );
+    item->setData( 0, TextFormatConfigKeyRole, key );
+    item->setData( 0, TextFormatRole, QVariant::fromValue(format) );
+    item->setData( 0, DefaultTextFormatRole, QVariant::fromValue(defaultFormat) );
+    updateTextFormatDisplay( item );
 
-    QString formatName = ui->textFormatList->name(i);
-    QMenu *menu = new QMenu(formatName, this);
-    QAction *actReset = menu->addAction("Reset to Default");
-    QAction *actClearBg = menu->addAction("Clear Background");
+    if (!parent)
+        parent = ui->textFormats->invisibleRootItem();
 
-    QAction *result = menu->exec(ui->textFormatList->viewport()->mapToGlobal(pos));
+    parent->addChild(item);
 
-    if (result == actReset)
-    {
-        QList<SyntaxFormat> formats;
-        formats /*<< PlainFormat*/ << KeywordFormat << BuiltinFormat << EnvVarFormat
-            << ClassFormat << NumberFormat << SymbolFormat
-            << StringFormat << CharFormat << CommentFormat << PrimitiveFormat;
+    return item;
+}
 
-        Manager *mng = Main::instance()->settings();
-        mng->beginGroup("IDE/editor/highlighting");
-        QTextCharFormat fm = mng->defaultValue(formatName.toLower()).value<QTextCharFormat>();
-        mng->endGroup();
+void EditorPage::updateTextFormatDisplay( QTreeWidgetItem *item )
+{
+    QTextCharFormat format = item->data( 0, DefaultTextFormatRole ).value<QTextCharFormat>();
+    format.merge( item->data( 0, TextFormatRole ).value<QTextCharFormat>() );
 
-        ui->textFormatList->setFormat(i, fm);
+    QBrush fg = format.foreground();
+    if ( fg != Qt::NoBrush)
+        item->setForeground( 0, fg );
+    else
+        item->setData( 0, Qt::ForegroundRole, QVariant() );
+
+    QBrush bg = format.background();
+    if ( bg != Qt::NoBrush)
+        item->setBackground( 0, bg );
+    else
+        item->setData( 0, Qt::BackgroundRole, QVariant() );
+
+    QFont f;
+    if (format.hasProperty(QTextFormat::FontItalic))
+        f.setItalic( format.fontItalic() );
+    if (format.hasProperty(QTextFormat::FontWeight))
+        f.setWeight( format.fontWeight() );
+
+    item->setFont( 0, f );
+}
+
+QTextCharFormat EditorPage::constructTextFormat()
+{
+    QTextCharFormat format;
+
+    QBrush fg = ui->fgPicker->brush();
+    if ( fg.style() != Qt::NoBrush)
+        format.setForeground(fg);
+
+    QBrush bg = ui->bgPicker->brush();
+    if (bg.style() != Qt::NoBrush)
+        format.setBackground(bg);
+
+    if (ui->italicOption->isChecked())
+        format.setFontItalic(true);
+
+    if (ui->boldOption->isChecked())
+        format.setFontWeight(QFont::Bold);
+
+    return format;
+}
+
+void EditorPage::updateTextFormatEdit()
+{
+    QTreeWidgetItem *item = ui->textFormats->currentItem();
+    bool canEdit = item && item->data(0, TextFormatConfigKeyRole).isValid();
+    ui->textFormatEdit->setEnabled(canEdit);
+
+    if (!canEdit) {
+        ui->fgPicker->setBrush( QBrush() );
+        ui->bgPicker->setBrush( QBrush() );
+        ui->italicOption->setChecked(false);
+        ui->italicOption->setChecked(false);
     }
-    else if (result == actClearBg)
-    {
-        QTextCharFormat fm( ui->textFormatList->format(i) );
-        fm.clearBackground();
-        ui->textFormatList->setFormat(i, fm);
+    else {
+        QTextCharFormat format = item->data( 0, TextFormatRole).value<QTextCharFormat>();
+        ui->fgPicker->setBrush( format.foreground() );
+        ui->bgPicker->setBrush( format.background() );
+        ui->italicOption->setChecked( format.fontItalic() );
+        ui->boldOption->setChecked( format.fontWeight() == QFont::Bold );
     }
+}
+
+void EditorPage::updateTextFormatDisplay()
+{
+    QTreeWidgetItem *item = ui->textFormats->currentItem();
+    bool canEdit = item && item->data(0, TextFormatConfigKeyRole).isValid();
+    if (!canEdit)
+        return;
+
+    QTextCharFormat format = constructTextFormat();
+    item->setData( 0, TextFormatRole, QVariant::fromValue(format) );
+
+    if (item != mCommonTextFormatItem)
+        updateTextFormatDisplay( item );
+    else
+        updateTextFormatDisplayCommons();
+}
+
+void EditorPage::updateTextFormatDisplayCommons()
+{
+    QTextCharFormat commonFormat =
+            mCommonTextFormatItem->data(0, TextFormatRole).value<QTextCharFormat>();
+
+    QPalette palette;
+
+    QBrush fg = commonFormat.foreground();
+    if ( fg != Qt::NoBrush)
+        palette.setBrush( QPalette::Text, fg );
+
+    QBrush bg = commonFormat.background();
+    if (bg != Qt::NoBrush)
+        palette.setBrush( QPalette::Base, bg );
+
+    ui->textFormats->setPalette(palette);
 }
 
 }} // namespace ScIDE::Settings
-

@@ -19,8 +19,6 @@
 #ifndef SERVER_NOVA_SERVER_HPP
 #define SERVER_NOVA_SERVER_HPP
 
-#include <boost/thread.hpp>
-
 #include "buffer_manager.hpp"
 #include "memory_pool.hpp"
 #include "node_graph.hpp"
@@ -203,18 +201,13 @@ private:
         return success;
     }
 
-    static void free_all_notify(nova_server * server, server_node const & node)
-    {
-        server->notification_node_ended(&node);
-    }
-
     static void free_deep_notify(nova_server * server, server_node & node)
     {
         if (node.is_synth())
             server->notification_node_ended(&node);
         else {
             abstract_group * group = static_cast<abstract_group*>(&node);
-            group->apply_on_children(boost::bind(nova_server::free_deep_notify, server, _1));
+            group->apply_on_children(std::bind(nova_server::free_deep_notify, server, std::placeholders::_1));
         }
     }
 
@@ -231,14 +224,21 @@ public:
     bool group_free_all(abstract_group * group)
     {
         /// todo: later we want to traverse the node graph only once
-        group->apply_on_children(boost::bind(free_all_notify, this, _1));
+        group->apply_on_children( [&](server_node const & node) {
+            this->notification_node_ended(&node);
+        });
+
         return group_free_implementation<&node_graph::group_free_all>(group);
     }
 
     bool group_free_deep(abstract_group * group)
     {
         /// todo: later we want to traverse the node graph only once
-        group->apply_on_children(boost::bind(nova_server::free_deep_notify, this, _1));
+
+        group->apply_on_children( [&](server_node & node) {
+            free_deep_notify(this, node);
+        });
+
         return group_free_implementation<&node_graph::group_free_deep>(group);
     }
 
@@ -258,29 +258,10 @@ public:
     void set_node_slot(int node_id, const char * slot, float value);
     /* @} */
 
-    void register_prototype(synth_prototype_ptr const & prototype);
-
     void cpu_load(float & peak, float & average) const
     {
-#ifdef JACK_BACKEND
-        return get_cpuload(peak, average);
-#else
-        peak = average = 0.f;
-#endif
+        audio_backend::get_cpuload(peak, average);
     }
-
-#if 0
-    /* node control */
-    void free_node(node_id);
-
-    /* synth control */
-    node_id add_synth(synthdef def, list<pair<slot_id, float> > args, node_position_constraint const &);
-    void set_synth_slot(node_id, slot_id, float);
-
-    /* group control */
-    node_id add_group(node_position_constraint const &);
-    void set_group_slot(node_id, slot_id, float);
-#endif
 
     void increment_logical_time(void)
     {

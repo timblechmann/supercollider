@@ -54,11 +54,12 @@ Spawner : Pattern {
 				if (nexttime.notNil, {
 					// that child stream ended, so rest until next one
 					outevent = Event.silent(nexttime - now, event);
+					cleanup.update(outevent);
 					event = outevent.yield;
 					now = nexttime;
 				},{
 					priorityQ.clear;
-					cleanup.exit(event);
+					^cleanup.exit(event);
 				});
 			},{
 				cleanup.update(outevent);

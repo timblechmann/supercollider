@@ -211,20 +211,6 @@ static int addMsgSlotWithTags(big_scpacket *packet, PyrSlot *slot)
 	return errNone;
 }
 
-static int makeSynthMsg(big_scpacket *packet, PyrSlot *slots, int size)
-{
-	packet->BeginMsg();
-
-	for (int i=0; i<size; ++i) {
-		int error = addMsgSlot(packet, slots+i);
-		if (error != errNone)
-			return error;
-	}
-
-	packet->EndMsg();
-	return errNone;
-}
-
 static int makeSynthMsgWithTags(big_scpacket *packet, PyrSlot *slots, int size)
 {
 	packet->BeginMsg();
@@ -363,7 +349,7 @@ int netAddrSend(PyrObject *netAddrObj, int msglen, char *bufptr, bool sendMsgLen
 
 ///////////
 
-inline int OSCStrLen(char *str)
+inline size_t OSCStrLen(char *str)
 {
 	return (strlen(str) + 4) & ~3;
 }
@@ -1345,7 +1331,7 @@ void init_OSC_primitives()
 	definePrimitive(base, index++, "_ServerShmInterface_getControlBusValues", prGetControlBusValues, 3, 0);
 
 	definePrimitive(base, index++, "_ServerShmInterface_setControlBusValue", prSetControlBusValue, 3, 0);
-	definePrimitive(base, index++, "_ServerShmInterface_setControlBusValues", prSetControlBusValues, 4, 0);
+	definePrimitive(base, index++, "_ServerShmInterface_setControlBusValues", prSetControlBusValues, 3, 0);
 
 	//post("initOSCRecs###############\n");
 	s_call = getsym("call");

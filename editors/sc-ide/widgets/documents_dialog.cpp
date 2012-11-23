@@ -46,7 +46,7 @@ DocumentsDialog::DocumentsDialog(const QList<Document*> & docs, Mode mode, QWidg
 
 void DocumentsDialog::init( Mode mode, const QList<Document*> &docs )
 {
-    DocumentManager *mng = Main::instance()->documentManager();
+    DocumentManager *mng = Main::documentManager();
     connect(mng, SIGNAL(changedExternally(Document*)), this, SLOT(onDocumentChangedExternally(Document*)));
 
     mMode = mode;
@@ -89,40 +89,40 @@ void DocumentsDialog::init( Mode mode, const QList<Document*> &docs )
     QPushButton *btn;
     QPushButton *defaultBtn;
     if (mode == ExternalChange) {
-        defaultBtn = btn = dialogBtnBox->addButton(tr("Reload"), QDialogButtonBox::ActionRole);
+        defaultBtn = btn = dialogBtnBox->addButton(tr("&Reload"), QDialogButtonBox::ActionRole);
         btn->setIcon( QIcon::fromTheme("view-refresh") );
         connect(btn, SIGNAL(clicked()), this, SLOT(reloadSelected()));
 
-        btn = dialogBtnBox->addButton(tr("Overwrite"), QDialogButtonBox::ActionRole);
+        btn = dialogBtnBox->addButton(tr("Over&write"), QDialogButtonBox::ActionRole);
         btn->setIcon( QIcon::fromTheme("document-save") );
         connect(btn, SIGNAL(clicked()), this, SLOT(saveSelected()));
 
-        btn = dialogBtnBox->addButton(tr("Ignore"), QDialogButtonBox::AcceptRole);
+        btn = dialogBtnBox->addButton(tr("&Ignore"), QDialogButtonBox::AcceptRole);
         btn->setIcon( QIcon::fromTheme("window-close") );
         connect(btn, SIGNAL(clicked()), this, SLOT(ignoreSelected()));
 
-        btn = dialogBtnBox->addButton(tr("Close"), QDialogButtonBox::AcceptRole);
+        btn = dialogBtnBox->addButton(tr("&Close"), QDialogButtonBox::AcceptRole);
         btn->setIcon( QIcon::fromTheme("window-close") );
         connect(btn, SIGNAL(clicked()), this, SLOT(closeSelected()));
     }
     else {
-        btn = dialogBtnBox->addButton(tr("Ignore"), QDialogButtonBox::ActionRole);
-        btn->setIcon( QIcon::fromTheme("window-close") );
-        connect(btn, SIGNAL(clicked()), this, SLOT(ignoreSelected()));
-
-        btn = dialogBtnBox->addButton(tr("Save"), QDialogButtonBox::ActionRole);
+        defaultBtn = btn = dialogBtnBox->addButton(tr("&Save"), QDialogButtonBox::ActionRole);
         btn->setIcon( QIcon::fromTheme("document-save") );
         connect(btn, SIGNAL(clicked()), this, SLOT(saveSelected()));
 
-        defaultBtn = btn = dialogBtnBox->addButton(tr("Do Not Quit"), QDialogButtonBox::RejectRole);
+        btn = dialogBtnBox->addButton(tr("&Discard"), QDialogButtonBox::ActionRole);
+        btn->setIcon( QIcon::fromTheme("window-close") );
+        connect(btn, SIGNAL(clicked()), this, SLOT(ignoreSelected()));
+
+        btn = dialogBtnBox->addButton(tr("&Cancel"), QDialogButtonBox::RejectRole);
         btn->setIcon( QIcon::fromTheme("window-close") );
         connect(btn, SIGNAL(clicked()), this, SLOT(reject()));
     }
 
-    QPushButton *selectAllBtn = new QPushButton(tr("Select All"));
+    QPushButton *selectAllBtn = new QPushButton(tr("Select &All"));
     connect(selectAllBtn, SIGNAL(clicked()), this, SLOT(selectAll()));
 
-    QPushButton *selectNoneBtn = new QPushButton(tr("Select None"));
+    QPushButton *selectNoneBtn = new QPushButton(tr("Select N&one"));
     connect(selectNoneBtn, SIGNAL(clicked()), this, SLOT(selectNone()));
 
     QLabel *iconLabel = new QLabel;
@@ -192,7 +192,7 @@ void DocumentsDialog::saveSelected()
 
 void DocumentsDialog::reloadSelected()
 {
-    DocumentManager *mng = Main::instance()->documentManager();
+    DocumentManager *mng = Main::documentManager();
 
     int i = 0;
     while (i < count())
@@ -228,7 +228,7 @@ void DocumentsDialog::ignoreSelected()
 
 void DocumentsDialog::closeSelected()
 {
-    DocumentManager *mng = Main::instance()->documentManager();
+    DocumentManager *mng = Main::documentManager();
 
     int i = 0;
     while (i < count())
@@ -272,11 +272,11 @@ void DocumentsDialog::Item::update()
     setTitle(mDoc->title());
     setPath(mDoc->filePath());
     if (!mDoc->filePath().isEmpty() && !QFile::exists(mDoc->filePath())) {
-        setStatus("Removed");
+        setStatus(tr("Removed"));
         setChecked(false);
     }
     else {
-        setStatus("Modified");
+        setStatus(tr("Modified"));
         setChecked(true);
     }
 }

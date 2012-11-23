@@ -12,6 +12,9 @@ HelpBrowser {
 	var rout;
 
 	*initClass {
+		Class.initClassTree(SCDoc);
+		defaultHomeUrl = SCDoc.helpTargetUrl ++ "/Help.html";
+
 		StartUp.add {
 			NotificationCenter.register(SCDoc, \didIndexAllDocs, this) {
 				if(WebView.implClass.respondsTo(\clearCache)) {
@@ -29,14 +32,16 @@ HelpBrowser {
 	}
 
 	*new { arg aHomeUrl, newWin;
-		if( aHomeUrl.isNil ) {
-			aHomeUrl = defaultHomeUrl ?? { SCDoc.helpTargetDir ++ "/Help.html" };
-		};
-		^super.new.init( aHomeUrl, newWin ?? { openNewWindows } );
+		^super.new.init( aHomeUrl ? defaultHomeUrl, newWin ?? { openNewWindows } );
 	}
 
 	*goTo {|url|
-		this.front.goTo(url);
+		var ideClass = \ScIDE.asClass;
+		if ( ideClass.notNil ) {
+			ideClass.openHelpUrl(url);
+		}{
+			this.front.goTo(url);
+		}
 	}
 
 	*front {
@@ -45,17 +50,22 @@ HelpBrowser {
 		^w;
 	}
 
+	*goHome { this.goTo(defaultHomeUrl); }
+
 	*openBrowsePage {|category|
 		category = if(category.notNil) {"#"++category} {""};
-		this.goTo(SCDoc.helpTargetDir++"/Browse.html"++category);
+		this.goTo(SCDoc.helpTargetUrl++"/Browse.html"++category);
 	}
 	*openSearchPage {|text|
 		text = if(text.notNil) {"#"++text} {""};
-		this.goTo(SCDoc.helpTargetDir++"/Search.html"++text);
+		this.goTo(SCDoc.helpTargetUrl++"/Search.html"++text);
 	}
 	*openHelpFor {|text|
+		this.goTo(SCDoc.findHelpFile(text));
+		/* The following was replaced, for compatibility with SC IDE:
 		var w = this.front;
 		{ w.startAnim; w.goTo(SCDoc.findHelpFile(text)) }.fork(AppClock);
+		*/
 	}
 	*openHelpForMethod {|method|
 		var cls = method.ownerClass;
@@ -67,49 +77,30 @@ HelpBrowser {
 			cls = cls.name.asString;
 			met = "-"++met;
 		};
-		this.goTo(SCDoc.helpTargetDir+/+"Classes"+/+cls++".html#"++met);
+		this.goTo(SCDoc.helpTargetUrl++"/Classes/"++cls++".html#"++met);
 	}
-	*getOldWrapUrl {|url|
-		var c;
-		^("file://" ++ SCDoc.helpTargetDir +/+ "OldHelpWrapper.html#"++url++"?"++
-		SCDoc.helpTargetDir +/+ if((c=url.basename.split($.).first).asSymbol.asClass.notNil)
-			{"Classes" +/+ c ++ ".html"}
-			{"Guides/WritingHelp.html"})
-	}
-	cmdPeriod { rout.play(AppClock) }
-	goTo {|url, brokenAction|
-		var newPath, oldPath, plainTextExts = #[".sc",".scd",".txt",".schelp"];
 
-		plainTextExts.do {|x|
-			if(url.endsWith(x)) {
-				^this.openTextFile(url);
-			}
-		};
+	cmdPeriod { rout.play(AppClock) }
+	goTo {|urlString, brokenAction|
+		var url, newPath, oldPath;
 
 		window.front;
 		this.startAnim;
 
-		brokenAction = brokenAction ? {SCDoc.helpTargetDir++"/BrokenLink.html#"++url};
+		brokenAction = brokenAction ? { |fragment|
+			var brokenUrl = URI.fromLocalPath( SCDoc.helpTargetDir++"/BrokenLink.html" );
+			brokenUrl.fragment = fragment;
+			brokenUrl;
+		};
+
+		url = URI(urlString);
 
 		rout = Routine {
 			try {
-				url = SCDoc.prepareHelpForURL(url) ?? brokenAction;
-				#newPath, oldPath = [url,webView.url].collect {|x|
-					if(x.notEmpty) {x.findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1][1]}
-				};
-				// detect old helpfiles and open them in OldHelpWrapper
-				if(
-					block{|break|
-						Help.do {|key, path|
-							if(url.endsWith(path)) {
-								break.value(true)
-							}
-						}; false
-					}
-				) {
-					url = HelpBrowser.getOldWrapUrl(url)
-				};
-				webView.url = url;
+				url = SCDoc.prepareHelpForURL(url) ?? { brokenAction.(urlString) };
+				newPath = url.path;
+				oldPath = URI(webView.url).path;
+				webView.url = url.asString;
 				// needed since onLoadFinished is not called if the path did not change:
 				if(newPath == oldPath) {webView.onLoadFinished.value};
 				webView.focus;
@@ -179,7 +170,7 @@ HelpBrowser {
 		srchBox.action = {|x|
 			if(x.string.notEmpty) {
 				this.goTo(if(x.string.first==$#)
-					{SCDoc.helpTargetDir++"/Search.html#"++x.string.drop(1)}
+					{SCDoc.helpTargetUrl ++ "/Search.html" ++ x.string}
 					{SCDoc.findHelpFile(x.string)}
 				);
 			}
@@ -241,17 +232,20 @@ HelpBrowser {
 		};
 		webView.onLoadFailed = { this.stopAnim };
 		webView.onLinkActivated = {|wv, url|
-			var newPath, oldPath;
-			if(openNewWin) {
-				#newPath, oldPath = [url,webView.url].collect {|x|
-					if(x.notEmpty) {x.findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1][1]}
+			var redirected, newPath, oldPath;
+			redirected = this.redirectTextFile(url);
+			if (not(redirected)) {
+				if(openNewWin) {
+					#newPath, oldPath = [url,webView.url].collect {|x|
+						if(x.notEmpty) {x.findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1][1]}
+					};
 				};
-			};
-			if(newPath!=oldPath) {
-				HelpBrowser.new(newWin:true).goTo(url);
-			} {
-				this.goTo(url);
-			};
+				if(newPath!=oldPath) {
+					HelpBrowser.new(newWin:true).goTo(url);
+				} {
+					this.goTo(url);
+				};
+			}
 		};
 		if(webView.respondsTo(\onReload_)) {
 			webView.onReload = {|wv, url|
@@ -259,6 +253,11 @@ HelpBrowser {
 					WebView.clearCache;
 				};
 				this.goTo(url);
+			};
+		};
+		if(webView.respondsTo(\onJavaScriptMsg_)) {
+			webView.onJavaScriptMsg = {|wv, err, type|
+				"JavaScript %: %".format(if(type==0,"Error","Message"),err).postln;
 			};
 		};
 
@@ -300,15 +299,25 @@ HelpBrowser {
 		};
 	}
 
-	openTextFile {|path|
-		var win, winRect, txt, file, fonts;
-		path = path.replace("%20"," ").findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1][1];
-		if(File.exists(path)) {
-			path.openDocument;
-		} {
-			webView.url = SCDoc.helpTargetDir++"/BrokenLink.html#"++path;
-			window.front;
-		}
+	redirectTextFile {|url|
+		var plainTextExts = #[".sc",".scd",".txt",".schelp",".rtf"];
+
+		plainTextExts.do {|x|
+			var path;
+			if(url.endsWith(x)) {
+				path = url.replace("%20"," ")
+					.findRegexp("(^\\w+://)?([^#]+)(#.*)?")[1..].flop[1][1];
+				if(File.exists(path)) {
+					path.openDocument;
+				} {
+					webView.url = SCDoc.helpTargetUrl++"/BrokenLink.html#"++path;
+					window.front;
+				};
+				^true
+			}
+		};
+
+		^false
 	}
 
 	startAnim {

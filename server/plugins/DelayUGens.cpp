@@ -132,7 +132,7 @@ struct BufDelayUnit : public Unit
 	SndBuf *m_buf;
 	float m_dsamp;
 	float m_delaytime;
-	int m_iwrphase;
+	long m_iwrphase;
 	uint32 m_numoutput;
 };
 
@@ -225,6 +225,7 @@ struct Pluck : public FeedbackDelay, CubicInterpolationUnit
 struct LocalBuf : public Unit
 {
 	SndBuf *m_buf;
+	void * chunk;
 };
 
 struct MaxLocalBufs : public Unit
@@ -664,19 +665,21 @@ inline int32 BUFMASK(int32 x)
 	return (1 << (31 - CLZ(x))) - 1;
 }
 
-
 static void LocalBuf_allocBuffer(LocalBuf *unit, SndBuf *buf, int numChannels, int numFrames)
 {
 	int numSamples = numFrames * numChannels;
 	// Print("bufnum: %i, allocating %i channels and %i frames. memsize: %i\n", (int)unit->m_fbufnum, numChannels, numFrames, numSamples * sizeof(float));
-	buf->data = (float*)RTAlloc(unit->mWorld, numSamples * sizeof(float));
+	const int alignment = 128; // in bytes
+	unit->chunk = (float*)RTAlloc(unit->mWorld, numSamples * sizeof(float) + alignment);
 
-	if (!buf->data) {
+	if (!unit->chunk) {
 		if(unit->mWorld->mVerbosity > -2){
 			Print("failed to allocate memory for LocalBuffer\n");
 		}
 		return;
 	}
+
+	buf->data = (float*) ((intptr_t)((char*)unit->chunk + (alignment - 1)) & -alignment);
 
 	buf->channels = numChannels;
 	buf->frames   = numFrames;
@@ -689,9 +692,6 @@ static void LocalBuf_allocBuffer(LocalBuf *unit, SndBuf *buf, int numChannels, i
 	buf->isLocal  = true;
 #endif
 }
-
-
-
 
 void LocalBuf_Ctor(LocalBuf *unit)
 {
@@ -718,15 +718,14 @@ void LocalBuf_Ctor(LocalBuf *unit)
 
 void LocalBuf_Dtor(LocalBuf *unit)
 {
-	RTFree(unit->mWorld, unit->m_buf->data);
+	RTFree(unit->mWorld, unit->chunk);
 	if(unit->mParent->localBufNum <= 1) { // only the last time.
 		for (int i = 0; i != unit->mParent->localMaxBufNum; ++i)
 			unit->mParent->mLocalSndBufs[i].~SndBuf();
 		RTFree(unit->mWorld, unit->mParent->mLocalSndBufs);
 		unit->mParent->localMaxBufNum = 0;
-	} else {
+	} else
 		unit->mParent->localBufNum = unit->mParent->localBufNum - 1;
-	}
 }
 
 
@@ -736,8 +735,6 @@ void MaxLocalBufs_Ctor(MaxLocalBufs *unit)
 {
 	Graph *parent = unit->mParent;
 
-	int offset =  unit->mWorld->mNumSndBufs;
-	int bufnum =  parent->localBufNum;
 	int maxBufNum = (int)(IN0(0) + .5f);
 	if(!parent->localMaxBufNum) {
 		parent->mLocalSndBufs = (SndBuf*)RTAlloc(unit->mWorld, maxBufNum * sizeof(SndBuf));
@@ -746,10 +743,8 @@ void MaxLocalBufs_Ctor(MaxLocalBufs *unit)
 			new(&parent->mLocalSndBufs[i]) SndBuf();
 #endif
 		parent->localMaxBufNum = maxBufNum;
-	} else {
+	} else
 		printf("warning: MaxLocalBufs - maximum number of local buffers is already declared (%i) and must remain unchanged.\n", parent->localMaxBufNum);
-	}
-
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2267,12 +2262,13 @@ static inline void DelayN_delay_loop(float * out, const float * in, long & iwrph
 					in += nsmps;
 					dlyrd += nsmps;
 					dlywr += nsmps;
-				} else
+				} else {
 					LOOP(nsmps,
 						ZXP(dlywr) = ZXP(in);
 						ZXP(out) = 0.f;
-						ZXP(dlyrd);
 					);
+					dlyrd += nsmps;
+				}
 			} else {
 				LOOP(nsmps,
 					ZXP(dlywr) = ZXP(in);
@@ -3750,6 +3746,10 @@ static bool DelayUnit_AllocDelayLine(DelayUnit *unit, const char * className)
 		RTFree(unit->mWorld, unit->m_dlybuf);
 	unit->m_dlybuf = (float*)RTAlloc(unit->mWorld, delaybufsize * sizeof(float));
 
+#if 0 // for debugging we may want to fill the buffer with nans
+	std::fill_n(unit->m_dlybuf, delaybufsize, std::numeric_limits<float>::signaling_NaN());
+#endif
+
 	if (unit->m_dlybuf == NULL) {
 		SETCALC(ft->fClearUnitOutputs);
 		ClearUnitOutputs(unit, 1);
@@ -4196,8 +4196,6 @@ inline void FilterX_perform_a(CombX *unit, int inNumSamples, UnitCalcFunc resetF
 
 	float *dlybuf = unit->m_dlybuf;
 	long iwrphase = unit->m_iwrphase;
-	float dsamp = unit->m_dsamp;
-	float feedbk = unit->m_feedbk;
 	long mask = unit->m_mask;
 
 	LOOP1(inNumSamples,
@@ -6160,8 +6158,8 @@ Pluck - Karplus-Strong
 void Pluck_Ctor(Pluck *unit)
 {
 //	FeedbackDelay_Reset(unit);
-	float maxdelaytime = unit->m_maxdelaytime = IN0(2);
-	float delaytime = unit->m_delaytime = IN0(3);
+	unit->m_maxdelaytime = IN0(2);
+	unit->m_delaytime = IN0(3);
 	unit->m_dlybuf = 0;
 	bool allocationSucessful = DelayUnit_AllocDelayLine(unit, "Pluck");
 	if (!allocationSucessful)
@@ -7188,7 +7186,7 @@ void Pluck_next_ka_z(Pluck *unit, int inNumSamples)
 	uint32 bufSamples = buf->samples; \
 	uint32 bufFrames = buf->frames; \
 	int guardFrame __attribute__((__unused__)) = bufFrames - 2; \
-	double loopMax = (double)bufSamples;
+	double loopMax __attribute__((__unused__)) = (double)bufSamples;
 
 #define CHECK_DELTAP_BUF \
 	if ((!bufData) || (bufChannels != 1)) { \
@@ -7304,7 +7302,7 @@ void DelTapWr_next_simd(DelTapWr *unit, int inNumSamples)
 	uint32 phaseIn = *iPhaseIn; \
 	float fbufnum  = IN0(0); \
 	uint32 bufnum = (uint32)fbufnum; \
-	float* out = ZOUT(0); \
+	float* out __attribute__((__unused__)) = ZOUT(0); \
 
 #define SETUP_TAPDELA \
 	float* delTime = ZIN(2); \

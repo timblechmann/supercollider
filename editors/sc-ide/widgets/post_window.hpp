@@ -21,11 +21,15 @@
 #ifndef SCIDE_WIDGETS_POST_WINDOW_HPP_INCLUDED
 #define SCIDE_WIDGETS_POST_WINDOW_HPP_INCLUDED
 
+#include "util/docklet.hpp"
 #include <QAction>
-#include <QDockWidget>
 #include <QPlainTextEdit>
 
 namespace ScIDE {
+
+namespace Settings { class Manager; }
+
+class PostDocklet;
 
 class PostWindow:
     public QPlainTextEdit
@@ -33,32 +37,82 @@ class PostWindow:
     Q_OBJECT
 
 public:
-    PostWindow(QWidget* parent = 0);
+    enum ActionRole {
+        Copy,
+        Clear,
+        ZoomIn,
+        ZoomOut,
+        LineWrap,
+        AutoScroll,
+
+        ActionCount
+    };
+
+    explicit PostWindow(QWidget* parent = 0);
+
+    void applySettings( Settings::Manager * );
+    void storeSettings( Settings::Manager * );
+
+    QAction * action ( ActionRole role ) const { return mActions[role]; }
+
+    QSize sizeHint() const { return mSizeHint; }
+    QSize minimumSizeHint() const { return QSize(50,50); }
+    QString symbolUnderCursor();
 
 signals:
     void scrollToBottomRequest();
 
 public slots:
     void post(const QString &text);
-
     void scrollToBottom();
+    void zoomIn(int steps = 1);
+    void zoomOut(int steps = 1);
+
+    bool openDocumentation();
+    void openDefinition();
+    void findReferences();
+
+protected:
+    virtual bool event( QEvent * );
+    virtual void wheelEvent( QWheelEvent * );
+    virtual void focusOutEvent (QFocusEvent *e);
+    virtual void mouseDoubleClickEvent(QMouseEvent *e);
+    virtual QMimeData *createMimeDataFromSelection() const;
 
 private slots:
-    void onScrollChange();
+    void onAutoScrollTriggered(bool);
+    void setLineWrap(bool on);
 
 private:
+    friend class PostDocklet;
+    void createActions( Settings::Manager * );
+    void updateActionShortcuts( Settings::Manager * );
+    void zoomFont(int steps);
+
+    QAction * mActions[ActionCount];
+    /*
     QAction * mAutoScrollAction;
     QAction * mClearAction;
+    QAction * mLineWrapAction;*/
+    QSize mSizeHint;
 };
 
 
-class PostDock:
-    public QDockWidget
+class PostDocklet:
+    public Docklet
 {
     Q_OBJECT
 
 public:
-    PostDock(QWidget* parent = 0);
+    PostDocklet(QWidget* parent = 0);
+
+public slots:
+    void raiseAndFocus()
+    {
+        show();
+        raise();
+        mPostWindow->setFocus();
+    }
 
 private slots:
     void onFloatingChanged(bool floating);

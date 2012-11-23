@@ -29,7 +29,6 @@ Primitives for File i/o.
 #include "PyrPrimitive.h"
 #include "PyrSymbol.h"
 #include "PyrFilePrim.h"
-#include "PyrFileUtils.h"
 #include "ReadWriteMacros.h"
 #include "SCBase.h"
 #include "SC_DirUtils.h"
@@ -52,7 +51,6 @@ Primitives for File i/o.
 #else
 # include <direct.h>
 # include <malloc.h>
-# define strcasecmp stricmp
 #endif
 
 #ifdef _WIN32
@@ -78,8 +76,6 @@ Primitives for File i/o.
 #endif
 
 #define DELIMITOR ':'
-
-bool filelen(FILE *file, size_t *length);
 
 int prFileDelete(struct VMGlobals *g, int numArgsPushed)
 {
@@ -165,7 +161,7 @@ int prFileRealPath(struct VMGlobals* g, int numArgsPushed )
 
 int prFileMkDir(struct VMGlobals * g, int numArgsPushed)
 {
-	PyrSlot *a = g->sp - 1, *b = g->sp;
+	PyrSlot *b = g->sp;
 	char filename[PATH_MAX];
 
 	int error = slotStrVal(b, filename, PATH_MAX);
@@ -182,7 +178,7 @@ int prFileMkDir(struct VMGlobals * g, int numArgsPushed)
 
 int prFileCopy(struct VMGlobals * g, int numArgsPushed)
 {
-	PyrSlot *a = g->sp - 2, *b = g->sp - 1, *c = g->sp;
+	PyrSlot *b = g->sp - 1, *c = g->sp;
 	char filename1[PATH_MAX];
 	char filename2[PATH_MAX];
 	int error;
@@ -193,7 +189,7 @@ int prFileCopy(struct VMGlobals * g, int numArgsPushed)
 	if (error != errNone)
 		return error;
 
-	boost::filesystem3::copy(filename1, filename2);
+	boost::filesystem::copy(filename1, filename2);
 	return errNone;
 }
 
@@ -336,7 +332,7 @@ int prFilePos(struct VMGlobals *g, int numArgsPushed)
 	if (file == NULL) return errFailed;
 	if (fgetpos(file, &pos)) return errFailed;
 
-#ifdef SC_LINUX
+#ifdef __linux__
 	// sk: hack alert!
 	length = pos.__pos;
 #else
@@ -349,19 +345,18 @@ int prFilePos(struct VMGlobals *g, int numArgsPushed)
 
 int prFileLength(struct VMGlobals *g, int numArgsPushed)
 {
-	PyrSlot *a;
-	PyrFile *pfile;
-	FILE *file;
-	fpos_t pos;
-	size_t length;
+	PyrSlot * a = g->sp;
+	PyrFile *pfile = (PyrFile*)slotRawObject(a);
+	FILE *file = (FILE*)slotRawPtr(&pfile->fileptr);
 
-	a = g->sp;
-	pfile = (PyrFile*)slotRawObject(a);
-	file = (FILE*)slotRawPtr(&pfile->fileptr);
 	if (file == NULL) return errFailed;
+
 	// preserve file position
+	fpos_t pos;
 	if (fgetpos(file, &pos)) return errFailed;
-	if (filelen(file, &length)) return errFailed;
+	if (fseek(file, 0, SEEK_END)) return errFailed;
+	size_t length;
+	length = ftell(file);
 	if (fsetpos(file, &pos)) return errFailed;
 
 	SetInt(a, length);
@@ -1571,6 +1566,8 @@ int prSFOpenWrite(struct VMGlobals *g, int numArgsPushed)
 	slotIntVal(slotRawObject(a)->slots + 5, &info.samplerate);
 
 	file = sf_open(filename, SFM_WRITE, &info);
+	sf_command(file, SFC_SET_CLIPPING, NULL, SF_TRUE);
+
 	if (file) {
 		SetPtr(slotRawObject(a)->slots+0, file);
 		SetTrue(a);

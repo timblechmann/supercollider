@@ -209,7 +209,7 @@ static id sharedSCVM = nil;
 	pthread_mutex_unlock(&gLangMutex);
 }
 
-- (void)sendMain: (char*) methodName
+- (void)sendMain: (const char*) methodName
 {
 	pthread_mutex_lock(&gLangMutex);
 	runLibrary(getsym(methodName));
@@ -338,7 +338,7 @@ void setupUserPaneViews(id target, id view, int tagsum)
 		int thisTag = [view tag];
 		if (thisTag > 0) newTagSum += thisTag;
 	}
-	post("  view '%s' %d %d\n", class_getName(view->isa), tagsum, newTagSum);
+	post("  view '%s' %d %d\n", class_getName(object_getClass(view)), tagsum, newTagSum);
 
 	if ([view respondsToSelector: @selector(setTarget:)]) {
 		[view setTarget: target];
@@ -381,7 +381,7 @@ void setupUserPaneViews(id target, id view, int tagsum)
 	NSMutableDictionary *dict = [NSMutableDictionary dictionary];
 	[dict setObject: panel forKey: @"NSOwner"];
 	NSZone *zone = [NSApp zone];
-	post("path '%s'\n", [nspath cString]);
+	post("path '%s'\n", [nspath cStringUsingEncoding:[NSString defaultCStringEncoding]]);
 	BOOL result = [NSBundle loadNibFile: nspath externalNameTable: dict withZone: zone];
 	if (!result) {
 		post("loadNibFile failed\n");
@@ -452,7 +452,6 @@ bool gIsFullScreen = false;
 - (void)windowWillMiniaturize:(NSNotification *)notification
 {
     if(gIsFullScreen){
-		SCNSWindow* window = [notification object];
 		[self sendMain:"exitFullScreen"];
 	}
 }

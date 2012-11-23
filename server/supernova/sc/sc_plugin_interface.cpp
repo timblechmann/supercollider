@@ -691,7 +691,7 @@ void sc_plugin_interface::initialize(server_arguments const & args, float * cont
     memset(world.mSndBufUpdates, 0, world.mNumSndBufs*sizeof(SndBufUpdates));
     world.mBufCounter = 0;
 
-    async_buffer_guards.reset(new boost::mutex[world.mNumSndBufs]);
+    async_buffer_guards.reset(new std::mutex[world.mNumSndBufs]);
 
     /* audio settings */
     world.mBufLength = args.blocksize;
@@ -704,6 +704,27 @@ void sc_plugin_interface::initialize(server_arguments const & args, float * cont
     world.mNumOutputs = args.output_channels;
 
     world.mRealTime = !args.non_rt;
+
+    /* rngs */
+    world.mNumRGens = args.rng_count;
+    world.mRGen = new RGen[world.mNumRGens];
+    std::vector<std::uint32_t> seeds(world.mNumRGens);
+
+    try {
+        std::random_device rd;
+        std::seed_seq seq({ rd(), rd(), rd() });
+        seq.generate(seeds.begin(), seeds.end());
+    } catch (...) {
+        auto now = std::chrono::high_resolution_clock::now();
+
+        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+
+        std::seed_seq seq({ seconds.count() });
+        seq.generate(seeds.begin(), seeds.end());
+    }
+
+    for (int i=0; i<world.mNumRGens; ++i)
+        world.mRGen[i].init(seeds[i]);
 }
 
 void sc_plugin_interface::reset_sampling_rate(int sr)
@@ -717,19 +738,24 @@ void sc_plugin_interface::reset_sampling_rate(int sr)
 
 void sc_done_action_handler::update_nodegraph(void)
 {
-    std::for_each(done_nodes.begin(), done_nodes.end(), boost::bind(&nova_server::free_node, instance, _1));
+    for (server_node * node : done_nodes)
+        instance->free_node(node);
     done_nodes.clear();
 
-    std::for_each(resume_nodes.begin(), resume_nodes.end(), boost::bind(&nova_server::node_resume, instance, _1));
+    for (server_node * node : resume_nodes)
+        instance->node_resume(node);
     resume_nodes.clear();
 
-    std::for_each(pause_nodes.begin(), pause_nodes.end(), boost::bind(&nova_server::node_pause, instance, _1));
+    for (server_node * node : pause_nodes)
+        instance->node_pause(node);
     pause_nodes.clear();
 
-    std::for_each(freeDeep_nodes.begin(), freeDeep_nodes.end(), boost::bind(&nova_server::group_free_deep, instance, _1));
+    for (abstract_group * group : freeDeep_nodes)
+        instance->group_free_deep(group);
     freeDeep_nodes.clear();
 
-    std::for_each(freeAll_nodes.begin(), freeAll_nodes.end(), boost::bind(&nova_server::group_free_all, instance, _1));
+    for (abstract_group * group : freeAll_nodes)
+        instance->group_free_all(group);
     freeAll_nodes.clear();
 }
 
@@ -741,11 +767,11 @@ sc_plugin_interface::~sc_plugin_interface(void)
     delete[] world.mSndBufs;
     delete[] world.mSndBufsNonRealTimeMirror;
     delete[] world.mSndBufUpdates;
+    delete[] world.mRGen;
     delete world.mNRTLock;
 }
 
-namespace
-{
+namespace {
 
 sample * allocate_buffer(size_t samples)
 {

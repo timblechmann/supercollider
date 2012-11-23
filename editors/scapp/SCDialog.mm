@@ -58,7 +58,7 @@
 		[openPanel retain];
 	}
 	[openPanel setAllowsMultipleSelection: allowsMultiple];
-    if(NSOKButton == [openPanel runModalForTypes: nil]) {
+    if(NSOKButton == [openPanel runModal]) {
          [self returnPaths: [openPanel URLs]];
     } else {
         [self cancel];
@@ -76,7 +76,7 @@
 	PyrObject* array = newPyrArray(g->gc, count, 0, true);
 	for (i = 0; i < count; i++)
 	{
-		PyrString* pyrPathString = newPyrString(g->gc,[[[urls objectAtIndex: i ] path] cString],0,true);
+		PyrString* pyrPathString = newPyrString(g->gc,[[[urls objectAtIndex: i ] path] cStringUsingEncoding:[NSString defaultCStringEncoding]],0,true);
 
 		SetObject(array->slots + array->size, pyrPathString);
 		array->size++;
@@ -98,7 +98,7 @@
 {
 	NSSavePanel *savePanel = [NSSavePanel savePanel];
 	if([savePanel runModal] == NSFileHandlingPanelOKButton) {
-		[self returnPath: [savePanel filename]];
+		[self returnPath: [[savePanel URL] path]];
 	} else {
 		[self cancel];
 	}
@@ -107,14 +107,14 @@
 -(void)returnPath:(NSString*)path
 {
 	// check if greater than 512
-	int size = [path cStringLength];
+	int size = [path lengthOfBytesUsingEncoding:[NSString defaultCStringEncoding]];
 	if(size > 512) {
 		[self error];
 		return;
 	}
 
 	pthread_mutex_lock (&gLangMutex);
-	memcpy(result->slots,[path cString], size);
+	memcpy(result->slots,[path cStringUsingEncoding:[NSString defaultCStringEncoding]], size);
 	result->size = size;
 	pthread_mutex_unlock (&gLangMutex);
 

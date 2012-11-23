@@ -2341,6 +2341,7 @@ void InRect_Ctor(InRect* unit)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
 void LinExp_next(LinExp *unit, int inNumSamples)
 {
 	float *out = ZOUT(0);
@@ -2399,7 +2400,7 @@ FLATTEN static void LinExp_next_nova_kk(LinExp *unit, int inNumSamples)
 	float dstlo = ZIN0(3);
 	float dsthi = ZIN0(4);
 	float dstratio = dsthi/dstlo;
-	float rsrcrange = 1. / (srchi - srclo);
+	float rsrcrange = sc_reciprocal(srchi - srclo);
 	float rrminuslo = rsrcrange * -srclo;
 
 	LinExp_next_nova_loop(out, in, inNumSamples, dstlo, dstratio, rsrcrange, rrminuslo);
@@ -2415,8 +2416,8 @@ void LinExp_next_kk(LinExp *unit, int inNumSamples)
 	float srchi = ZIN0(2);
 	float dstlo = ZIN0(3);
 	float dsthi = ZIN0(4);
-	float dstratio = dsthi/dstlo;
-	float rsrcrange = 1. / (srchi - srclo);
+	float dstratio = dsthi * sc_reciprocal(dstlo);
+	float rsrcrange = sc_reciprocal(srchi - srclo);
 	float rrminuslo = rsrcrange * -srclo;
 
 	LOOP1(inNumSamples,
@@ -2440,7 +2441,7 @@ void LinExp_next_aa(LinExp *unit, int inNumSamples)
 		float zsrchi = ZXP(srchi);
 		float zsrclo = ZXP(srclo);
 		float dstratio = zdsthi/zdstlo;
-		float rsrcrange = 1. / (zsrchi - zsrclo);
+		float rsrcrange = sc_reciprocal(zsrchi - zsrclo);
 		float rrminuslo = rsrcrange * -zsrclo;
 		ZXP(out) = zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
 	);
@@ -2460,7 +2461,7 @@ void LinExp_next_ak(LinExp *unit, int inNumSamples)
 		float zsrchi = ZXP(srchi);
 		float zsrclo = ZXP(srclo);
 
-		float rsrcrange = 1. / (zsrchi - zsrclo);
+		float rsrcrange = sc_reciprocal(zsrchi - zsrclo);
 		float rrminuslo = rsrcrange * -zsrclo;
 		ZXP(out) = dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
 	);
@@ -2474,7 +2475,7 @@ void LinExp_next_ka(LinExp *unit, int inNumSamples)
 	float srchi = ZIN0(2);
 	float *dstlo = ZIN(3);
 	float *dsthi = ZIN(4);
-	float rsrcrange = 1. / (srchi - srclo);
+	float rsrcrange = sc_reciprocal(srchi - srclo);
 	float rrminuslo = rsrcrange * -srclo;
 
 	LOOP1(inNumSamples,
@@ -2530,7 +2531,7 @@ static void LinExp_SetCalc(LinExp* unit)
 	float dsthi = ZIN0(4);
 	unit->m_dstlo = dstlo;
 	unit->m_dstratio = dsthi/dstlo;
-	unit->m_rsrcrange = 1. / (srchi - srclo);
+	unit->m_rsrcrange = sc_reciprocal(srchi - srclo);
 	unit->m_rrminuslo = unit->m_rsrcrange * -srclo;
 }
 
@@ -3885,11 +3886,11 @@ void IEnvGen_Ctor(IEnvGen *unit)
 	unit->m_envvals = (float*)RTAlloc(unit->mWorld, (int)(numvals + 1.) * sizeof(float));
 
 	unit->m_envvals[0] = IN0(2);
-//	Print("%3.3f\n", unit->m_envvals[0]);
+	//	Print("offset of and initial  values %3,3f, %3.3f\n", offset, unit->m_envvals[0]);
 	// fill m_envvals with the values;
 	for (int i = 1; i <= numvals; i++) {
 	    unit->m_envvals[i] = IN0(4 + i);
-//	    Print("%3.3f\n", unit->m_envvals[i]);
+		//	    Print("val for: %d, %3.3f\n", i, unit->m_envvals[i]);
 	}
 
 //	float out = OUT0(0);
@@ -3986,26 +3987,27 @@ void IEnvGen_next_a(IEnvGen *unit, int inNumSamples)
 	}
 }
 
-
 void IEnvGen_next_k(IEnvGen *unit, int inNumSamples)
 {
 	float* out = OUT(0);
 	float level = unit->m_level;
-	float pointin = sc_max(IN0(0) - unit->m_offset, 0);
+	float pointin = IN0(0);
+	float offset = unit->m_offset;
 	int numStages = (int)IN0(3);
-
+	float point; // = unit->m_pointin;
+	
 	float totalDur = IN0(4);
+	
+	int stagemul;
 	// pointer, offset
 	// level0, numstages, totaldur,
-	float point = unit->m_pointin;
-
 	// [initval, [dur, shape, curve, level] * N ]
-
-	if (pointin == unit->m_pointin) {
-		Fill(inNumSamples, out, level);
-	} else {
-		float pointslope = CALCSLOPE(pointin, point);
-		for( int i = 0; i < inNumSamples; i++) {
+	
+	for( int i = 0; i < inNumSamples; i++) {
+		if (pointin == unit->m_pointin){
+			out[i] = level;
+		} else {
+			unit->m_pointin = point = sc_max(pointin - offset, 0.0);
 			float newtime = 0.f;
 			int stage = 0;
 			float seglen = 0.f;
@@ -4016,32 +4018,28 @@ void IEnvGen_next_k(IEnvGen *unit, int inNumSamples)
 					unit->m_level = level = unit->m_envvals[0];
 				} else {
 					float segpos = point;
-					// determine which segment the current time pointer needs calculated
+					// determine which segment the current time pointer needs
 					for(int j = 0; point >= newtime; j++) {
 						seglen = unit->m_envvals[(j * 4) + 1];
 						newtime += seglen;
 						segpos -= seglen;
 						stage = j;
-						}
-
+					}
+					stagemul = stage * 4;
 					segpos = segpos + seglen;
-					float begLevel = unit->m_envvals[(stage * 4)];
-					int shape = (int)unit->m_envvals[(stage * 4) + 2];
-					float curve = unit->m_envvals[(stage * 4) + 3];
-					float endLevel = unit->m_envvals[(stage * 4) + 4];
+					float begLevel = unit->m_envvals[stagemul];
+					int shape = (int)unit->m_envvals[stagemul + 2];
+					int curve = (int)unit->m_envvals[stagemul + 3];
+					float endLevel = unit->m_envvals[stagemul + 4];
 					float pos = (segpos / seglen);
-
+					
 					GET_ENV_VAL
 				}
 			}
 			out[i] = level;
-			point += pointslope;
 		}
-
-		unit->m_pointin = pointin;
 	}
 }
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 

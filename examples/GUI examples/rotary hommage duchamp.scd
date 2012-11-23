@@ -1,5 +1,5 @@
 
-// rotary hommage ˆ Duchamp
+// rotary hommage Ã  Duchamp
 // Julian Rohrhuber 2006
 (
 		var  w, width, center, bounds, a, b, c, z = 0, colors, fillOrStroke, shape;
@@ -11,7 +11,7 @@
 		fillOrStroke = [Pen.fillOval(_), Pen.strokeOval(_)];
 		shape = { (2 ** rrand(1, 5)).asInteger + rrand(0, 4) }.dup(rrand(5, 7));
 		shape = shape.sort.reverse;
-		w.drawHook = {
+		w.drawFunc = {
 			thisThread.randSeed = seed;
 			Pen.width = width;
 			center = 30;
@@ -35,5 +35,5 @@
 			
 		};
 		w.refresh;
-			fork {Êloop {Êrate.reciprocal.wait; defer {Êw.refresh; } } };		
+			fork { loop { rate.reciprocal.wait; defer { w.refresh; } } };
 )

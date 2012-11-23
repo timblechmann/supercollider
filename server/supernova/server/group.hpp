@@ -26,8 +26,7 @@
 
 #include "utilities/exists.hpp"
 
-namespace nova
-{
+namespace nova {
 
 struct abstract_group_tag;
 
@@ -105,7 +104,7 @@ public:
             return true;
 
         for (group_list::const_iterator it = child_groups.begin(); it != child_groups.end(); ++it)
-            if (it->is_parallel())
+            if (it->has_parallel_group_children())
                 return true;
 
         return false;
@@ -118,27 +117,23 @@ public:
         return child_synth_count + child_group_count;
     }
 
-    /* number of child synths and groups */
-    std::pair<std::size_t, std::size_t> child_count_deep(void) const
-    {
-        std::size_t synths = child_synth_count;
-        std::size_t groups = child_group_count;
-
-        for (group_list::const_iterator it = child_groups.begin(); it != child_groups.end(); ++it)
-        {
-            std::size_t recursive_synths, recursive_groups;
-            boost::tie(recursive_synths, recursive_groups) = it->child_count_deep();
-            groups += recursive_groups;
-            synths += recursive_synths;
-        }
-        return std::make_pair(synths, groups);
-    }
-
     template<typename functor>
     void apply_on_children(functor const & f)
     {
         for (server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it)
             f(*it);
+    }
+
+    template<typename functor>
+    void apply_deep_on_children(functor const & f)
+    {
+        for (server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it) {
+            if (it->is_group()) {
+                abstract_group & grp = static_cast<abstract_group&>(*it);
+                grp.apply_deep_on_children(f);
+            }
+            f(*it);
+        }
     }
 
     template<typename functor>
@@ -185,15 +180,15 @@ public:
 
     void free_children(void)
     {
-        child_nodes.clear_and_dispose(boost::mem_fn(&server_node::clear_parent));
+        child_nodes.clear_and_dispose(std::mem_fn(&server_node::clear_parent));
         assert(child_synth_count == 0);
         assert(child_group_count == 0);
     }
 
     void free_synths_deep(void)
     {
-        child_nodes.remove_and_dispose_if(boost::mem_fn(&server_node::is_synth),
-                                          boost::mem_fn(&server_node::clear_parent));
+        child_nodes.remove_and_dispose_if(std::mem_fn(&server_node::is_synth),
+                                          std::mem_fn(&server_node::clear_parent));
 
         /* now there are only group classes */
         for(server_node_list::iterator it = child_nodes.begin(); it != child_nodes.end(); ++it) {

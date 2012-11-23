@@ -6,6 +6,7 @@
 #include <mach-o/dyld.h> // for _NSGetExecutablePath
 #include <libgen.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <CoreFoundation/CFString.h>
 #include <CoreFoundation/CFBundle.h>
@@ -21,12 +22,21 @@ void SC_StandAloneInfo::SC_StandAloneInfoInit() {
 	CFStringEncoding encoding = kCFStringEncodingASCII;
 	if(!haveCheckedBundleStatus) {
 		haveCheckedBundleStatus = true;
+		
 		CFURLRef enablerURL = CFBundleCopyResourceURL (
 			CFBundleGetMainBundle(),
 			CFSTR("SCClassLibrary"),
 			NULL,
 			NULL
 		);
+		if( !enablerURL ) {
+			enablerURL = CFBundleCopyResourceURL (
+				  CFBundleGetMainBundle(),
+				  CFSTR("sclang.app"),
+				  NULL,
+				  NULL
+				  );
+		}
 		if ( enablerURL ) {
 			// If sclang or SuperCollider binary is run within the .app bundle,
 			// this is how we find the Resources path.

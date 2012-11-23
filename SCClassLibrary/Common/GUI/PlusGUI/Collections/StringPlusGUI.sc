@@ -3,33 +3,42 @@
 		Document.new(title, this, makeListener);
 	}
 
-	openTextFile{ arg selectionStart=0, selectionLength=0;
-		if(Document.implementationClass.notNil) {
-			Document.open(this.absolutePath , selectionStart, selectionLength);
-		} {
-			this.openOS;
-		}
-	}
 	openHTMLFile{ arg selectionStart=0, selectionLength=0;
+		var webView;
+
 		if (Platform.openHTMLFileAction.notNil) {
-			Platform.openHTMLFileAction.value(this, selectionStart, selectionLength)
-		} {
-			this.openTextFile(selectionStart, selectionLength)
-		}
+			Platform.openHTMLFileAction.value(this, selectionStart, selectionLength);
+			^this
+		};
+
+		webView = \QWebView.asClass;
+		if (webView.notNil) {
+			webView = webView.new;
+			webView.url_(this);
+			webView.front;
+			^this;
+		};
+
+		this.openDocument(selectionStart, selectionLength)
 	}
 
-	openDocument {
+	openDocument { arg selectionStart=0, selectionLength=0;
+		var ideClass;
 		if(Document.implementationClass.notNil) {
-			Document.open(this);
-		} {
-			this.openOS;
-		}
-	}
-//	*fromUser { arg prompt="Enter string :", default="";
-//		_GetStringFromUser
-//		^this.primitiveFailed
-//	}
+			Document.open(this, selectionStart, selectionLength);
+			^this
+		};
 
+		ideClass = \ScIDE.asClass;
+		if ( ideClass.notNil ) {
+			if ( this.endsWith(".sc") || this.endsWith(".scd") ) {
+				ideClass.open(this, selectionStart, selectionLength);
+				^this
+			}
+		};
+
+		this.openOS
+	}
 
 	draw {
 		this.drawAtPoint(Point(0,0), Font.default, Color.black);
@@ -116,3 +125,8 @@
 	}
 }
 
++ Symbol {
+	openDocument { arg selectionStart=0, selectionLength=0;
+		^this.asString.openDocument(selectionStart, selectionLength)
+	}
+}

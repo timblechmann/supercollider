@@ -25,11 +25,8 @@
 #include "MsgFifo.h"
 #include "SC_SyncCondition.h"
 #include "SC_PlugIn.h"
-#ifdef _WIN32
-	#include <sndfile-win.h>
-#else
-	#include <sndfile.h>
-#endif
+
+#include <sndfile.h>
 
 #include <new>
 
@@ -416,8 +413,6 @@ void VDiskIn_first(VDiskIn *unit, int inNumSamples)
 
 	float pchRatio = unit->m_pchRatio;
 	float pchSlope = CALCSLOPE(newPchRatio, pchRatio);
-
-	const float* tableInit = bufData;
 
 	for (uint32 i = 0; i < bufChannels; i++){
 	    out[i][0] = bufData[0 + i];

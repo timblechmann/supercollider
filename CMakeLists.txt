@@ -107,7 +107,6 @@ if(APPLE)
 		APPEND
 		PROPERTY COMPILE_DEFINITIONS SC_DARWIN)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	add_definitions("-DSC_LINUX")
 	add_definitions(-DSC_DATA_DIR="${CMAKE_INSTALL_PREFIX}/share/SuperCollider")
 elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 	add_definitions("-DSC_FREEBSD")
@@ -122,12 +121,16 @@ if(WIN32)
     add_definitions(-DWIN32_LEAN_AND_MEAN)
 
     if(MSVC)
-        SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_RELEASE} /MTd")
-        SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_DEBUG} /MT")
+        SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
+        SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
     endif()
 
     # correctly link the static Boost Thread library:
     add_definitions(-DBOOST_THREAD_USE_LIB)
+	#avoid unnecesary autolink
+	add_definitions(-DBOOST_DATE_TIME_NO_LIB)
+
+    add_definitions(-DBOOST_CHRONO_HEADER_ONLY)
 endif()
 
 
@@ -148,9 +151,10 @@ set(AUDIOAPI "default" CACHE STRING "Audio API to use (one of {default,coreaudio
 option(LIBSCSYNTH "Compile libscsynth as shared library" OFF)
 
 option(INSTALL_HELP "Install help docs and examples along with the software" ON)
-option(INSTALL_OLD_HELP "Install old and deprecated help files" ON)
 option(SC_DOC_RENDER "Pre-render SCDoc documentation. (For putting online, etc)" OFF)
 option(SC_IDE "Build Qt IDE." ON)
+
+option(ENABLE_TESTSUITE "Compile testsuite." ON)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     option(SUPERNOVA "Build with supernova as optional audio synthesis server" ON)
@@ -178,12 +182,6 @@ if (SC_QT)
 endif (SC_QT)
 
 if(WIN32)
-	option(SC_PSYCOLLIDER "Build PsyCollider" ON)
-else()
-	option(SC_PSYCOLLIDER "Build PsyCollider" OFF)
-endif()
-
-if(WIN32)
     option(SC_WIN_DEP_DIRS
         "A list of directories where dependencies will be searched for when packaging.")
 endif()
@@ -196,6 +194,9 @@ endif()
 option(SC_SYMLINK_CLASSLIB "Place a symlink of SCCLassLibrary instead of copying" OFF)
 option(SC_OX "Try to compile with support for C++0x (experimental, mainly related to supernova)" OFF)
 
+option(SYSTEM_BOOST   "Use boost libraries from system" OFF)
+option(SYSTEM_YAMLCPP "Use yaml-cpp library from system" ON)
+
 #############################################
 # some default libraries
 
@@ -206,7 +207,7 @@ if (NOT PTHREADS_FOUND)
 endif()
 include_directories(${PTHREADS_INCLUDE_DIR})
 
-if (MSVC OR MINGW)
+if(MSVC OR MINGW)
     set(MATH_LIBRARY "")
 else()
     find_library(MATH_LIBRARY m)
@@ -220,20 +221,22 @@ if(CURL)
 	endif()
 endif()
 
-set(Boost_USE_MULTITHREADED      ON)
-find_package( Boost 1.48.0 COMPONENTS thread system filesystem program_options regex test )
-
-if (SC_OX)
-	set(Boost_FOUND OFF) # boost 1.48 does not like c++11
+if(SYSTEM_BOOST)
+  set(Boost_USE_MULTITHREADED      ON)
+  find_package( Boost 1.50.0 COMPONENTS  thread system filesystem program_options regex test_exec_monitor )
 endif()
 
 if (Boost_FOUND)
 	link_directories(${Boost_LIBRARY_DIRS})
 else()
-	message("building boost libraries manually")
+	message(STATUS "building boost libraries manually")
 endif()
 
-
+if(SYSTEM_YAMLCPP)
+  find_package(YamlCpp)
+else()
+  set(YAMLCPP_FOUND OFF)
+endif()
 
 #############################################
 # some preprocessor flags
@@ -285,6 +288,12 @@ endif()
 #############################################
 # subdirectories
 add_subdirectory(external_libraries)
+
+if(NOT YAMLCPP_FOUND)
+  set(YAMLCPP_LIBRARY yaml)
+  set(YAMLCPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/external_libraries/yaml-cpp-0.3.0/include)
+endif()
+
 add_subdirectory(server)
 add_subdirectory(lang)
 add_subdirectory(editors)
@@ -320,7 +329,7 @@ if(NOT SC_QT)
 endif()
 
 if(WIN32)
-	set(SCCLASSLIB_EXCLUDE_REGEX "${SCCLASSLIB_EXCLUDE_REGEX}|PsycolliderDocument")
+	set(SCCLASSLIB_EXCLUDE_REGEX "${SCCLASSLIB_EXCLUDE_REGEX}")
 endif()
 
 
@@ -396,12 +405,6 @@ install(DIRECTORY examples
 	PATTERN "*#" EXCLUDE
 )
 
-if(INSTALL_OLD_HELP)
-	install(DIRECTORY Help
-		DESTINATION ${auxresourcesdir}
-	)
-endif()
-
 if(INSTALL_HELP)
 	if(SC_SYMLINK_CLASSLIB AND APPLE)
 		message(STATUS "Will create symlink of HelpSource to ${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/HelpSource")
@@ -469,7 +472,9 @@ set_directory_properties(
 #
 # testsuite
 #
-add_subdirectory(testsuite)
+if(ENABLE_TESTSUITE)
+  add_subdirectory(testsuite)
+endif()
 
 #############################################
 # CPack support

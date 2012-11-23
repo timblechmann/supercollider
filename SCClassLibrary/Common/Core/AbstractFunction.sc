@@ -110,7 +110,8 @@ AbstractFunction {
 
 	bitAnd { arg function, adverb; ^this.composeBinaryOp('bitAnd', function, adverb) }
 	bitOr { arg function, adverb; ^this.composeBinaryOp('bitOr', function, adverb) }
-	bitXor { arg function, adverb; ^this.composeBinaryOp('bitXor', function, adverb) }	bitHammingDistance { arg function, adverb; ^this.composeBinaryOp('hammingDistance', function, adverb) }
+	bitXor { arg function, adverb; ^this.composeBinaryOp('bitXor', function, adverb) }
+	bitHammingDistance { arg function, adverb; ^this.composeBinaryOp('hammingDistance', function, adverb) }
 
 	lcm { arg function, adverb; ^this.composeBinaryOp('lcm', function, adverb) }
 	gcd { arg function, adverb; ^this.composeBinaryOp('gcd', function, adverb) }
@@ -157,11 +158,12 @@ AbstractFunction {
 	ref { ^this.composeUnaryOp('asRef') }
 
 	// nary operators
-	clip { arg lo, hi; ^this.composeNAryOp('clip', [lo,hi]) }
+	clip { arg lo, hi; ^this.composeNAryOp('clip', [lo,hi])  }
 	wrap { arg lo, hi; ^this.composeNAryOp('wrap', [lo,hi])  }
 	fold { arg lo, hi; ^this.composeNAryOp('fold', [lo,hi])  }
-	blend { arg that, blendFrac = 0.5; ^this.composeNAryOp('blend', [that, blendFrac]) }
-
+	blend { arg that, blendFrac = 0.5;
+		^this.composeNAryOp('blend', [that, blendFrac])
+	}
 	linlin { arg inMin, inMax, outMin, outMax, clip=\minmax;
 		^this.composeNAryOp('linlin', [inMin, inMax, outMin, outMax, clip])
 	}
@@ -308,7 +310,7 @@ FunctionList : AbstractFunction {
 		array.remove(function);
 		if(array.size < 2) { ^array[0] };
 	}
-	
+
 	replaceFunc { arg find, replace;
 		array = array.replace(find, replace);
 	}

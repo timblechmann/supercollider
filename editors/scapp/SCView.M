@@ -948,7 +948,7 @@ int SCView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 			PyrString* pstring = slotRawString(slot);
 			if(!pstring) return errNone;
 			if(mDragLabel) [mDragLabel release];
-			mDragLabel = [[NSString alloc] initWithCString: pstring->s length: pstring->size];
+			mDragLabel = [[[NSString alloc] initWithCString: pstring->s encoding:[NSString defaultCStringEncoding] ] substringToIndex: pstring->size];
 			return errNone;
 		} else if (IsNil(slot)) {
 			if(mDragLabel) [mDragLabel release];
@@ -1032,7 +1032,9 @@ void SCView::beginDrag(SCPoint where)
 		slotCopy(&slot, &g->classvars->slots[classVarIndex]);
 		slotCopy(&stringSlot, &g->classvars->slots[classVarIndex+1]);
 		if (isKindOfSlot(&stringSlot, class_string)) {
-			string = [NSString stringWithCString: slotRawString(&stringSlot)->s length: slotRawString(&stringSlot)->size];
+			PyrString *pstring = slotRawString(&stringSlot);
+			string = [NSString stringWithCString: pstring->s encoding:[NSString defaultCStringEncoding]];
+			string = [string substringToIndex: pstring->size];
 		}
 		if(mDragLabel) label = mDragLabel;
 	}
@@ -1068,7 +1070,6 @@ SCContainerView::~SCContainerView()
 
 int SCContainerView::setProperty(PyrSymbol *symbol, PyrSlot *slot)
 {
-    int err;
 	char *name = symbol->name;
 
 	if (strcmp(name, "visible")==0) {
@@ -1236,9 +1237,6 @@ SCCompositeView::~SCCompositeView()
 void SCCompositeView::setBounds(SCRect inBounds)
 {
     SCView *child = mChildren;
-	SCView *myTop = mTop;
-	SCRect topBounds = myTop->getBounds();
-	SCRect topPBounds = myTop->getLayout().bounds;
 
 //    float right = mBounds.x + mBounds.width;
 //    float bottom = mBounds.y + mBounds.height;
@@ -3398,7 +3396,6 @@ void SCPopUpMenu::mouseBeginTrack(SCPoint where, int modifiers, NSEvent *theEven
         beginDrag(where);
     } else {
 		if (!mMenu) return;
-		SCRect bounds = getDrawBounds();
 
 		[(SCGraphView*)mTop->GetNSView() startMenuTracking: this];
 
@@ -3407,7 +3404,6 @@ void SCPopUpMenu::mouseBeginTrack(SCPoint where, int modifiers, NSEvent *theEven
 			[[mMenu itemAtIndex:i] setState:mValue==i];
 		}
 
-		NSPoint p = NSMakePoint(bounds.x, bounds.y);
 		NSView *view = mTop->GetNSView();
 		[NSMenu popUpContextMenu:mMenu withEvent:theEvent forView:view];
 		setValue([mMenu current], true);
@@ -5174,8 +5170,8 @@ void SCEnvelopeView::draw(SCRect inDamage)
 					float  gcx, gcy, gcox, gcoy;
 					SCEnvObject * conObj = (mEnvObj + (i-1));
 					float curve;
-					float dur, numpointsY, yLevel, pos;
-					float begTime, endTime, begLevel, endLevel, stepsize, ar, br, yrange;
+					float dur, yLevel;
+					float begTime, endTime, begLevel, endLevel, stepsize;
 					int numsteps;
 					float startPointX, endPointX, startPointY, endPointY;
 					curve = conObj->curve;
@@ -5358,8 +5354,8 @@ void SCEnvelopeView::draw(SCRect inDamage)
 								break;
 
 							case shape_Exponential:
-								float dur, numpointsY, yLevel, pos;
-								float begTime, endTime, begLevel, endLevel, stepsize, ar, br, yrange;
+								float dur, yLevel;
+								float begTime, endTime, begLevel, endLevel, stepsize;
 								int numsteps;
 								float startPointX, endPointX, startPointY, endPointY;
 

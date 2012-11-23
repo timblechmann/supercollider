@@ -21,12 +21,6 @@
 
 #include "node_graph.hpp"
 
-#ifdef BOOST_HAS_RVALUE_REFS
-#define MOVE(X) std::move(X)
-#else
-#define MOVE(X) X
-#endif
-
 namespace nova
 {
 
@@ -84,8 +78,7 @@ private:
         const reverse_iterator last = iterator_sub(end, 1);
 
         size_t collected_satellites = 0;
-        for (;;)
-        {
+        for (;;) {
             ++prev;
             if (prev == end)
                  // we are the first item, so we use the head activiation limit
@@ -134,8 +127,7 @@ private:
         sequential_child_list sequential_children;
         sequential_children.reserve(g.child_synth_count);
 
-        for (r_iterator it = g.child_nodes.rbegin(); it != g.child_nodes.rend(); ++it)
-        {
+        for (r_iterator it = g.child_nodes.rbegin(); it != g.child_nodes.rend(); ++it) {
             server_node & node = *it;
 
             if (node.is_synth())
@@ -201,10 +193,10 @@ private:
             successor_container satellites = fill_satellite_successors(last_node->satellite_successors, 1);
             successor_container combined_successors = concat_successors(satellites, successors);
 
-            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(*seq_it++))), node_count),
+            q_item = q->allocate_queue_item(queue_node(std::move(queue_node_data(static_cast<abstract_synth*>(*seq_it++))), node_count),
                                             combined_successors, activation_limit);
         } else
-            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(*seq_it++))), node_count),
+            q_item = q->allocate_queue_item(queue_node(std::move(queue_node_data(static_cast<abstract_synth*>(*seq_it++))), node_count),
                                             successors, activation_limit);
 
         queue_node & q_node = q_item->get_job();
@@ -241,8 +233,7 @@ private:
         server_node_list::reverse_iterator previous = it;
         ++it;
 
-        for (;;)
-        {
+        for (;;) {
             if (it == child_nodes.rend())
                 return previous; // we found the beginning of this group
 
@@ -276,8 +267,7 @@ private:
                                   + count_satellite_predecessor_nodes(node);
 
         if (grp.has_synth_children()) {
-            if (node.has_satellite_successor())
-            {
+            if (node.has_satellite_successor()) {
                 successor_container satellites = fill_satellite_successors(node.satellite_successors,
                                                  count_tail_nodes(grp));
                 successor_container group_successors = concat_successors(satellites, successors);
@@ -354,11 +344,11 @@ private:
         if (node.has_satellite_successor()) {
             successor_container satellites = fill_satellite_successors(node.satellite_successors, 1);
 
-            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(&node)))),
+            q_item = q->allocate_queue_item(queue_node(std::move(queue_node_data(static_cast<abstract_synth*>(&node)))),
                                             concat_successors(successors, satellites),
                                             activation_limit);
         } else {
-            q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth*>(&node)))),
+            q_item = q->allocate_queue_item(queue_node(std::move(queue_node_data(static_cast<abstract_synth*>(&node)))),
                                             successors, activation_limit);
         }
 
@@ -422,12 +412,11 @@ private:
         const size_t activation_limit = 0;
 
         for (server_node_list::const_iterator it = satellite_predecessors.begin();
-                it != satellite_predecessors.end(); ++it)
-        {
+                it != satellite_predecessors.end(); ++it) {
             server_node & node = const_cast<server_node &>(*it);
 
             if (node.is_synth()) {
-                thread_queue_item * q_item = q->allocate_queue_item(queue_node(MOVE(queue_node_data(static_cast<abstract_synth *>(&node)))),
+                thread_queue_item * q_item = q->allocate_queue_item(queue_node(std::move(queue_node_data(static_cast<abstract_synth *>(&node)))),
                                              successors, activation_limit);
 
                 q->add_initially_runnable(q_item);

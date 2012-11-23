@@ -250,12 +250,16 @@ Event : Environment {
 					// assembles a synth control list from event values
 
 				getMsgFunc: { |instrument|
-					var	synthLib, synthDesc, desc;
+					var	synthLib, desc;
 						// if user specifies a msgFunc, prefer user's choice
 					if(~msgFunc.isNil) {
-						instrument = ~instrument = instrument.asSymbol;
+						instrument = ~instrument = if(instrument.class===Symbol) {
+							instrument
+						} {
+							instrument.asDefName.asSymbol
+						};
 						synthLib = ~synthLib ?? { SynthDescLib.global };
-						synthDesc = desc = synthLib.at(instrument);
+						desc = synthLib.at(instrument);
 						if (desc.notNil) {
 							~hasGate = desc.hasGate;
 							~msgFunc = desc.msgFunc;
@@ -266,6 +270,7 @@ Event : Environment {
 				},
 				synthDefName: { |instrument, variant, synthDesc|
 						// allow `nil to cancel a variant in a pattern
+					instrument = instrument.asDefName;
 					variant = variant.dereference;
 					if(variant.notNil and: { synthDesc.notNil and: { synthDesc.hasVariants } })
 						{ (instrument ++ "." ++ variant).asSymbol }
@@ -614,6 +619,7 @@ Event : Environment {
 						if (freqs.isRest.not) {
 							~freq = freqs;
 							~amp = ~amp.value;
+							~isPlaying = true;
 							msgFunc = ~getMsgFunc.valueEnvir;
 							instrumentName = ~synthDefName.valueEnvir;
 							bndl = msgFunc.valueEnvir;
@@ -668,7 +674,8 @@ Event : Environment {
 						} {
 							~schedBundleArray.value(~lag, ~timingOffset, server,
 								[\n_free, ~id.asControlInput].flop)
-						}
+						};
+						~isPlaying = false;
 					},
 
 					kill: #{|server|

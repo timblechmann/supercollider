@@ -152,7 +152,6 @@ void FFT_Ctor(FFT *unit)
 		unit->m_scfft = 0;
 		return;
 	}
-	int fullbufsize = unit->m_fullbufsize * sizeof(float);
 	int audiosize = unit->m_audiosize * sizeof(float);
 
 	int hopsize = (int)(sc_max(sc_min(ZIN0(2), 1.f), 0.f) * unit->m_audiosize);
@@ -172,6 +171,11 @@ void FFT_Ctor(FFT *unit)
 	SCWorld_Allocator alloc(ft, unit->mWorld);
 	unit->m_scfft = scfft_create(unit->m_fullbufsize, unit->m_audiosize, (SCFFT_WindowFunction)unit->m_wintype, unit->m_inbuf,
 								 unit->m_fftsndbuf->data, kForward, alloc);
+
+	if (!unit->m_scfft) {
+		SETCALC(*ClearUnitOutputs);
+		return;
+	}
 
 	memset(unit->m_inbuf, 0, audiosize);
 
@@ -256,6 +260,12 @@ void IFFT_Ctor(IFFT* unit){
 	unit->m_scfft = scfft_create(unit->m_fullbufsize, unit->m_audiosize, (SCFFT_WindowFunction)unit->m_wintype, unit->m_fftsndbuf->data,
 								 unit->m_fftsndbuf->data, kBackward, alloc);
 
+	if (!unit->m_scfft) {
+		SETCALC(*ClearUnitOutputs);
+		unit->m_olabuf = 0;
+		return;
+	}
+
 	// "pos" will be reset to zero when each frame comes in. Until then, the following ensures silent output at first:
 	unit->m_pos = 0; //unit->m_audiosize;
 
@@ -284,7 +294,6 @@ void IFFT_next(IFFT *unit, int wrongNumSamples)
 
 	// Load state from struct into local scope
 	int pos     = unit->m_pos;
-	int fullbufsize  = unit->m_fullbufsize;
 	int audiosize = unit->m_audiosize;
 // 	int numSamples = unit->mWorld->mFullRate.mBufLength;
 	int numSamples = unit->m_numSamples;
@@ -372,7 +381,6 @@ void FFTTrigger_Ctor(FFTTrigger *unit)
 
 	int numSamples = unit->mWorld->mFullRate.mBufLength;
 	float dataHopSize = IN0(1);
-	int initPolar = unit->m_polar = (int)IN0(2);
 	unit->m_numPeriods = unit->m_periodsRemain = (int)(((float)unit->m_fullbufsize * dataHopSize) / numSamples) - 1;
 
 	buf->coord = (IN0(2) == 1.f) ? coord_Polar : coord_Complex;
