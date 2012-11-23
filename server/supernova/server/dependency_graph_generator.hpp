@@ -53,10 +53,13 @@ class dependency_graph_generator
 public:
     dsp_thread_queue * operator()(node_graph * graph)
     {
-        /* pessimize: reserve enough memory for the worst case */
-        q = new node_graph::dsp_thread_queue(graph->synth_count_);
+        // TODO: we also have parallelism when having satellite nodes!
+        bool has_parallelism = graph->root_group()->has_parallel_group_children();
 
-        fill_queue(*graph->root_group());
+        /* pessimize: reserve enough memory for the worst case */
+        q = new node_graph::dsp_thread_queue(graph->synth_count_, has_parallelism);
+
+        fill_queue(*graph->root_group()); // LATER: we could optimize the case when we do not have any paralleism
 #ifndef NDEBUG
         q->validate_queue();
 #endif
