@@ -271,9 +271,6 @@ public:
 public:
     HOT void operator()(void)
     {
-        if (unlikely(dsp_queue_dirty))
-            rebuild_dsp_queue();
-
         scheduler<scheduler_hook, thread_init_functor>::operator()();
         sc_factory->update_nodegraph();
     }
@@ -286,6 +283,14 @@ public:
     }
 
 private:
+    friend class scheduler_hook;
+    void sn_scheduler_hook()
+    {
+        execute_scheduled_bundles();
+        if (unlikely(dsp_queue_dirty))
+            rebuild_dsp_queue();
+    }
+
     bool dsp_queue_dirty;
 
     callback_interpreter<system_callback, false> system_interpreter; // rt to system thread
@@ -325,7 +330,7 @@ inline void realtime_engine_functor::run_tick(void)
 
 inline void scheduler_hook::operator()(void)
 {
-    instance->execute_scheduled_bundles();
+    instance->sn_scheduler_hook();
 }
 
 inline bool log_printf(const char *fmt, ...)
