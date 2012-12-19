@@ -1087,6 +1087,8 @@ void handle_s_new(received_message const & msg)
     try {
         while (args != end)
             set_control(synth, args, end);
+
+        synth->prepare();
     } catch(std::exception & e) {
         log_printf("exception in /s_new: %s\n", e.what());
     }
