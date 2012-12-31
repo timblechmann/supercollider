@@ -79,7 +79,6 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrSignal.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/PyrSymbolTable.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/SC_LanguageConfig.cpp
-	${CMAKE_SOURCE_DIR}/lang/LangSource/Samp.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/SimpleStack.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/VMGlobals.cpp
 	${CMAKE_SOURCE_DIR}/lang/LangSource/dumpByteCodes.cpp
@@ -93,6 +92,7 @@ set(scapp_sources
 	${CMAKE_SOURCE_DIR}/lang/LangPrimSource/SC_CoreAudioPrim.cpp
 
 	${CMAKE_SOURCE_DIR}/common/fftlib.c
+	${CMAKE_SOURCE_DIR}/common/Samp.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_fftlib.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_AllocPool.cpp
 	${CMAKE_SOURCE_DIR}/common/SC_DirUtils.cpp
