@@ -19,6 +19,7 @@
 */
 
 #include "find_replace_tool.hpp"
+#include "main_window.hpp"
 #include "code_editor/editor.hpp"
 #include "../core/main.hpp"
 #include "../core/settings/manager.hpp"
@@ -116,6 +117,8 @@ TextFindReplacePanel::TextFindReplacePanel( QWidget * parent ):
     connect(mFindField, SIGNAL(returnPressed()), this, SLOT(onFindFieldReturn()));
     connect(mFindField, SIGNAL(textChanged(QString)), this, SLOT(onFindFieldTextChanged()));
     connect(mReplaceField, SIGNAL(returnPressed()), this, SLOT(replace()));
+    // Update search results when options change:
+    connect(optMenu, SIGNAL(triggered(QAction*)), this, SLOT(findAll()));
 
     Settings::Manager *settings = Main::settings();
     QAction *action;
@@ -208,6 +211,8 @@ void TextFindReplacePanel::onFindFieldTextChanged()
         mSearchPosition = mEditor->textCursor().selectionStart();
 
     int count = mEditor->findAll(expr, flagz);
+    if (!expr.isEmpty())
+        reportFoundOccurrencies(count);
 
     QTextCursor searchCursor(mEditor->textDocument());
     searchCursor.setPosition(mSearchPosition);
@@ -251,8 +256,13 @@ void TextFindReplacePanel::findAll()
 {
     if (!mEditor) return;
 
+    QRegExp expr = regexp();
+
     // NOTE: empty expression removes any search highlighting
-    mEditor->findAll(regexp(), flags());
+    int count = mEditor->findAll(expr, flags());
+
+    if (!expr.isEmpty())
+        reportFoundOccurrencies(count);
 }
 
 void TextFindReplacePanel::replace()
@@ -272,11 +282,28 @@ void TextFindReplacePanel::replaceAll()
     if (!mEditor) return;
 
     QRegExp expr = regexp();
-    if (expr.isEmpty()) return;
+    if (expr.isEmpty())
+        return;
 
-    mEditor->replaceAll(expr, replaceString(), flags());
+    QTextDocument::FindFlags opt = flags();
+
+    int count = mEditor->replaceAll(expr, replaceString(), opt);
+
+    reportReplacedOccurrencies( count );
 
     mSearchPosition = -1;
+}
+
+void TextFindReplacePanel::reportFoundOccurrencies( int count )
+{
+    QString message = tr("%n occurrencies found.", "Find text in document...", count);
+    MainWindow::instance()->showStatusMessage( message );
+}
+
+void TextFindReplacePanel::reportReplacedOccurrencies( int count )
+{
+    QString message = tr("%n occurrencies replaced.", "Find/replace text in document...", count);
+    MainWindow::instance()->showStatusMessage( message );
 }
 
 } // namespace ScIDE

@@ -1,11 +1,11 @@
 SynthDefOld : SynthDef {
 	
 	*new { arg name, ugenGraphFunc, rates, prependArgs, variants, metadata;
-		^this.prNew(name).variants_(variants).metadata_(metadata).children_(Array.new(64))
+		^super.new.name_(name.asSymbol).variants_(variants).metadata_(metadata).children_(Array.new(64))
 			.build(ugenGraphFunc, rates, prependArgs)
-	}	
-	
-	writeDefFile { arg dir, overwrite;
+	}
+
+	writeDefFile { arg dir, overwrite(true);
 		if((metadata.tryPerform(\at, \shouldNotSend) ? false).not) {
 			super.writeDefFileOld(name, dir, overwrite);
 		} {
@@ -21,7 +21,7 @@ SynthDefOld : SynthDef {
 		// This describes the file format for the synthdef files.
 		var allControlNamesTemp, allControlNamesMap;
 
-		file.putPascalString(name);
+		file.putPascalString(name.asString);
 
 		this.writeConstants(file);
 

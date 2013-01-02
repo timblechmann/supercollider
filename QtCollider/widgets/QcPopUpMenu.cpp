@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -36,11 +36,11 @@ QcPopUpMenu::QcPopUpMenu() :
   connect( this, SIGNAL(activated(int)), this, SLOT(doAction(int)) );
 }
 
-void QcPopUpMenu::setItems( const VariantList & items )
+void QcPopUpMenu::setItems( const QVariantList & items )
 {
   clear();
-  Q_FOREACH( QVariant item, items.data )
-      addItem( item.toString() );
+  Q_FOREACH( const QVariant & item, items )
+    addItem( item.toString() );
 }
 
 void QcPopUpMenu::doAction( int choice )

@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -23,6 +23,7 @@
 #include "../QcWidgetFactory.h"
 
 #include <QKeyEvent>
+#include <QModelIndex>
 
 class QcListWidgetFactory : public QcWidgetFactory<QcListWidget>
 {
@@ -39,24 +40,24 @@ QcListWidget::QcListWidget() : _emitAction(true)
            this, SLOT( onCurrentItemChanged() ) );
 }
 
-void QcListWidget::setItems( const VariantList & items )
+void QcListWidget::setItems( const QVariantList & items )
 {
   _emitAction = false;
   clear();
-  Q_FOREACH( QVariant item, items.data )
-    addItem( item.toString() );
+  Q_FOREACH( const QVariant & item, items )
+      addItem( item.toString() );
   setCurrentRow( 0 );
   _emitAction = true;
 }
 
-void QcListWidget::setColors( const VariantList & colors ) const
+void QcListWidget::setColors( const QVariantList & colors ) const
 {
-  int cc = colors.data.count();
+  int cc = colors.count();
   int ic = count();
   for( int i=0; i<cc && i < ic; ++i ) {
-    QListWidgetItem *it = item(i);
-    QColor color( colors.data[i].value<QColor>() );
-    if( color.isValid() ) it->setBackground( color );
+      QListWidgetItem *it = item(i);
+      QColor color( colors[i].value<QColor>() );
+      if( color.isValid() ) it->setBackground( color );
   }
 }
 
@@ -66,6 +67,15 @@ void QcListWidget::setCurrentRowWithoutAction( int row )
   _emitAction = false;
   setCurrentRow( row );
   _emitAction = b;
+}
+
+QVariantList QcListWidget::selection() const
+{
+    QModelIndexList modelIndexes = QListView::selectedIndexes();
+    QVariantList indexes;
+    Q_FOREACH( const QModelIndex & index, modelIndexes )
+        indexes << index.row();
+    return indexes;
 }
 
 void QcListWidget::onCurrentItemChanged()

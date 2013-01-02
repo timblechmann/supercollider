@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -27,7 +27,7 @@
 class QcButton : public QPushButton, QcHelper, QtCollider::Style::Client
 {
   Q_OBJECT
-  Q_PROPERTY( VariantList states READ dummyVariantList WRITE setStates );
+  Q_PROPERTY( QVariantList states READ dummyVariantList WRITE setStates );
   Q_PROPERTY( int value READ getValue WRITE setValue );
   Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
 
@@ -48,7 +48,7 @@ class QcButton : public QPushButton, QcHelper, QtCollider::Style::Client
       QColor textColor;
       QColor buttonColor;
     };
-    void setStates( const VariantList & );
+    void setStates( const QVariantList & );
     void setValue( int val ) { setState( val ); }
     int getValue() const { return currentState; }
     void setState( int );

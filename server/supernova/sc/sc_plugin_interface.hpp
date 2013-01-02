@@ -54,18 +54,25 @@ public:
     void add_done_node(server_node * node)
     {
         spin_lock::scoped_lock lock(cmd_lock);
+        if (std::find(done_nodes.begin(), done_nodes.end(), node) != done_nodes.end())
+            return;
+
         done_nodes.push_back(node);
     }
 
     void add_freeDeep_node(abstract_group * node)
     {
         spin_lock::scoped_lock lock(cmd_lock);
+        if (std::find(freeDeep_nodes.begin(), freeDeep_nodes.end(), node) != freeDeep_nodes.end())
+            return;
         freeDeep_nodes.push_back(node);
     }
 
     void add_freeAll_node(abstract_group * node)
     {
         spin_lock::scoped_lock lock(cmd_lock);
+        if (std::find(freeAll_nodes.begin(), freeAll_nodes.end(), node) != freeAll_nodes.end())
+            return;
         freeAll_nodes.push_back(node);
     }
 
@@ -109,13 +116,13 @@ public:
     /* audio buffer handling */
     SndBuf* allocate_buffer(uint32_t index, uint32_t frames, uint32_t channels);
     int allocate_buffer(SndBuf * buf, uint32_t frames, uint32_t channels, double samplerate);
-    int buffer_read_alloc(uint32_t index, const char * filename, uint32_t start, uint32_t frames);
-    int buffer_alloc_read_channels(uint32_t index, const char * filename, uint32_t start, uint32_t frames, uint32_t channel_count,
-                                   const uint32_t * channel_data);
-    int buffer_read(uint32_t index, const char * filename, uint32_t start_file, uint32_t frames, uint32_t start_buffer,
-                    bool leave_open);
-    int buffer_read_channel(uint32_t index, const char * filename, uint32_t start_file, uint32_t frames, uint32_t start_buffer,
-                    bool leave_open, uint32_t channel_count, const uint32_t * channel_data);
+    void buffer_read_alloc(uint32_t index, const char * filename, uint32_t start, uint32_t frames);
+    void buffer_alloc_read_channels(uint32_t index, const char * filename, uint32_t start, uint32_t frames, uint32_t channel_count,
+                                    const uint32_t * channel_data);
+    void buffer_read(uint32_t index, const char * filename, uint32_t start_file, uint32_t frames, uint32_t start_buffer,
+                     bool leave_open);
+    void buffer_read_channel(uint32_t index, const char * filename, uint32_t start_file, uint32_t frames, uint32_t start_buffer,
+                             bool leave_open, uint32_t channel_count, const uint32_t * channel_data);
 
     sample * get_nrt_mirror_buffer(uint32_t index)
     {
@@ -160,7 +167,7 @@ private:
 
 public:
     /* copies nrt mirror to rt buffers */
-    void buffer_sync(uint32_t index);
+    void buffer_sync(uint32_t index) noexcept;
 
     /* @{ */
     /* control bus handling */

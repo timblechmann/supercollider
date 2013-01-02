@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -126,10 +126,11 @@ class QcGraph : public QWidget, QcHelper, QtCollider::Style::Client
 {
   Q_OBJECT
   Q_ENUMS( ElementStyle )
-  Q_PROPERTY( VariantList value READ value WRITE setValue )
-  Q_PROPERTY( VariantList strings READ dummyVariantList WRITE setStrings );
+  Q_PROPERTY( QVariantList value READ value WRITE setValue )
+  Q_PROPERTY( QVariantList strings READ dummyVariantList WRITE setStrings );
   Q_PROPERTY( int index READ index WRITE setIndex );
   Q_PROPERTY( int lastIndex READ lastIndex );
+  Q_PROPERTY( QVariantList selectionIndexes READ selectionIndexes);
   Q_PROPERTY( int thumbSize READ dummyInt WRITE setThumbSize );
   Q_PROPERTY( int thumbWidth READ dummyInt WRITE setThumbWidth );
   Q_PROPERTY( int thumbHeight READ dummyInt WRITE setThumbHeight );
@@ -152,7 +153,7 @@ class QcGraph : public QWidget, QcHelper, QtCollider::Style::Client
   Q_PROPERTY( bool gridOn READ dummyBool WRITE setGridOn );
 
   public:
-    Q_INVOKABLE void connectElements( int, VariantList );
+    Q_INVOKABLE void connectElements( int, QVariantList );
     Q_INVOKABLE void setStringAt( int, const QString & );
     Q_INVOKABLE void setFillColorAt( int, const QColor & );
     Q_INVOKABLE void setEditableAt( int, bool );
@@ -161,7 +162,7 @@ class QcGraph : public QWidget, QcHelper, QtCollider::Style::Client
     Q_INVOKABLE void setThumbSizeAt( int, int );
     Q_INVOKABLE void setCurves( double curvature );
     Q_INVOKABLE void setCurves( int type );
-    Q_INVOKABLE void setCurves( const VariantList & curves );
+    Q_INVOKABLE void setCurves( const QVariantList & curves );
 
   public Q_SLOTS:
     Q_INVOKABLE void select( int index, bool exclusive = true );
@@ -191,16 +192,17 @@ class QcGraph : public QWidget, QcHelper, QtCollider::Style::Client
   public:
     QcGraph();
 
-    VariantList value() const;
+    QVariantList value() const;
     QcGraphElement *currentElement() const;
     int index() const;
     int lastIndex() const { return _lastIndex; }
+    QVariantList selectionIndexes() const;
     float currentX() const;
     float currentY() const;
     QPointF grid() const { return _gridMetrics; }
 
-    void setValue( const VariantList & );
-    void setStrings( const VariantList &list );
+    void setValue( const QVariantList & );
+    void setStrings( const QVariantList &list );
 
     void setIndex( int i );
     void setCurrentX( float );

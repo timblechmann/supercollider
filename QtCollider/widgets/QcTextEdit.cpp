@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -21,6 +21,7 @@
 
 #include "QcTextEdit.h"
 #include "../QcWidgetFactory.h"
+#include "../hacks/hacks_qt.hpp"
 
 #include <QFile>
 #include <QUrl>
@@ -120,12 +121,12 @@ void QcTextEdit::setTextColor( const QColor &color )
   cursor.setCharFormat( format );
 }
 
-void QcTextEdit::setRangeColor( const VariantList &list )
+void QcTextEdit::setRangeColor( const QVariantList &list )
 {
-  if( list.data.count() < 3 ) return;
-  QColor c = list.data[0].value<QColor>();
-  int start = list.data[1].toInt();
-  int size = list.data[2].toInt();
+  if( list.count() < 3 ) return;
+  QColor c = list[0].value<QColor>();
+  int start = list[1].toInt();
+  int size = list[2].toInt();
 
   QTextCharFormat format;
   format.setForeground( c );
@@ -136,12 +137,12 @@ void QcTextEdit::setRangeColor( const VariantList &list )
   cursor.setCharFormat( format );
 }
 
-void QcTextEdit::setRangeFont( const VariantList & list )
+void QcTextEdit::setRangeFont( const QVariantList & list )
 {
-  if( list.data.count() < 3 ) return;
-  QFont f = list.data[0].value<QFont>();
-  int start = list.data[1].toInt();
-  int size = list.data[2].toInt();
+  if( list.count() < 3 ) return;
+  QFont f = list[0].value<QFont>();
+  int start = list[1].toInt();
+  int size = list[2].toInt();
 
   QTextCharFormat format;
   format.setFont( f );
@@ -152,12 +153,12 @@ void QcTextEdit::setRangeFont( const VariantList & list )
   cursor.setCharFormat( format );
 }
 
-void QcTextEdit::setRangeText( const VariantList & list )
+void QcTextEdit::setRangeText( const QVariantList & list )
 {
-  if( list.data.count() < 3 ) return;
-  QString text = list.data[0].value<QString>();
-  int start = list.data[1].toInt();
-  int size = list.data[2].toInt();
+  if( list.count() < 3 ) return;
+  QString text = list[0].value<QString>();
+  int start = list[1].toInt();
+  int size = list[2].toInt();
 
   QTextCursor cursor( document() );
   cursor.movePosition( QTextCursor::NextCharacter, QTextCursor::MoveAnchor, start );
@@ -197,7 +198,7 @@ void QcTextEdit::insertFromMimeData ( const QMimeData * data )
     for(int i = 0; i < n; ++i)
     {
       QUrl &url = urls[i];
-      QString text = url.scheme() == "file" ? url.toLocalFile() : url.toString();
+      QString text = QURL_IS_LOCAL_FILE(url) ? url.toLocalFile() : url.toString();
       c.insertText(text);
       if(n > 1) c.insertText("\n");
     }

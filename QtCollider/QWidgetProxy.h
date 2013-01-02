@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -72,13 +72,17 @@ public:
 
   virtual bool setParent( QObjectProxy *parent );
 
+  void setDragData( QMimeData * data, const QString & label );
+
   inline QWidget *widget() { return static_cast<QWidget*>( object() ); }
 
 protected:
 
   virtual void customEvent( QEvent * );
 
-  virtual bool filterEvent( QObject *, QEvent *, EventHandlerData &, QList<QVariant> & args );
+  virtual bool preProcessEvent( QObject *, QEvent *, EventHandlerData &, QList<QVariant> & args );
+
+  virtual bool postProcessEvent( QObject *, QEvent *, bool handled );
 
 private Q_SLOTS:
 
@@ -93,13 +97,17 @@ private:
   void bringFrontEvent();
   void setFocusEvent( QtCollider::SetFocusEvent * );
   void setAlwaysOnTopEvent( QtCollider::SetAlwaysOnTopEvent * );
-  void startDragEvent( QtCollider::StartDragEvent * );
+  void performDrag();
 
   static void sendRefreshEventRecursive( QWidget *w );
 
   QWidget *_keyEventWidget;
   QWidget *_mouseEventWidget;
   static QAtomicInt _globalEventMask;
+
+  static QMimeData *sDragData;
+  static QString sDragLabel;
+  bool _performDrag;
 };
 
 namespace QtCollider {
@@ -120,17 +128,6 @@ struct SetAlwaysOnTopEvent  : public QEvent
     alwaysOnTop(b)
   {}
   bool alwaysOnTop;
-};
-
-struct StartDragEvent : public QEvent
-{
-  StartDragEvent( const QString &label_, QMimeData *data_ )
-  : QEvent( (QEvent::Type) QtCollider::Event_Proxy_StartDrag ),
-    label( label_ ), data( data_ )
-  {}
-  ~StartDragEvent() { delete data; }
-  QString label;
-  QMimeData *data;
 };
 
 }

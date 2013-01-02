@@ -7,6 +7,11 @@ WindowsPlatform : Platform
 		^(deprecated ++ super.startupFiles)
 	}
 
+	initPlatform {
+		super.initPlatform;
+		recordingsDir = this.myDocumentsDir +/+ "SuperCollider" +/+ "Recordings";
+	}
+
 	startup {
 		// Server setup
 		Server.program = "scsynth.exe";
@@ -38,4 +43,6 @@ WindowsPlatform : Platform
 		var tmp = this.userAppSupportDir +/+ "";
 		^if(File.exists(tmp)) { tmp }
 	}
+
+	myDocumentsDir { _WinPlatform_myDocumentsDir }
 }

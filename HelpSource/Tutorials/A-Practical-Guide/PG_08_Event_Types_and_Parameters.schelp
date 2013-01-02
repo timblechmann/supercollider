@@ -25,6 +25,23 @@ definitionList::
 ## \timingOffset || Number of strong::beats:: to delay the event's server message(s). In conjunction with link::Classes/Quant::, this allows control over the order of event preparation between different patterns in the client, without desynchronizing sonic events that should play together. link::Tutorials/A-Practical-Guide/PG_06g_Data_Sharing:: has an example of its use to pass data from a bass pattern to a chord pattern.
 
 ## \sustain || Number of beats to wait before releasing a Synth node on the server. The SynthDef must have a code::gate:: argument for the explicit release to be sent; otherwise, the pattern assumes the note will release itself using a timed envelope. code::\sustain:: is calculated from code::~dur * ~legato * ~stretch:: if not given directly.
+
+## \sendGate || The default behavior for releasing a note is to look in the link::Classes/SynthDesc:: for an argument called \gate. If it's present, the event will send a code::node.set(\gate, 0):: message to the server. If not, no release will be sent; it's assumed that the SynthDef will release itself after a given length of time. code::\sendGate:: overrides this behavior: code::true:: means to force the release message to be sent, whether or not the argument exists, while code::false:: means to suppress the release message.
+
+It isn't typical use to override; nonetheless, for some special cases, it may be useful.
+
+## \tempo || Optional. If a value is given (in beats per second), it will change the tempo of the TempoClock playing the pattern. Here, the note duration is constant but the clock's speed changes.
+
+note::Changing the tempo will affect all patterns playing on the same clock.::
+
+code::
+Pbind(
+	\curve, Pseg(Pseq([0, 1, 0], 1), 15),
+	\degree, Pwhite(-7, 0, inf) + Pkey(\curve).linlin(0, 1, 0, 14).asInteger,
+	\dur, 0.5,
+	\tempo, Pkey(\curve).linlin(0, 1, 1, 10)
+).play;
+::
 ::
 
 subsection::Node control
@@ -178,7 +195,7 @@ definitionList::
 
 subsection::Buffer control
 
-All of these buffer event types expect the buffer number to be provided. They will not automatically get a buffer number from the server's buffer allocator. A Buffer object is allowed -- you could create the Buffer first using code::Buffer.alloc:: or code::Buffer.new:: and then use this object in the control events. See also link::#event_types_with_cleanup#Event types with cleanup:: below for other, user-friendlier Buffer control options.
+All of these buffer event types expect the buffer number to be provided. They will not automatically get a buffer number from the server's buffer allocator. A Buffer object is allowed -- you could create the Buffer first using code::Buffer.alloc:: or code::Buffer.new:: and then use this object in the control events. See also link::#Event types with cleanup:: below for other, user-friendlier Buffer control options.
 
 definitionList::
 ## alloc || Allocate memory for a buffer on the server. Only one buffer may be allocated per event.

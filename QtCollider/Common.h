@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -39,21 +39,11 @@
 
 extern pthread_mutex_t gLangMutex;
 
-struct VariantList {
-  QList<QVariant> data;
-};
-
-Q_DECLARE_METATYPE( VariantList );
 Q_DECLARE_METATYPE( PyrObject * );
 Q_DECLARE_METATYPE( QVector<double> );
 Q_DECLARE_METATYPE( QVector<int> );
 
 namespace QtCollider {
-
-  enum MetaType {
-    Type_VariantList,
-    Type_Count
-  };
 
   enum EventType {
     Event_SCRequest_Input = QEvent::User,
@@ -68,7 +58,6 @@ namespace QtCollider {
     Event_Proxy_BringFront,
     Event_Proxy_SetFocus,
     Event_Proxy_SetAlwaysOnTop,
-    Event_Proxy_StartDrag,
     Event_Proxy_Release
   };
 

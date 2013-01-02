@@ -6,6 +6,7 @@ else()
     find_package(FFTW3f 3.3)
     if (FFTW3F_FOUND)
         add_definitions("-DSC_FFT_FFTW")
+        include_directories (${FFTW3F_INCLUDE_DIR})
     else()
         message(SEND_ERROR "Cannot find libfftw3f")
     endif()
@@ -21,6 +22,11 @@ if(CMAKE_COMPILER_IS_GNUCXX)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=i686 -msse -msse2 -mfpmath=sse")
     endif()
   endif()
+
+  if(${_gcc_version} VERSION_LESS 4.7)
+    message(FATAL_ERROR "supernova requires at least gcc-4.7. please configure the build with -DSUPERNOVA=OFF")
+  endif()
+
 endif(CMAKE_COMPILER_IS_GNUCXX)
 
 

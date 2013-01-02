@@ -36,7 +36,7 @@
 using namespace ScIDE;
 
 Document::Document( bool isPlainText ):
-    mId( QUuid::createUuid().toString().toAscii() ),
+    mId( QUuid::createUuid().toString().toLatin1() ),
     mDoc( new QTextDocument(this) ),
     mTitle( tr("Untitled") ),
     mIndentWidth(4),
@@ -182,7 +182,7 @@ Document *DocumentManager::open( const QString & path, int initialCursorPosition
                                    (info.suffix() == QString("scd")));
 
     Document *doc = createDocument( fileIsPlainText );
-    doc->mDoc->setPlainText( QString::fromUtf8( bytes.data(), bytes.size() ) );
+    doc->mDoc->setPlainText( decodeDocument(bytes) );
     doc->mDoc->setModified(false);
     doc->mFilePath = filePath;
     doc->mTitle = info.fileName();
@@ -215,7 +215,7 @@ bool DocumentManager::reload( Document *doc )
     QByteArray bytes( file.readAll() );
     file.close();
 
-    doc->mDoc->setPlainText( QString::fromUtf8( bytes.data(), bytes.size() ) );
+    doc->mDoc->setPlainText( decodeDocument(bytes) );
     doc->mDoc->setModified(false);
 
     QFileInfo info(doc->mFilePath);
@@ -225,6 +225,14 @@ bool DocumentManager::reload( Document *doc )
         mFsWatcher.addPath(doc->mFilePath);
 
     return true;
+}
+
+QString DocumentManager::decodeDocument(const QByteArray & bytes)
+{
+    QTextStream stream(bytes);
+    stream.setCodec("UTF-8");
+    stream.setAutoDetectUnicode(true);
+    return stream.readAll();
 }
 
 void DocumentManager::close( Document *doc )
@@ -302,6 +310,8 @@ bool DocumentManager::doSaveAs( Document *doc, const QString & path )
     QString str = doc->textDocument()->toPlainText();
     file.write(str.toUtf8());
     file.close();
+
+    info.refresh();
 
     doc->mFilePath = cpath;
     doc->mTitle = info.fileName();

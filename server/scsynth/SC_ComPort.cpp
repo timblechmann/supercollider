@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <stdexcept>
 #include <stdarg.h>
+#include <cerrno>
 
 #include <sys/types.h>
 #include "OSC_Packet.h"
@@ -36,15 +37,12 @@
 	# define bzero( ptr, count ) memset( ptr, 0, count )
 #else
 	#include <netinet/tcp.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
 #endif
 
-#if defined(__linux__) || defined(__FreeBSD__)
-	#include <errno.h>
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 	#include <unistd.h>
-#endif
-
-#if defined(SC_IPHONE) || defined(__APPLE__)
-	#include <errno.h>
 #endif
 
 #ifdef USE_RENDEZVOUS
@@ -271,7 +269,7 @@ static void dumpOSC(int mode, int size, char* inData)
 		if (strcmp(inData, "#bundle") == 0)
 		{
 			char* data = inData + 8;
-			scprintf("[ \"#bundle\", %lld, ", OSCtime(data));
+			scprintf("[ \"#bundle\", %llu, ", OSCtime(data));
 			data += 8;
 			char* dataEnd = inData + size;
 			while (data < dataEnd) {

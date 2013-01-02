@@ -38,9 +38,13 @@ Installation
 Simply run the installer, and choose a path where all the application
 files will be unpacked.
 
-After installation, you can use SuperCollider in two ways:
+After installation, you can use SuperCollider in two ways, described below:
 * Using the provided SuperCollider IDE (recommended)
 * In command line mode
+
+NOTE: Location of extensions and configuration files has changed in 3.6.1.
+If you want to keep those from previous versions, please read the section
+about changed locations below.
 
 ------------------------------------------------------------------------
 Using the SuperCollider IDE
@@ -72,13 +76,37 @@ the up and down arrow keys.
 - Ctrl+D: to quit the SuperCollider command line
 
 ------------------------------------------------------------------------
-Paths and files you may want to be aware of
+NOTE: Changed location of extensions and configuration files
 ------------------------------------------------------------------------
 
-- $USER_HOME$\SuperCollider\startup.scd : user startup file
+The location of application-related user data has moved in accordance
+with Windows policies. This means that from version 3.6.1 on, SuperCollider
+will not pickup extensions, startup file, and configuration files from
+locations used by previous versions.
 
-- $USER_HOME$\SuperCollider\Extensions : user extension folder for classes,
-plugins and help files
+To continue using extensions and configuration from versions prior to 3.6.1,
+please copy the contents of the old directory to the new one, given below:
+
+The new directory:
+
+  Windows 7 / Vista:
+    C:\Users\<USERNAME>\AppData\Local\SuperCollider
+  Windows XP:
+    C:\Documents and Settings\<USERNAME>\Local Settings\Application Data\SuperCollider
+
+The old directories:
+
+  Between versions 3.6.0 and 3.6.1:
+    Windows 7 / Vista:
+      C:\Users\<USERNAME>\AppData\Roaming\SuperCollider
+    Windows XP:
+      C:\Documents and Settings\<USERNAME>\Application Data\SuperCollider
+
+  Prior to version 3.6.0:
+    Windows 7 / Vista:
+      C:\Users\<USERNAME>\SuperCollider
+    Windows XP:
+      C:\Documents and Settings\<USERNAME>\SuperCollider
 
 ------------------------------------------------------------------------
 Outro

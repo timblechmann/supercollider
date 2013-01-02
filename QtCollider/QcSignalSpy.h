@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -95,9 +95,7 @@ int qt_metacall( QMetaObject::Call call, int methodId, void **argData )
     Q_ASSERT( methodId == 0 );
 
     QList<QVariant> args;
-#if QT_VERSION >= 0x040700
     args.reserve( _argTypes.count() );
-#endif
 
     for (int i = 0; i < _argTypes.count(); ++i) {
       QMetaType::Type type = static_cast<QMetaType::Type>(_argTypes.at(i));

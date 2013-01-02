@@ -43,7 +43,7 @@ In general, when working with a single machine one will probably be using one of
 
 The difference between the two is that the local server runs as a separate application with its own address space, and the internal server runs within the same space as the language/client app.
 
-Both local and internal server supports link::#-scope#scoping:: and link::Classes/Bus#synchronous_control_bus_methods#synchronous bus access::.
+Both local and internal server supports link::#-scope#scoping:: and link::Classes/Bus#Synchronous control bus methods#synchronous bus access::.
 
 The local server, and any other server apps running on your local machine, have the advantage that if the language app crashes, it (and thus possibly your piece) will continue to run. It is thus an inherently more robust arrangement. But note that even if the synths on the server continue to run, any language-side sequencing and control will terminate if the language app crashes.
 
@@ -294,7 +294,7 @@ method:: pid
 Get process ID of running server (if not internal).
 
 method:: hasShmInterface
-Returns true if a link::Classes/ServerShmInterface:: is available. See also link::Classes/Bus#synchronous_control_bus_methods#Synchronous Control Bus Methods::.
+Returns true if a link::Classes/ServerShmInterface:: is available. See also link::Classes/Bus#Synchronous control bus methods::.
 discussion::
 The shared memory interface is initialized after first server boot.
 
@@ -460,6 +460,23 @@ Show input/output level meters.
 method:: plotTree
 Plot the node/group tree. As link::#-queryAllNodes:: but graphical.
 
+argument:: interval
+Polling interval.
+
+method:: plotTreeView
+Plot the node/group tree graphically on a given view.
+
+argument:: interval
+Polling interval.
+
+argument:: parent
+Parent view.
+
+argument:: actionIfFail
+Function to be evaluated in case communication with the server cannot be established.
+
+returns:: Function to be evaluated in order to clean up all actions performed inside the method. To be called for instance by the onClose method of the enclosing window.
+
 subsection:: Recording Support
 
 The following methods are for convenience use. For recording with sample accurate start and stop times you should make your own nodes. See the link::Classes/DiskOut:: helpfile for more info. For non-realtime recording, see the link::Guides/Non-Realtime-Synthesis:: helpfile.
@@ -542,7 +559,7 @@ method:: recordNode
 Returns:: the current recording synth so that it can be used as a target. This should only be necessary for nodes which are not created in the default group.
 
 method:: recChannels
-Get/set the number of channels (int) to record. The default is two. Must be called strong::before:: prepareForRecord.
+Get/set the number of channels (int) to record. Is automatically set to the value of link::Classes/ServerOptions#-numOutputBusChannels:: when booting the server. Must be called strong::before:: prepareForRecord.
 
 method:: recHeaderFormat
 Get/set the header format (string) of the output file. The default is "aiff". Must be called strong::before:: prepareForRecord.

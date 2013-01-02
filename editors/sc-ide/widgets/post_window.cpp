@@ -34,6 +34,7 @@
 #include <QShortcut>
 #include <QKeyEvent>
 #include <QTextDocumentFragment>
+#include <QMimeData>
 
 namespace ScIDE {
 
@@ -285,12 +286,12 @@ bool PostWindow::openDocumentation()
 
 void PostWindow::openDefinition()
 {
-    Main::openDefinition(symbolUnderCursor(), MainWindow::instance());
+    Main::openDefinition(symbolUnderCursor(), window());
 }
 
 void PostWindow::findReferences()
 {
-    Main::findReferences(symbolUnderCursor(), MainWindow::instance());
+    Main::findReferences(symbolUnderCursor(), window());
 }
 
 void PostWindow::setLineWrap(bool lineWrapOn)

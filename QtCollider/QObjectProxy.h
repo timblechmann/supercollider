@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -36,8 +36,6 @@
 
 #define qcProxyDebugMsg( LEVEL, MSG ) \
   qcDebugMsg( LEVEL, QString("[%1]: ").arg(_scClassName) + QString(MSG) )
-
-struct VariantList;
 
 class QObjectProxy;
 class QcSignalSpy;
@@ -133,7 +131,9 @@ class QObjectProxy : public QObject
 
     virtual void customEvent( QEvent * );
 
-    virtual bool filterEvent( QObject *, QEvent *, EventHandlerData &, QList<QVariant> & args );
+    virtual bool preProcessEvent( QObject *, QEvent *, EventHandlerData &, QList<QVariant> & args );
+
+    virtual bool postProcessEvent( QObject *, QEvent *, bool handled ) { return handled; }
 
     bool invokeEventHandler( QEvent *e, EventHandlerData &, QList<QVariant> & args );
 

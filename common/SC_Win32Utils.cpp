@@ -25,6 +25,8 @@
 #include <cstdlib>
 #include <sys/timeb.h>
 #include <time.h>
+#include <windows.h>
+#include <shlobj.h>
 
 #include "SC_Win32Utils.h"
 
@@ -54,7 +56,7 @@ void win32_ExtractContainingFolder(char* folder,const char* pattern,int maxChars
 
 void win32_gettimeofday(timeval* tv, void*)
 {
-	long unsigned secBetween1601and1970 = 11644473600ULL;
+	unsigned __int64 secBetween1601and1970 = 11644473600ULL;
 	FILETIME fileTime;
 	GetSystemTimeAsFileTime(&fileTime);
 	tv->tv_sec  = (* (unsigned __int64 *) &fileTime / (unsigned __int64)10000000) - secBetween1601and1970;
@@ -62,33 +64,13 @@ void win32_gettimeofday(timeval* tv, void*)
 
 }
 
-void win32_GetHomeFolder(char* homeFolder, int bufLen)
+void win32_GetKnownFolderPath(int folderId, char *dest, int size)
 {
-  char homeFolder_[MAX_PATH];
-  const char *h = 0;
-  if (!(h = ::getenv("home")))
-    h = ::getenv("HOME");
-
-  if (h)
-    strcpy(homeFolder_,h);
-  else {
-    // for Windows NT HOME might be defined as either $(HOMESHARE)/$(HOMEPATH)
-    //                                         or     $(HOMEDRIVE)/$(HOMEPATH)
-    h = ::getenv("HOMESHARE");
-    if (!h)
-      h = ::getenv("HOMEDRIVE");
-    if (h) {
-      strcpy(homeFolder_,h);
-      h = ::getenv("HOMEPATH");
-      if (h)
-        strcat(homeFolder_,h);
-    }
-  }
-  size_t len = strlen(homeFolder_);
-  if (bufLen < len + 1)
-		fprintf(stderr, "the buffer given to win32_GetHomeFolder(...) is too small\n");
-  strncpy(homeFolder,homeFolder_,len);
-  homeFolder[len]= 0;
+	// Use a temporary buffer, as SHGetFolderLocation() requires it
+	// to be at least MAX_PATH size, but destination size may be less
+	char buf[MAX_PATH];
+	SHGetFolderPath(NULL, folderId, NULL, 0, buf);
+	strncpy(dest, buf, size);
 }
 
 char* win32_basename(char* path)

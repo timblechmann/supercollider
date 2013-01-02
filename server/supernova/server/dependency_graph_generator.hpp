@@ -21,8 +21,7 @@
 
 #include "node_graph.hpp"
 
-namespace nova
-{
+namespace nova {
 
 /** node graph parser class
  *

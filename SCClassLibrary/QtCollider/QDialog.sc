@@ -6,7 +6,7 @@ QFileDialog : QObject {
     var me = super.new( [fileMode, acceptMode] );
 
     if( okFunc.notNil ) {
-      me.connectFunction( 'accepted(VariantList)', {
+      me.connectFunction( 'accepted(QVariantList)', {
         |me, result|
         if( stripResult )
           { okFunc.performList(\value, result) }
@@ -26,12 +26,6 @@ QFileDialog : QObject {
 
 QDialog {
   *implementsClass {^'Dialog'}
-
-  *getPaths { arg okFunc, cancelFunc, allowsMultiple=true;
-    var fileMode;
-    if( allowsMultiple ) { fileMode = 3 } { fileMode = 1 };
-    ^QFileDialog.new( okFunc, cancelFunc, fileMode, 0 );
-  }
 
   *openPanel { arg okFunc, cancelFunc, multipleSelection=false;
     var fileMode;

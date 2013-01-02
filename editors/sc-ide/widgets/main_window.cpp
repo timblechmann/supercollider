@@ -41,6 +41,8 @@
 #include "code_editor/sc_editor.hpp"
 #include "settings/dialog.hpp"
 
+#include "QtCollider/hacks/hacks_qt.hpp"
+
 #include "SC_DirUtils.h"
 
 #include <QAction>
@@ -57,8 +59,25 @@
 #include <QStatusBar>
 #include <QVBoxLayout>
 #include <QUrl>
+#include <QMimeData>
+#include <QMetaMethod>
 
 namespace ScIDE {
+
+static QWidget * findFirstResponder
+( QWidget *widget, const char * methodSignature, int & methodIndex )
+{
+    methodIndex = -1;
+    while ( widget ) {
+        methodIndex = widget->metaObject()->indexOfMethod( methodSignature );
+        if (methodIndex != -1)
+            break;
+        if (widget->isWindow())
+            break;
+        widget = widget->parentWidget();
+    }
+    return widget;
+}
 
 MainWindow * MainWindow::mInstance = 0;
 
@@ -451,6 +470,23 @@ void MainWindow::createActions()
     action->setStatusTip(tr("Show/hide Help browser docklet"));
     settings->addAction( mHelpBrowserDocklet->toggleViewAction(),
                          "ide-docklet-help", ideCategory );
+
+    // Add actions to docklets, so shortcuts work when docklets detached:
+
+    mPostDocklet->widget()->addAction(mActions[LookupDocumentation]);
+    mPostDocklet->widget()->addAction(mActions[LookupDocumentationForCursor]);
+    mPostDocklet->widget()->addAction(mActions[LookupImplementation]);
+    mPostDocklet->widget()->addAction(mActions[LookupImplementationForCursor]);
+    mPostDocklet->widget()->addAction(mActions[LookupReferences]);
+    mPostDocklet->widget()->addAction(mActions[LookupReferencesForCursor]);
+
+    mHelpBrowserDocklet->widget()->addAction(mActions[LookupDocumentation]);
+    mHelpBrowserDocklet->widget()->addAction(mActions[LookupDocumentationForCursor]);
+    mHelpBrowserDocklet->widget()->addAction(mActions[LookupImplementation]);
+    mHelpBrowserDocklet->widget()->addAction(mActions[LookupImplementationForCursor]);
+    mHelpBrowserDocklet->widget()->addAction(mActions[LookupReferences]);
+    mHelpBrowserDocklet->widget()->addAction(mActions[LookupReferencesForCursor]);
+
 }
 
 void MainWindow::createMenus()
@@ -594,12 +630,7 @@ void MainWindow::createMenus()
 
 static void saveDetachedState( Docklet *docklet,  QVariantMap & data )
 {
-    if ( docklet->isDetached() && docklet->isVisible() ) {
-        QByteArray geometryData = docklet->window()->saveGeometry().toBase64();
-        data.insert( docklet->objectName(), geometryData );
-    }
-    else
-        data.insert( docklet->objectName(), QByteArray() );
+    data.insert( docklet->objectName(), docklet->saveDetachedState().toBase64() );
 }
 
 template <class T>
@@ -627,14 +658,8 @@ void MainWindow::saveWindowState()
 
 static void restoreDetachedState( Docklet *docklet,  const QVariantMap & data )
 {
-    QByteArray geomData = data.value( docklet->objectName() ).value<QByteArray>();
-    if (!geomData.isEmpty()) {
-        docklet->setDetached( true );
-        qDebug() << "restore win geom:" << docklet;
-        docklet->window()->restoreGeometry( QByteArray::fromBase64( geomData ) );
-    }
-    else
-        docklet->setDetached( false );
+    QByteArray base64data = data.value( docklet->objectName() ).value<QByteArray>();
+    docklet->restoreDetachedState( QByteArray::fromBase64( base64data ) );
 }
 
 template <class T>
@@ -970,14 +995,15 @@ bool MainWindow::save( Document *doc, bool forceChoose )
         }else{
             QString fp = doc->filePath();
             if(fp.endsWith(".scd"))
-                dialog.setFilter(filters[0]);
+                dialog.setNameFilter(filters[0]);
             else if(fp.endsWith(".sc"))
-                dialog.setFilter(filters[1]);
+                dialog.setNameFilter(filters[1]);
             else if(fp.endsWith(".schelp"))
-                dialog.setFilter(filters[2]);
+                dialog.setNameFilter(filters[2]);
             else
-                dialog.setFilter(filters[3]);
+                dialog.setNameFilter(filters[3]);
             dialog.selectFile(fp);
+
         }
 
         if (dialog.exec() == QDialog::Accepted)
@@ -1206,31 +1232,35 @@ void MainWindow::openSession(const QString &sessionName)
 
 void MainWindow::lookupImplementationForCursor()
 {
-    QWidget * focussedWidget = QApplication::focusWidget();
+    static const QByteArray signature = QMetaObject::normalizedSignature("openDefinition()");
 
-    int indexOfMethod = focussedWidget->metaObject()->indexOfMethod("openDefinition()");
-    if (indexOfMethod != -1)
-        QMetaObject::invokeMethod( focussedWidget, "openDefinition", Qt::DirectConnection );
+    int methodIdx = -1;
+    QWidget * widget = findFirstResponder(
+                QApplication::focusWidget(), signature.constData(), methodIdx );
+    if (widget && methodIdx != -1)
+        widget->metaObject()->method(methodIdx).invoke( widget, Qt::DirectConnection );
 }
 
 void MainWindow::lookupImplementation()
 {
-    LookupDialog dialog(mEditors);
+    LookupDialog dialog( QApplication::activeWindow() );
     dialog.exec();
 }
 
 void MainWindow::lookupReferencesForCursor()
 {
-    QWidget * focussedWidget = QApplication::focusWidget();
+    static const QByteArray signature = QMetaObject::normalizedSignature("findReferences()");
 
-    int indexOfMethod = focussedWidget->metaObject()->indexOfMethod("findReferences()");
-    if (indexOfMethod != -1)
-        QMetaObject::invokeMethod( focussedWidget, "findReferences", Qt::DirectConnection );
+    int methodIdx = -1;
+    QWidget * widget = findFirstResponder(
+                QApplication::focusWidget(), signature.constData(), methodIdx );
+    if (widget && methodIdx != -1)
+        widget->metaObject()->method(methodIdx).invoke( widget, Qt::DirectConnection );
 }
 
 void MainWindow::lookupReferences()
 {
-    ReferencesDialog dialog(parentWidget());
+    ReferencesDialog dialog( QApplication::activeWindow() );
     dialog.exec();
 }
 
@@ -1364,7 +1394,8 @@ void MainWindow::showSettings()
 
 void MainWindow::lookupDocumentation()
 {
-    PopupTextInput * dialog = new PopupTextInput(tr("Look up Documentation For"), this);
+    PopupTextInput * dialog = new PopupTextInput(tr("Look up Documentation For"),
+                                                 QApplication::activeWindow());
 
     bool success = dialog->exec();
     if (success)
@@ -1375,14 +1406,19 @@ void MainWindow::lookupDocumentation()
 
 void MainWindow::lookupDocumentationForCursor()
 {
-    QWidget * focussedWidget = QApplication::focusWidget();
+    static const QByteArray signature = QMetaObject::normalizedSignature("openDocumentation()");
 
     bool documentationOpened = false;
+    QWidget * widget = QApplication::focusWidget();
+    int methodIdx = -1;
 
-    int indexOfMethod = focussedWidget->metaObject()->indexOfMethod("openDocumentation()");
-    if (indexOfMethod != -1)
-        QMetaObject::invokeMethod( focussedWidget, "openDocumentation", Qt::DirectConnection,
-                                   Q_RETURN_ARG(bool, documentationOpened) );
+    widget = findFirstResponder( widget, signature.constData(), methodIdx );
+
+    if (widget && methodIdx != -1) {
+        widget->metaObject()->method(methodIdx).invoke(
+                    widget, Qt::DirectConnection,
+                    Q_RETURN_ARG(bool, documentationOpened) );
+    };
 
     if (!documentationOpened)
         openHelp();
@@ -1399,7 +1435,7 @@ void MainWindow::dragEnterEvent( QDragEnterEvent * event )
 {
     if (event->mimeData()->hasUrls()) {
         foreach (QUrl url, event->mimeData()->urls()) {
-            if (url.scheme() == QString("file")) { // LATER: use isLocalFile
+            if ( QURL_IS_LOCAL_FILE(url) ) {
                 // LATER: check mime type ?
                 event->acceptProposedAction();
                 return;
@@ -1409,13 +1445,16 @@ void MainWindow::dragEnterEvent( QDragEnterEvent * event )
 }
 
 bool MainWindow::checkFileExtension( const QString & fpath ) {
-    if (fpath.endsWith(".wav") || fpath.endsWith(".mp3") || fpath.endsWith(".aiff") || fpath.endsWith(".ogg")){
-        int ret = QMessageBox::question(this, tr("Open binary file?"),
-                tr("This file has a binary file extension. Are you sure you want to open it as a text file?"),
-                QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
-        if(ret != QMessageBox::Ok)
-            return false;
+    if (fpath.endsWith(".sc") || fpath.endsWith(".scd") || fpath.endsWith(".txt") ||
+        fpath.endsWith(".schelp")) {
+        return true;
     }
+    int ret = QMessageBox::question(this, tr("Open binary file?"), fpath +
+                tr("\n\nThe file has an unrecognized extension. It may be a binary file. Would you still like to open it?"),
+                QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel);
+    if(ret != QMessageBox::Ok)
+        return false;
+
     return true;
 }
 
@@ -1424,7 +1463,7 @@ void MainWindow::dropEvent( QDropEvent * event )
     const QMimeData * data = event->mimeData();
     if (data->hasUrls()) {
         foreach (QUrl url, data->urls()) {
-            if (url.scheme() == QString("file")) { // LATER: use isLocalFile
+            if ( QURL_IS_LOCAL_FILE(url) ) {
                 QString fpath = url.toLocalFile();
                 if (MainWindow::checkFileExtension(fpath))
                     Main::documentManager()->open(fpath);

@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -78,10 +78,10 @@ void QcScopeShm::setBufferNumber( int n )
   _scopeIndex = n;
 }
 
-void QcScopeShm::setWaveColors( const VariantList & newColors )
+void QcScopeShm::setWaveColors( const QVariantList & newColors )
 {
   colors.clear();
-  Q_FOREACH( QVariant var, newColors.data ) {
+  Q_FOREACH( const QVariant & var, newColors ) {
     QColor color = var.value<QColor>();
     if( !color.isValid() )
       colors.append( QColor( 0,0,0 ) );

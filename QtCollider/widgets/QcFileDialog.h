@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -44,7 +44,7 @@ public:
 
 Q_SIGNALS:
 
-  void accepted( VariantList result );
+  void accepted( QVariantList result );
   void rejected();
 
 private Q_SLOTS:
@@ -57,9 +57,9 @@ private Q_SLOTS:
   void onFinished( int res ) {
     if( res == QDialog::Accepted ) {
       QStringList files = dialog->selectedFiles();
-      VariantList varFiles;
+      QVariantList varFiles;
       Q_FOREACH( QString f, files ) {
-        varFiles.data << QVariant( f );
+        varFiles << QVariant( f );
       }
       Q_EMIT( accepted( varFiles ) );
     }

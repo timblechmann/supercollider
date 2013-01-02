@@ -30,7 +30,9 @@
 #define gettimeofday win32_gettimeofday
 #define basename win32_basename
 #define dirname win32_dirname
-#define nanosleep win32_nanosleep
+#ifndef __MINGW64_VERSION_MAJOR //defined in stdio.h mingw64 for 64 and 32 bits
+#define nanosleep sc_win32_nanosleep
+#endif
 #define pipe win32_pipe
 
 #if _MSC_VER
@@ -40,9 +42,9 @@
 void win32_ReplaceCharInString(char* string, int len, char src, char dst);
 // Finds the parent folder of a specified path pattern (including trailing slash)
 void win32_ExtractContainingFolder(char* folder,const char* pattern,int maxChars);
+void win32_GetKnownFolderPath(int folderId, char *dest, int size);
 void win32_synctimes();
 void win32_gettimeofday(timeval* tv, void*);
-void win32_GetHomeFolder(char* homeFolder, int bufLen);
 char* win32_basename(char* path);
 char* win32_dirname(char* path);
 int win32_nanosleep (const struct timespec *requested_time, struct timespec *remaining);

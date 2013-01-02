@@ -40,6 +40,7 @@
 #include <QFileOpenEvent>
 #include <QLibraryInfo>
 #include <QTranslator>
+#include <QDebug>
 
 using namespace ScIDE;
 
@@ -62,8 +63,23 @@ int main( int argc, char *argv[] )
     qtTranslator.load("qt_" + QLocale::system().name(), QLibraryInfo::location(QLibraryInfo::TranslationsPath));
     app.installTranslator(&qtTranslator);
 
+    char resourcePath[PATH_MAX];
+    sc_GetResourceDirectory(resourcePath, PATH_MAX);
+    QString ideTranslationPath = QString(resourcePath) + "/translations";
+
+    bool translationLoaded;
+
+    // Load fallback translator that only handles plural forms in English
+    QTranslator fallbackTranslator;
+    translationLoaded = fallbackTranslator.load( "scide", ideTranslationPath );
+    app.installTranslator(&fallbackTranslator);
+    if (!translationLoaded)
+        qWarning("scide warning: Failed to load fallback translation file.");
+
+    // Load translator for locale
+    QString ideTranslationFile = "scide_" + QLocale::system().name();
     QTranslator scideTranslator;
-    scideTranslator.load("scide_" + QLocale::system().name());
+    scideTranslator.load( ideTranslationFile, ideTranslationPath );
     app.installTranslator(&scideTranslator);
 
     // Set up style
@@ -80,6 +96,11 @@ int main( int argc, char *argv[] )
     Settings::Manager *settings = main->settings();
     SessionManager *sessions = main->sessionManager();
 
+    // NOTE: window has to be shown before restoring its geometry,
+    // or else restoring maximized state will fail, if it has ever before
+    // been saved un-maximized.
+    win->show();
+
     QString startSessionName = settings->value("IDE/startWithSession").toString();
     if (startSessionName == "last") {
         QString lastSession = sessions->lastSession();
@@ -95,8 +116,6 @@ int main( int argc, char *argv[] )
         win->restoreWindowState();
         sessions->newSession();
     }
-
-    win->show();
 
     foreach (QString argument, arguments) {
         main->documentManager()->open(argument);
@@ -131,7 +150,9 @@ bool SingleInstanceGuard::tryConnect(QStringList const & arguments)
 
                 stream << QString("open");
                 stream << canonicalArguments;
-                socket->flush();
+                if (!socket->waitForBytesWritten(300))
+                    qWarning("SingleInstanceGuard: writing data to another IDE instance timed out");
+
                 return true;
             }
         }

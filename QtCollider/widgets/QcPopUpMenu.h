@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -25,7 +25,7 @@
 class QcPopUpMenu : public QComboBox, QcHelper
 {
   Q_OBJECT
-  Q_PROPERTY( VariantList items READ dummyVariantList WRITE setItems );
+  Q_PROPERTY( QVariantList items READ dummyVariantList WRITE setItems );
   Q_PROPERTY( bool reactivationEnabled READ reactivationEnabled WRITE setReactivationEnabled )
 
 public:
@@ -42,7 +42,7 @@ private Q_SLOTS:
     void clearChanged() { _changed = false; }
 
 private:
-    void setItems( const VariantList & );
+    void setItems( const QVariantList & );
     bool _changed;
     bool _reactivation;
 };

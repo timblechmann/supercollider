@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -20,7 +20,7 @@
 ************************************************************************/
 
 #include "primitives.h"
-#include "../Slot.h"
+#include "../type_codec.hpp"
 #include "../QWidgetProxy.h"
 #include "../Common.h"
 
@@ -36,11 +36,14 @@
 // WARNING these primitives have to always execute asynchronously, or Cocoa language client will
 // hang.
 
+#define QWIDGET_PROXY_RECEIVER(slot) \
+  qobject_cast<QWidgetProxy*>( QtCollider::read<QObjectProxy*>(slot) )
+
 namespace QtCollider {
 
 QC_LANG_PRIMITIVE( QWidget_SetFocus, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy( r ) );
+  QWidgetProxy *proxy = QWIDGET_PROXY_RECEIVER(r);
 
   QApplication::postEvent( proxy, new SetFocusEvent( IsTrue(a) ) );
 
@@ -48,7 +51,7 @@ QC_LANG_PRIMITIVE( QWidget_SetFocus, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 }
 
 QC_LANG_PRIMITIVE( QWidget_BringFront, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy( r ) );
+  QWidgetProxy *proxy = QWIDGET_PROXY_RECEIVER(r);
 
   QApplication::postEvent( proxy,
                            new QEvent( (QEvent::Type) QtCollider::Event_Proxy_BringFront ) );
@@ -57,7 +60,7 @@ QC_LANG_PRIMITIVE( QWidget_BringFront, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 }
 
 QC_LANG_PRIMITIVE( QWidget_Refresh, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy( r ) );
+  QWidgetProxy *proxy = QWIDGET_PROXY_RECEIVER(r);
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
@@ -67,16 +70,16 @@ QC_LANG_PRIMITIVE( QWidget_Refresh, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
 }
 
 QC_LANG_PRIMITIVE( QWidget_MapToGlobal, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy( r ) );
+  QWidgetProxy *proxy = QWIDGET_PROXY_RECEIVER(r);
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
   QWidget *w = proxy->widget();
   if( !w ) return errNone;
 
-  QPoint pt( Slot::toPoint( a ).toPoint() );
+  QPoint pt( QtCollider::get( a ) );
   pt = w->mapToGlobal( pt );
-  Slot::setPoint( r, pt );
+  QtCollider::set( r, pt );
 
   return errNone;
 }
@@ -84,18 +87,18 @@ QC_LANG_PRIMITIVE( QWidget_MapToGlobal, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 QC_LANG_PRIMITIVE( QWidget_SetLayout, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
   if( !isKindOfSlot( a, SC_CLASS(QLayout) ) ) return errWrongType;
 
-  QWidgetProxy *wProxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+  QWidgetProxy *wProxy = QWIDGET_PROXY_RECEIVER(r);
 
   if( !wProxy->compareThread() ) return QtCollider::wrongThreadError();
 
-  QObjectProxy *lProxy = Slot::toObjectProxy( a );
+  QObjectProxy *lProxy = QtCollider::get<QObjectProxy*>( a );
   wProxy->setLayout( lProxy );
 
   return errNone;
 }
 
 QC_LANG_PRIMITIVE( QWidget_GetAlwaysOnTop, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *wProxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+  QWidgetProxy *wProxy = QWIDGET_PROXY_RECEIVER(r);
 
   if( QThread::currentThread() != wProxy->thread() ) return errFailed;
 
@@ -104,7 +107,7 @@ QC_LANG_PRIMITIVE( QWidget_GetAlwaysOnTop, 0, PyrSlot *r, PyrSlot *a, VMGlobals 
 }
 
 QC_LANG_PRIMITIVE( QWidget_SetAlwaysOnTop, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *wProxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+  QWidgetProxy *wProxy = QWIDGET_PROXY_RECEIVER(r);
 
   QApplication::postEvent( wProxy, new SetAlwaysOnTopEvent( IsTrue(a) ) );
 
@@ -128,31 +131,34 @@ struct MimeData : public QMimeData {
 };
 
 QC_LANG_PRIMITIVE( QWidget_StartDrag, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *wProxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+    qcDebugMsg(1, "Starting drag...");
+
+  QWidgetProxy *wProxy = QWIDGET_PROXY_RECEIVER(r);
   if( !wProxy->compareThread() ) return QtCollider::wrongThreadError();
 
   PyrSlot *data = a+1;
-  QString str = Slot::toString(a+2);
+  QString str = QtCollider::get(a+2);
+  QString label = QtCollider::get(a);
 
   QMimeData *mime = new QtCollider::MimeData;
 
   mime->setData( "application/supercollider", QByteArray() );
 
-  QColor color( Slot::toColor(data) );
+  QColor color = QtCollider::get(data);
   if( color.isValid() )
     mime->setColorData( QVariant(color) );
 
   if( !str.isEmpty() )
     mime->setText( str );
 
-  QApplication::postEvent( wProxy, new StartDragEvent( Slot::toString(a), mime ) );
+  wProxy->setDragData( mime, label );
 
   return errNone;
 }
 
 QC_LANG_PRIMITIVE( QWidget_SetGlobalEventEnabled, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
   if( NotInt( a+0 ) ) return errWrongType;
-  int event = Slot::toInt(a+0);
+  int event = QtCollider::get(a+0);
   bool enabled = IsTrue(a+1);
   if( !enabled && !IsFalse(a+1) ) return errWrongType;
 
@@ -162,7 +168,7 @@ QC_LANG_PRIMITIVE( QWidget_SetGlobalEventEnabled, 2, PyrSlot *r, PyrSlot *a, VMG
 }
 
 QC_LANG_PRIMITIVE( QWidget_SetAcceptsMouse, 1,  PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+  QWidgetProxy *proxy = QWIDGET_PROXY_RECEIVER(r);
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
   QWidget *w = proxy->widget();
@@ -175,7 +181,7 @@ QC_LANG_PRIMITIVE( QWidget_SetAcceptsMouse, 1,  PyrSlot *r, PyrSlot *a, VMGlobal
 }
 
 QC_LANG_PRIMITIVE( QWidget_AcceptsMouse, 1,  PyrSlot *r, PyrSlot *a, VMGlobals *g ) {
-  QWidgetProxy *proxy = qobject_cast<QWidgetProxy*>( Slot::toObjectProxy(r) );
+  QWidgetProxy *proxy = QWIDGET_PROXY_RECEIVER(r);
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
   QWidget *w = proxy->widget();

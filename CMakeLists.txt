@@ -106,10 +106,7 @@ if(APPLE)
 	set_property(DIRECTORY
 		APPEND
 		PROPERTY COMPILE_DEFINITIONS SC_DARWIN)
-elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
-	add_definitions(-DSC_DATA_DIR="${CMAKE_INSTALL_PREFIX}/share/SuperCollider")
-elseif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-	add_definitions("-DSC_FREEBSD")
+elseif(CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD" OR CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
 	add_definitions(-DSC_DATA_DIR="${CMAKE_INSTALL_PREFIX}/share/SuperCollider")
 endif()
 
@@ -144,6 +141,7 @@ option(CURL "Build with curl for remote file download." ON)
 option(FFT_GREEN "Use internal 'Green' FFT lib rather than FFTW. (Not recommended.)" OFF)
 
 option(SSE "Compile with support for SSE instructions.")
+option(SSE2 "Compile with support for SSE2 instructions.")
 option(SSE41 "Compile with support for SSE4.1 instructions.")
 option(SSE42 "Compile with support for SSE4.2 instructions.")
 
@@ -167,8 +165,8 @@ option(SC_MEMORY_DEBUGGING "Build sclang&scsynth for memory debugging (disable m
 option(GC_SANITYCHECK "Enable sanity checks in the sclang garbage collector.")
 
 option(NO_LIBSNDFILE "Disable soundfile functionality. (Not recommended.)" OFF)
-
 option(NO_AVAHI "Disable Avahi support. (Not recommended.)" OFF)
+option(NO_GPL3 "Disable GPL3 code, for pure-GPL2 situations. (Not recommended.)" OFF)
 
 option(SCLANG_SERVER "Build with internal server." ON)
 
@@ -180,11 +178,6 @@ option(SC_QT "Build SuperCollider with Qt GUI" ON)
 if (SC_QT)
   message( STATUS "Compiling with Qt GUI" )
 endif (SC_QT)
-
-if(WIN32)
-    option(SC_WIN_DEP_DIRS
-        "A list of directories where dependencies will be searched for when packaging.")
-endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX)
     option(NATIVE "Optimize binary for this architecture (binaries may not run on other machines, requires gcc-4.3 or higher).")
@@ -245,6 +238,10 @@ if (CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse -mfpmath=sse")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -mfpmath=sse")
 	endif()
+	if (SSE2)
+		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse2")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2")
+	endif()
 	if (SSE41)
 		set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse4.1")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse4.1")
@@ -283,6 +280,15 @@ endif()
 
 if (SC_MEMORY_DEBUGGING)
 	add_definitions(-DDISABLE_MEMORY_POOLS)
+endif()
+
+if(MINGW)
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mstackrealign")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mstackrealign")
+endif()
+
+if (NO_GPL3)
+	add_definitions(-DNO_GPL3)
 endif()
 
 #############################################
@@ -332,11 +338,8 @@ if(WIN32)
 	set(SCCLASSLIB_EXCLUDE_REGEX "${SCCLASSLIB_EXCLUDE_REGEX}")
 endif()
 
-
 if(APPLE)
-
 	if(SC_SYMLINK_CLASSLIB)
-
 		#if there are folders inside SCCLassLibrary abort cmake.
 		file(GLOB classlibraryfolders "${CMAKE_INSTALL_PREFIX}/${auxresourcesdir}/SCClassLibrary/[^.]*")
 		foreach(onedirectory ${classlibraryfolders})

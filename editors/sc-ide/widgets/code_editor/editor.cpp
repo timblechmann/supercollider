@@ -34,6 +34,7 @@
 #include <QTextBlock>
 #include <QTextDocumentFragment>
 #include <QUrl>
+#include <QMimeData>
 #include <QScrollBar>
 
 namespace ScIDE {
@@ -45,6 +46,7 @@ GenericCodeEditor::GenericCodeEditor( Document *doc, QWidget *parent ):
     Q_ASSERT(mDoc != 0);
 
     setFrameShape( QFrame::NoFrame );
+    setAttribute( Qt::WA_MacNoClickThrough, true );
 
     mLineIndicator = new LineIndicator(this);
     mLineIndicator->move( contentsRect().topLeft() );

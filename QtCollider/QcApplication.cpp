@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -67,11 +67,6 @@ QcApplication::QcApplication( int & argc, char ** argv )
   _mutex.lock();
   _instance = this;
   _mutex.unlock();
-
-  qRegisterMetaType<VariantList>();
-  qRegisterMetaType<QcTreeWidget::ItemPtr>();
-  qRegisterMetaType< QVector<double> >();
-  qRegisterMetaType< QVector<int> >();
 
   if (QtColliderUseGui()) { // avoid a crash on linux, if x is not available
     QIcon icon;

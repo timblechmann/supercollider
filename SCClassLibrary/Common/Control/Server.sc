@@ -3,8 +3,8 @@ ServerOptions
 	// order of variables is important here. Only add new instance variables to the end.
 	var <numAudioBusChannels=128;
 	var <>numControlBusChannels=4096;
-	var <numInputBusChannels=8;
-	var <numOutputBusChannels=8;
+	var <numInputBusChannels=2;
+	var <numOutputBusChannels=2;
 	var numBuffers=1026;
 
 	var <>maxNodes=1024;
@@ -452,8 +452,8 @@ Server {
 			if (val != serverRunning) {
 				if(thisProcess.platform.isSleeping.not) {
 					serverRunning = val;
-					if (serverRunning.not) {
 
+					if (serverRunning.not) {
 						ServerQuit.run(this);
 
 						if (serverInterface.notNil) {
@@ -474,7 +474,7 @@ Server {
 							}
 						})
 
-					}{
+					} {
 						ServerBoot.run(this);
 					};
 					{ this.changed(\serverRunning); }.defer;
@@ -637,7 +637,6 @@ Server {
 	}
 
 	boot { arg startAliveThread=true, recover=false, onFailure;
-		var resp;
 		if (serverRunning, { "server already running".inform; ^this });
 		if (serverBooting, { "server already booting".inform; ^this });
 
@@ -647,6 +646,11 @@ Server {
 		bootNotifyFirst = true;
 		this.doWhenBooted({
 			serverBooting = false;
+			if (recChannels.notNil and: (recChannels != options.numOutputBusChannels)) {
+				"Resetting recChannels to %".format(options.numOutputBusChannels).inform
+			};
+			recChannels = options.numOutputBusChannels;
+
 			if (sendQuit.isNil) {
 				sendQuit = this.inProcess or: {this.isLocal};
 			};
@@ -669,22 +673,19 @@ Server {
 	}
 
 	bootServerApp {
-		if (inProcess, {
+		if (inProcess) {
 			"booting internal".inform;
 			this.bootInProcess;
-			//alive = true;
-			//this.serverRunning = true;
 			pid = thisProcess.pid;
-		},{
+		} {
 			if (serverInterface.notNil) {
 				serverInterface.disconnect;
 				serverInterface = nil;
 			};
 
 			pid = (program ++ options.asOptionsString(addr.port)).unixCmd;
-			//unixCmd(program ++ options.asOptionsString(addr.port)).postln;
 			("booting " ++ addr.port.asString).inform;
-		});
+		};
 	}
 
 	reboot { arg func; // func is evaluated when server is off

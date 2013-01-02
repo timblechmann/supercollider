@@ -6,7 +6,7 @@
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
+* the Free Software Foundation, either version 2 of the License, or
 * (at your option) any later version.
 *
 * This program is distributed in the hope that it will be useful,
@@ -22,6 +22,7 @@
 #include "QWidgetProxy.h"
 #include "painting.h"
 #include "Common.h"
+#include "hacks/hacks_qt.hpp"
 
 #include <QApplication>
 #include <QLayout>
@@ -30,6 +31,8 @@
 #include <QPainter>
 #include <QFontMetrics>
 #include <QUrl>
+#include <QMimeData>
+#include <QDrag>
 
 #ifdef Q_WS_X11
 # include "hacks/hacks_x11.hpp"
@@ -43,9 +46,14 @@
 using namespace QtCollider;
 
 QAtomicInt QWidgetProxy::_globalEventMask = 0;
+QMimeData * QWidgetProxy::sDragData = 0;
+QString QWidgetProxy::sDragLabel;
 
-QWidgetProxy::QWidgetProxy( QWidget *w, PyrObject *po )
-: QObjectProxy( w, po ), _keyEventWidget( w ), _mouseEventWidget( w )
+QWidgetProxy::QWidgetProxy( QWidget *w, PyrObject *po ):
+    QObjectProxy( w, po ),
+    _keyEventWidget( w ),
+    _mouseEventWidget( w ),
+    _performDrag(false)
 { }
 
 void QWidgetProxy::setKeyEventWidget( QWidget *w )
@@ -130,6 +138,21 @@ bool QWidgetProxy::setParent( QObjectProxy *parentProxy )
   return false;
 }
 
+void QWidgetProxy::setDragData( QMimeData * data, const QString & label )
+{
+    if (data == 0)
+        return;
+
+    if (sDragData == 0) {
+        sDragData = data;
+        sDragLabel = label;
+        _performDrag = true;
+    } else {
+        delete data;
+        qcErrorMsg( "QWidgetProxy: attempt at starting a drag while another one is in progress.");
+    }
+}
+
 void QWidgetProxy::customEvent( QEvent *e )
 {
   int type = e->type();
@@ -142,9 +165,6 @@ void QWidgetProxy::customEvent( QEvent *e )
       return;
     case QtCollider::Event_Proxy_SetAlwaysOnTop:
       setAlwaysOnTopEvent( static_cast<SetAlwaysOnTopEvent*>(e) );
-      return;
-    case QtCollider::Event_Proxy_StartDrag:
-      startDragEvent( static_cast<StartDragEvent*>(e) );
       return;
     default:
       QObjectProxy::customEvent(e);
@@ -200,35 +220,34 @@ void QWidgetProxy::setAlwaysOnTopEvent( QtCollider::SetAlwaysOnTopEvent *e )
   }
 }
 
-void QWidgetProxy::startDragEvent( StartDragEvent* e )
+void QWidgetProxy::performDrag()
 {
-  QWidget *w = widget();
-  if( !w ) return;
+    Q_ASSERT(sDragData);
 
-  QFont f;
-  const QString & label = e->label;
-  QFontMetrics fm( f );
-  QSize size = fm.size( 0, label ) + QSize(8,4);
+    QFont f;
+    const QString & label = sDragLabel;
+    QFontMetrics fm( f );
+    QSize size = fm.size( 0, label ) + QSize(8,4);
 
-  QPixmap pix( size );
-  QPainter p( &pix );
-  p.setBrush( QColor(255,255,255) );
-  QRect r( pix.rect() );
-  p.drawRect(r.adjusted(0,0,-1,-1));
-  p.drawText( r, Qt::AlignCenter, label );
-  p.end();
+    QPixmap pix( size );
+    QPainter p( &pix );
+    p.setBrush( QColor(255,255,255) );
+    QRect r( pix.rect() );
+    p.drawRect(r.adjusted(0,0,-1,-1));
+    p.drawText( r, Qt::AlignCenter, label );
+    p.end();
 
-  QMimeData *mime = e->data;
-  e->data = 0; // prevent deleting the data when event destroyed;
+    QDrag *drag = new QDrag( widget() );
+    drag->setMimeData( sDragData );
+    drag->setPixmap( pix );
+    drag->setHotSpot( QPoint( 0, + r.height() + 2 ) );
+    drag->exec();
 
-  QDrag *drag = new QDrag(w);
-  drag->setMimeData( mime );
-  drag->setPixmap( pix );
-  drag->setHotSpot( QPoint( 0, + r.height() + 2 ) );
-  drag->exec();
+    sDragData = 0;
+    sDragLabel.clear();
 }
 
-bool QWidgetProxy::filterEvent( QObject *o, QEvent *e, EventHandlerData &eh, QList<QVariant> & args )
+bool QWidgetProxy::preProcessEvent( QObject *o, QEvent *e, EventHandlerData &eh, QList<QVariant> & args )
 {
   // NOTE We assume that qObject need not be checked here, as we wouldn't get events if
   // it wasn't existing
@@ -415,10 +434,10 @@ bool QWidgetProxy::interpretKeyEvent( QObject *o, QEvent *e, QList<QVariant> &ar
 
 static QString urlAsString( const QUrl & url )
 {
-  if(url.scheme() == "file")
-    return url.toLocalFile();
-  else
-    return url.toString();
+    if (QURL_IS_LOCAL_FILE(url))
+        return url.toLocalFile();
+    else
+        return url.toString();
 }
 
 static bool interpretMimeData( const QMimeData *data, QList<QVariant> &args )
@@ -427,10 +446,10 @@ static bool interpretMimeData( const QMimeData *data, QList<QVariant> &args )
   {
     QList<QUrl> urls = data->urls();
     if( urls.count() > 1 ) {
-      VariantList list;
+      QVariantList list;
       Q_FOREACH( QUrl url, urls )
-        list.data << urlAsString( url );
-      args << QVariant::fromValue<VariantList>(list);
+        list << urlAsString( url );
+      args << QVariant(list);
     }
     else {
       args << urlAsString( urls[0] );
@@ -472,6 +491,16 @@ bool QWidgetProxy::interpretDragEvent( QObject *o, QEvent *e, QList<QVariant> &a
   return true;
 }
 
+bool QWidgetProxy::postProcessEvent( QObject *object, QEvent *event, bool handled )
+{
+    if (_performDrag) {
+        _performDrag = false;
+        performDrag();
+        return true;
+    }
+
+    return handled;
+}
 
 void QWidgetProxy::customPaint( QPainter *painter )
 {
