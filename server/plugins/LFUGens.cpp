@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <cstdio>
 #include "function_attributes.h"
+#include "muladd_helpers.hpp"
 
 static InterfaceTable *ft;
 
@@ -108,7 +109,7 @@ struct Cutoff : public Unit
 	int mWaitCounter;
 };
 
-struct LinExp : public Unit
+struct LinExp : public muladd_ugen
 {
 	float m_dstratio, m_rsrcrange, m_rrminuslo, m_dstlo;
 };
@@ -2458,7 +2459,8 @@ void InRect_Ctor(InRect* unit)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-void LinExp_next(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2469,14 +2471,16 @@ void LinExp_next(LinExp *unit, int inNumSamples)
 	float rrminuslo = unit->m_rrminuslo;
 
 	LOOP1(inNumSamples,
-		ZXP(out) = dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
 #ifdef NOVA_SIMD
+template <typename MuladdHelper>
 static inline void LinExp_next_nova_loop(float * out, const float * in, int inNumSamples,
 										 nova::vec<float> dstlo, nova::vec<float> dstratio,
-										 nova::vec<float> rsrcrange, nova::vec<float> rrminuslo)
+										 nova::vec<float> rsrcrange, nova::vec<float> rrminuslo,
+										 MuladdHelper & ma)
 {
 	const int vecSize = nova::vec<float>::size;
 	int unroll = inNumSamples / (2*vecSize);
@@ -2487,8 +2491,8 @@ static inline void LinExp_next_nova_loop(float * out, const float * in, int inNu
 		val0.load_aligned(in);
 		val1.load_aligned(in + vecSize);
 
-		val0 = dstlo * pow(dstratio, val0 * rsrcrange + rrminuslo);
-		val1 = dstlo * pow(dstratio, val1 * rsrcrange + rrminuslo);
+		val0 = ma(dstlo * pow(dstratio, val0 * rsrcrange + rrminuslo));
+		val1 = ma(dstlo * pow(dstratio, val1 * rsrcrange + rrminuslo));
 
 		val0.store_aligned(out);
 		val1.store_aligned(out + vecSize);
@@ -2498,15 +2502,18 @@ static inline void LinExp_next_nova_loop(float * out, const float * in, int inNu
 	} while (--unroll);
 }
 
-FLATTEN static void LinExp_next_nova(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline FLATTEN static void LinExp_next_nova(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = OUT(0);
 	float *in   = IN(0);
 
-	LinExp_next_nova_loop(out, in, inNumSamples, unit->m_dstlo, unit->m_dstratio, unit->m_rsrcrange, unit->m_rrminuslo);
+	LinExp_next_nova_loop(out, in, inNumSamples, unit->m_dstlo, unit->m_dstratio, unit->m_rsrcrange, unit->m_rrminuslo, ma);
 }
 
-FLATTEN static void LinExp_next_nova_kk(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline
+FLATTEN static void LinExp_next_nova_kk(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = OUT(0);
 	float *in  = IN(0);
@@ -2519,12 +2526,13 @@ FLATTEN static void LinExp_next_nova_kk(LinExp *unit, int inNumSamples)
 	float rsrcrange = sc_reciprocal(srchi - srclo);
 	float rrminuslo = rsrcrange * -srclo;
 
-	LinExp_next_nova_loop(out, in, inNumSamples, dstlo, dstratio, rsrcrange, rrminuslo);
+	LinExp_next_nova_loop(out, in, inNumSamples, dstlo, dstratio, rsrcrange, rrminuslo, ma);
 }
 
 #endif
 
-void LinExp_next_kk(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_kk(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2537,11 +2545,28 @@ void LinExp_next_kk(LinExp *unit, int inNumSamples)
 	float rrminuslo = rsrcrange * -srclo;
 
 	LOOP1(inNumSamples,
-		ZXP(out) = dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
-void LinExp_next_aa(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_1(LinExp *unit, int inNumSamples, MuladdHelper & ma)
+{
+	float *out = ZOUT(0);
+	float *in   = ZIN(0);
+	float srclo = ZIN0(1);
+	float srchi = ZIN0(2);
+	float dstlo = ZIN0(3);
+	float dsthi = ZIN0(4);
+	float dstratio = dsthi * sc_reciprocal(dstlo);
+	float rsrcrange = sc_reciprocal(srchi - srclo);
+	float rrminuslo = rsrcrange * -srclo;
+
+	ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
+}
+
+template <typename MuladdHelper>
+inline void LinExp_next_aa(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2559,11 +2584,12 @@ void LinExp_next_aa(LinExp *unit, int inNumSamples)
 		float dstratio = zdsthi/zdstlo;
 		float rsrcrange = sc_reciprocal(zsrchi - zsrclo);
 		float rrminuslo = rsrcrange * -zsrclo;
-		ZXP(out) = zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
-void LinExp_next_ak(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_ak(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2579,11 +2605,12 @@ void LinExp_next_ak(LinExp *unit, int inNumSamples)
 
 		float rsrcrange = sc_reciprocal(zsrchi - zsrclo);
 		float rrminuslo = rsrcrange * -zsrclo;
-		ZXP(out) = dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
-void LinExp_next_ka(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_ka(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2598,22 +2625,37 @@ void LinExp_next_ka(LinExp *unit, int inNumSamples)
 		float zdsthi = ZXP(dsthi);
 		float zdstlo = ZXP(dstlo);
 		float dstratio = zdsthi/zdstlo;
-		ZXP(out) = zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER(LinExp, LinExp_next, 5)
+
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_aa, 5, aa)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_ak, 5, ak)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_ka, 5, ka)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_kk, 5, kk)
+
+#ifdef NOVA_SIMD
+
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_nova, 5, nova)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_nova_kk, 5, nova_kk)
+
+#endif
 
 static void LinExp_SetCalc(LinExp* unit)
 {
 	if(INRATE(1) == calc_FullRate || INRATE(2) == calc_FullRate) {
 		if(INRATE(3) == calc_FullRate || INRATE(4) == calc_FullRate) {
-			SETCALC(LinExp_next_aa); return;
+			LinExp_aa_Wrapper::setCalcFunc(unit);
+			return;
 		} else {
-			SETCALC(LinExp_next_ak); return;
+			LinExp_ak_Wrapper::setCalcFunc(unit);
+			return;
 		}
 	} else {
 		if(INRATE(3) == calc_FullRate || INRATE(4) == calc_FullRate) {
-			SETCALC(LinExp_next_ka); return;
+			LinExp_ka_Wrapper::setCalcFunc(unit); return;
 		}
 	}
 
@@ -2628,32 +2670,22 @@ static void LinExp_SetCalc(LinExp* unit)
 #ifdef NOVA_SIMD
 	if ((BUFLENGTH % (2*nova::vec<float>::size)) == 0)
 		if (allScalar)
-			SETCALC(LinExp_next_nova);
+			LinExp_nova_Wrapper::setCalcFunc(unit);
 		else
-			SETCALC(LinExp_next_nova_kk);
+			LinExp_nova_kk_Wrapper::setCalcFunc(unit);
 	else
 #endif
 	if (allScalar)
-		SETCALC(LinExp_next);
+		LinExp_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LinExp_next_kk);
+		LinExp_kk_Wrapper::setCalcFunc(unit);
 
 	if (!allScalar)
 		return;
-
-	float srclo = ZIN0(1);
-	float srchi = ZIN0(2);
-	float dstlo = ZIN0(3);
-	float dsthi = ZIN0(4);
-	unit->m_dstlo = dstlo;
-	unit->m_dstratio = dsthi/dstlo;
-	unit->m_rsrcrange = sc_reciprocal(srchi - srclo);
-	unit->m_rrminuslo = unit->m_rsrcrange * -srclo;
 }
 
 void LinExp_Ctor(LinExp* unit)
 {
-	LinExp_SetCalc(unit);
 	float srclo = ZIN0(1);
 	float srchi = ZIN0(2);
 	float dstlo = ZIN0(3);
@@ -2662,7 +2694,9 @@ void LinExp_Ctor(LinExp* unit)
 	unit->m_dstratio = dsthi/dstlo;
 	unit->m_rsrcrange = 1. / (srchi - srclo);
 	unit->m_rrminuslo = unit->m_rsrcrange * -srclo;
-	LinExp_next(unit, 1);
+	LinExp_SetCalc(unit);
+
+	LinExp_Wrapper::run_1(unit);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
