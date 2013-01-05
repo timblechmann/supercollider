@@ -557,6 +557,16 @@ struct muladd_helper
 	{
 		SETCALC(selectCalcFunc(unit));
 	}
+
+	static void run_1(UGenType * unit)
+	{
+		UnitCalcFunc f = selectCalcFunc(unit);
+		float mul = IN0(MulIndex);
+		float add = IN0(MulIndex+1);
+		unit->mul = mul;
+		unit->add = add;
+		f(unit, 1);
+	}
 };
 
 }
@@ -572,6 +582,17 @@ struct muladd_helper
 #define DEFINE_UGEN_FUNCTION_WRAPPER(TYPE, FUNCTION_NAME, INDEX)               \
 struct TYPE##_Wrapper:                                                         \
 	detail::muladd_helper<TYPE##_Wrapper, TYPE, INDEX>                         \
+{                                                                              \
+	template <typename MulAddHelper>                                           \
+	static inline void next(TYPE * unit, int inNumSamples, MulAddHelper & ma)  \
+	{                                                                          \
+		FUNCTION_NAME(unit, inNumSamples, ma);                                 \
+	}                                                                          \
+};
+
+#define DEFINE_UGEN_FUNCTION_WRAPPER_TAG(TYPE, FUNCTION_NAME, INDEX, TAG)      \
+struct TYPE##_##TAG##_Wrapper:                                                 \
+	detail::muladd_helper<TYPE##_##TAG##_Wrapper, TYPE, INDEX>                 \
 {                                                                              \
 	template <typename MulAddHelper>                                           \
 	static inline void next(TYPE * unit, int inNumSamples, MulAddHelper & ma)  \
