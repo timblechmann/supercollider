@@ -1853,7 +1853,7 @@ DEFINE_UGEN_FUNCTION_WRAPPER(LPZ1, LPZ1_next, 1)
 
 static void LPZ1_Ctor(LPZ1* unit)
 {
-	SETCALC(LPZ1_next_select(unit));
+	LPZ1_Wrapper::setCalcFunc(unit);
 	unit->m_x1 = ZIN0(0);
 	unit->mCalcFunc(unit, 1);
 }
@@ -1902,7 +1902,7 @@ DEFINE_UGEN_FUNCTION_WRAPPER(HPZ1, HPZ1_next, 1)
 
 static void HPZ1_Ctor(HPZ1* unit)
 {
-	SETCALC(HPZ1_next_select(unit));
+	HPZ1_Wrapper::setCalcFunc(unit);
 	unit->m_x1 = ZIN0(0);
 	unit->mCalcFunc(unit, 1);
 }
