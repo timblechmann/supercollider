@@ -121,7 +121,7 @@ struct Decay2 : public Unit
 	double m_y1b, m_b1b;
 };
 
-struct LeakDC : public Unit
+struct LeakDC : public muladd_ugen
 {
 	double m_b1, m_x1, m_y1;
 };
@@ -1446,7 +1446,8 @@ void Decay2_next(Decay2* unit, int inNumSamples)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LeakDC_next_i_4(LeakDC* unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LeakDC_next_i_4(LeakDC* unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in = ZIN(0);
@@ -1464,10 +1465,10 @@ void LeakDC_next_i_4(LeakDC* unit, int inNumSamples)
 		float out2 = y1 = x02 - x01 + b1 * y1;
 		float out3 = y1 = x03 - x02 + b1 * y1;
 
-		ZXP(out) = out0;
-		ZXP(out) = out1;
-		ZXP(out) = out2;
-		ZXP(out) = out3;
+		ZXP(out) = ma(out0);
+		ZXP(out) = ma(out1);
+		ZXP(out) = ma(out2);
+		ZXP(out) = ma(out3);
 
 		x1 = x03;
 	);
@@ -1475,7 +1476,8 @@ void LeakDC_next_i_4(LeakDC* unit, int inNumSamples)
 	unit->m_y1 = zapgremlins(y1);
 }
 
-void LeakDC_next_i(LeakDC* unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LeakDC_next_i(LeakDC* unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in = ZIN(0);
@@ -1485,20 +1487,22 @@ void LeakDC_next_i(LeakDC* unit, int inNumSamples)
 
 	LOOP1(inNumSamples,
 		double x0 = ZXP(in);
-		ZXP(out) = y1 = x0 - x1 + b1 * y1;
+		y1 = x0 - x1 + b1 * y1;
+		ZXP(out) = ma(y1);
 		x1 = x0;
 	);
 	unit->m_x1 = x1;
 	unit->m_y1 = zapgremlins(y1);
 }
 
-void LeakDC_next(LeakDC* unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LeakDC_next(LeakDC* unit, int inNumSamples, MuladdHelper & ma)
 {
 	if (ZIN0(1) == unit->m_b1) {
 		if ((inNumSamples & 3) == 0)
-			LeakDC_next_i_4(unit, inNumSamples);
+			LeakDC_next_i_4(unit, inNumSamples, ma);
 		else
-			LeakDC_next_i(unit, inNumSamples);
+			LeakDC_next_i(unit, inNumSamples, ma);
 	} else {
 		float *out = ZOUT(0);
 		float *in = ZIN(0);
@@ -1511,7 +1515,8 @@ void LeakDC_next(LeakDC* unit, int inNumSamples)
 		double b1_slope = CALCSLOPE(unit->m_b1, b1);
 		LOOP1(inNumSamples,
 			double x0 = ZXP(in);
-			ZXP(out) = y1 = x0 - x1 + b1 * y1;
+			y1 = x0 - x1 + b1 * y1;
+			ZXP(out) = ma(y1);
 			x1 = x0;
 			b1 += b1_slope;
 		);
@@ -1521,7 +1526,8 @@ void LeakDC_next(LeakDC* unit, int inNumSamples)
 }
 
 
-void LeakDC_next_1(LeakDC* unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LeakDC_next_1(LeakDC* unit, int inNumSamples, MuladdHelper & ma)
 {
 	double b1 = unit->m_b1 = ZIN0(1);
 
@@ -1529,31 +1535,38 @@ void LeakDC_next_1(LeakDC* unit, int inNumSamples)
 	double x1 = unit->m_x1;
 
 	double x0 = ZIN0(0);
-	ZOUT0(0) = y1 = x0 - x1 + b1 * y1;
+	y1 = x0 - x1 + b1 * y1;
+	ZOUT0(0) = ma(y1);
 	x1 = x0;
 
 	unit->m_x1 = x1;
 	unit->m_y1 = zapgremlins(y1);
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LeakDC, LeakDC_next_i, 2, i)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LeakDC, LeakDC_next_i_4, 2, i_4)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LeakDC, LeakDC_next_1, 2, 1)
+DEFINE_UGEN_FUNCTION_WRAPPER(LeakDC, LeakDC_next, 2)
+
+
 void LeakDC_Ctor(LeakDC *unit)
 {
 	//printf("LeakDC_Ctor\n");
 	if (BUFLENGTH == 1)
-		SETCALC(LeakDC_next_1);
+		LeakDC_1_Wrapper::setCalcFunc(unit);
 	else {
 		if (INRATE(1) == calc_ScalarRate) {
 			if ((BUFLENGTH & 3) == 0)
-				SETCALC(LeakDC_next_i_4);
+				LeakDC_i_4_Wrapper::setCalcFunc(unit);
 			else
-				SETCALC(LeakDC_next_i);
+				LeakDC_i_Wrapper::setCalcFunc(unit);
 		} else
-			SETCALC(LeakDC_next);
+			LeakDC_Wrapper::setCalcFunc(unit);
 	}
 	unit->m_b1 = 0.0;
 	unit->m_x1 = ZIN0(0);
 	unit->m_y1 = 0.0;
-	LeakDC_next_1(unit, 1);
+	LeakDC_1_Wrapper::run_1(unit);
 }
 
 
