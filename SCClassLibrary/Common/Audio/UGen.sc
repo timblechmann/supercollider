@@ -248,8 +248,11 @@ UGen : AbstractFunction {
 	}
 
 	linexp { arg inMin, inMax, outMin, outMax, clip = \minmax;
-		^LinExp.multiNew(this.rate, this.prune(inMin, inMax, clip),
-						inMin, inMax, outMin, outMax)
+		if (this.rate == \audio) {
+			^LinExp.ar(this.prune(inMin, inMax, clip), inMin, inMax, outMin, outMax)
+		} {
+			^LinExp.kr(this.prune(inMin, inMax, clip), inMin, inMax, outMin, outMax)
+		}
 	}
 	explin { arg inMin, inMax, outMin, outMax, clip = \minmax;
 		^(log(this.prune(inMin, inMax, clip)/inMin))
