@@ -17,12 +17,14 @@ XLine : UGen {
 }
 
 LinExp : PureUGen {
+	classvar <hasIntrusiveMuladd = true;
 	checkInputs { ^this.checkSameRateAsFirstInput }
-	*ar { arg in=0.0, srclo = 0.0, srchi = 1.0, dstlo = 1.0, dsthi = 2.0;
-		^this.multiNew('audio', in, srclo, srchi, dstlo, dsthi)
+
+	*ar { arg in=0.0, srclo = 0.0, srchi = 1.0, dstlo = 1.0, dsthi = 2.0, mul = 1.0, add = 0.0;
+		^this.multiNewMulAdd('audio', in, srclo, srchi, dstlo, dsthi, mul, add)
 	}
-	*kr { arg in=0.0, srclo = 0.0, srchi = 1.0, dstlo = 1.0, dsthi = 2.0;
-		^this.multiNew('control',  in, srclo, srchi, dstlo, dsthi)
+	*kr { arg in=0.0, srclo = 0.0, srchi = 1.0, dstlo = 1.0, dsthi = 2.0, mul = 1.0, add = 0.0;
+		^this.multiNewMulAdd('control',  in, srclo, srchi, dstlo, dsthi, mul, add)
 	}
 }
 
