@@ -145,12 +145,13 @@ VarLag : Filter {
 }
 
 LeakDC : Filter {
+	classvar <hasIntrusiveMuladd = true;
 
 	*ar { arg in = 0.0, coef = 0.995, mul = 1.0, add = 0.0;
-		^this.multiNew('audio', in, coef).madd(mul, add)
+		^this.multiNewMulAdd('audio', in, coef, mul, add)
 	}
 	*kr { arg in = 0.0, coef = 0.9, mul = 1.0, add = 0.0;
-		^this.multiNew('control', in, coef).madd(mul, add)
+		^this.multiNewMulAdd('control', in, coef, mul, add)
 	}
 }
 
