@@ -210,7 +210,7 @@ struct RHPF : public Unit
 	double m_y1, m_y2, m_a0, m_b1, m_b2;
 };
 
-struct LPF : public Unit
+struct LPF : public muladd_ugen
 {
 	float m_freq;
 	double m_y1, m_y2, m_a0, m_b1, m_b2;
@@ -2603,24 +2603,8 @@ void RHPF_next_1(RHPF* unit, int inNumSamples)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LPF_Ctor(LPF* unit)
-{
-	if (unit->mBufLength == 1)
-		SETCALC(LPF_next_1);
-	else
-		SETCALC(LPF_next);
-
-	unit->m_a0 = 0.f;
-	unit->m_b1 = 0.f;
-	unit->m_b2 = 0.f;
-	unit->m_y1 = 0.f;
-	unit->m_y2 = 0.f;
-	unit->m_freq = uninitializedControl;
-	LPF_next_1(unit, 1);
-}
-
-
-void LPF_next(LPF* unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LPF_next(LPF* unit, int inNumSamples, MuladdHelper & ma)
 {
 	//printf("LPF_next\n");
 
@@ -2653,13 +2637,13 @@ void LPF_next(LPF* unit, int inNumSamples)
 		double b2_slope = (next_b2 - b2) * unit->mRate->mFilterSlope;
 		LOOP(unit->mRate->mFilterLoops,
 			y0 = ZXP(in) + b1 * y1 + b2 * y2;
-			ZXP(out) = a0 * (y0 + 2. * y1 + y2);
+			ZXP(out) = ma(a0 * (y0 + 2. * y1 + y2));
 
 			y2 = ZXP(in) + b1 * y0 + b2 * y1;
-			ZXP(out) = a0 * (y2 + 2. * y0 + y1);
+			ZXP(out) = ma(a0 * (y2 + 2. * y0 + y1));
 
 			y1 = ZXP(in) + b1 * y2 + b2 * y0;
-			ZXP(out) = a0 * (y1 + 2.f * y2 + y0);
+			ZXP(out) = ma(a0 * (y1 + 2.f * y2 + y0));
 
 			a0 += a0_slope;
 			b1 += b1_slope;
@@ -2667,7 +2651,7 @@ void LPF_next(LPF* unit, int inNumSamples)
 		);
 		LOOP(unit->mRate->mFilterRemain,
 			y0 = ZXP(in) + b1 * y1 + b2 * y2;
-			ZXP(out) = a0 * (y0 + 2. * y1 + y2);
+			ZXP(out) = ma(a0 * (y0 + 2. * y1 + y2));
 			y2 = y1;
 			y1 = y0;
 		);
@@ -2679,20 +2663,20 @@ void LPF_next(LPF* unit, int inNumSamples)
 	} else {
 		LOOP(unit->mRate->mFilterLoops,
 			y0 = ZXP(in) + b1 * y1 + b2 * y2;
-			float out0 = a0 * (y0 + 2. * y1 + y2);
+			float out0 = ma(a0 * (y0 + 2. * y1 + y2));
 
 			y2 = ZXP(in) + b1 * y0 + b2 * y1;
-			float out1 = a0 * (y2 + 2. * y0 + y1);
+			float out1 = ma(a0 * (y2 + 2. * y0 + y1));
 
 			y1 = ZXP(in) + b1 * y2 + b2 * y0;
-			float out2 = a0 * (y1 + 2. * y2 + y0);
+			float out2 = ma(a0 * (y1 + 2. * y2 + y0));
 			ZXP(out) = out0;
 			ZXP(out) = out1;
 			ZXP(out) = out2;
 		);
 		LOOP(unit->mRate->mFilterRemain,
 			y0 = ZXP(in) + b1 * y1 + b2 * y2;
-			ZXP(out) = a0 * (y0 + 2. * y1 + y2);
+			ZXP(out) = ma(a0 * (y0 + 2. * y1 + y2));
 			y2 = y1;
 			y1 = y0;
 		);
@@ -2701,7 +2685,47 @@ void LPF_next(LPF* unit, int inNumSamples)
 	unit->m_y2 = zapgremlins(y2);
 }
 
-void LPF_next_1(LPF* unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LPF_next_i(LPF* unit, int inNumSamples, MuladdHelper & ma)
+{
+	//printf("LPF_next\n");
+	float *out = ZOUT(0);
+	float *in = ZIN(0);
+
+	double y0;
+	double y1 = unit->m_y1;
+	double y2 = unit->m_y2;
+	double a0 = unit->m_a0;
+	double b1 = unit->m_b1;
+	double b2 = unit->m_b2;
+
+	LOOP(unit->mRate->mFilterLoops,
+		y0 = ZXP(in) + b1 * y1 + b2 * y2;
+		float out0 = ma(a0 * (y0 + 2. * y1 + y2));
+
+		y2 = ZXP(in) + b1 * y0 + b2 * y1;
+		float out1 = ma(a0 * (y2 + 2. * y0 + y1));
+
+		y1 = ZXP(in) + b1 * y2 + b2 * y0;
+		float out2 = ma(a0 * (y1 + 2. * y2 + y0));
+		ZXP(out) = out0;
+		ZXP(out) = out1;
+		ZXP(out) = out2;
+	);
+	LOOP(unit->mRate->mFilterRemain,
+		y0 = ZXP(in) + b1 * y1 + b2 * y2;
+		ZXP(out) = ma(a0 * (y0 + 2. * y1 + y2));
+		y2 = y1;
+		y1 = y0;
+	);
+
+	unit->m_y1 = zapgremlins(y1);
+	unit->m_y2 = zapgremlins(y2);
+}
+
+
+template <typename MuladdHelper>
+static inline void LPF_next_1(LPF* unit, int inNumSamples, MuladdHelper & ma)
 {
 	//printf("LPF_next\n");
 	float in = ZIN0(0);
@@ -2726,7 +2750,7 @@ void LPF_next_1(LPF* unit, int inNumSamples)
 		b2 = -(1.f - sqrt2C + C2) * a0;
 
 		y0 = in + b1 * y1 + b2 * y2;
-		ZOUT0(0) = a0 * (y0 + 2. * y1 + y2);
+		ZOUT0(0) = ma(a0 * (y0 + 2. * y1 + y2));
 		y2 = y1;
 		y1 = y0;
 
@@ -2737,13 +2761,37 @@ void LPF_next_1(LPF* unit, int inNumSamples)
 	} else {
 
 		y0 = in + b1 * y1 + b2 * y2;
-		ZOUT0(0) = a0 * (y0 + 2. * y1 + y2);
+		ZOUT0(0) = ma(a0 * (y0 + 2. * y1 + y2));
 		y2 = y1;
 		y1 = y0;
 
 	}
 	unit->m_y1 = zapgremlins(y1);
 	unit->m_y2 = zapgremlins(y2);
+}
+
+DEFINE_UGEN_FUNCTION_WRAPPER(LPF, LPF_next, 2)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LPF, LPF_next_i, 2, i)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LPF, LPF_next_1, 2, 1)
+
+void LPF_Ctor(LPF* unit)
+{
+	if (unit->mBufLength == 1)
+		LPF_1_Wrapper::setCalcFunc(unit);
+	else {
+		if (INRATE(1) == calc_ScalarRate)
+			LPF_i_Wrapper::setCalcFunc(unit);
+		else
+			LPF_Wrapper::setCalcFunc(unit);
+	}
+
+	unit->m_a0 = 0.f;
+	unit->m_b1 = 0.f;
+	unit->m_b2 = 0.f;
+	unit->m_y1 = 0.f;
+	unit->m_y2 = 0.f;
+	unit->m_freq = uninitializedControl;
+	LPF_1_Wrapper::run_1(unit);
 }
 
 
