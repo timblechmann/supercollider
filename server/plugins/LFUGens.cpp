@@ -44,25 +44,25 @@ struct LFPulse : public Unit
 	float mFreqMul, mDuty;
 };
 
-struct LFSaw : public Unit
+struct LFSaw : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
 };
 
-struct LFPar : public Unit
+struct LFPar : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
 };
 
-struct LFCub : public Unit
+struct LFCub : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
 };
 
-struct LFTri : public Unit
+struct LFTri : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
@@ -211,20 +211,9 @@ extern "C"
 	void LFPulse_next_k(LFPulse *unit, int inNumSamples);
 	void LFPulse_Ctor(LFPulse* unit);
 
-	void LFSaw_next_a(LFSaw *unit, int inNumSamples);
-	void LFSaw_next_k(LFSaw *unit, int inNumSamples);
 	void LFSaw_Ctor(LFSaw* unit);
-
-	void LFTri_next_a(LFTri *unit, int inNumSamples);
-	void LFTri_next_k(LFTri *unit, int inNumSamples);
 	void LFTri_Ctor(LFTri* unit);
-
-	void LFPar_next_a(LFPar *unit, int inNumSamples);
-	void LFPar_next_k(LFPar *unit, int inNumSamples);
 	void LFPar_Ctor(LFPar* unit);
-
-	void LFCub_next_a(LFCub *unit, int inNumSamples);
-	void LFCub_next_k(LFCub *unit, int inNumSamples);
 	void LFCub_Ctor(LFCub* unit);
 
 	void LFGauss_next_a(LFGauss *unit, int inNumSamples);
@@ -543,7 +532,8 @@ void LFPulse_Ctor(LFPulse* unit)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFSaw_next_a(LFSaw *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFSaw_next_a(LFSaw *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -555,13 +545,14 @@ void LFSaw_next_a(LFSaw *unit, int inNumSamples)
 		phase += ZXP(freq) * freqmul;
 		if (phase >= 1.f) phase -= 2.f;
 		else if (phase <= -1.f) phase += 2.f;
-		ZXP(out) = z;
+		ZXP(out) = ma(z);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFSaw_next_k(LFSaw *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFSaw_next_k(LFSaw *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -569,13 +560,13 @@ void LFSaw_next_k(LFSaw *unit, int inNumSamples)
 	double phase = unit->mPhase;
 	if (freq >= 0.f) {
 		LOOP1(inNumSamples,
-			ZXP(out) = phase;
+			ZXP(out) = ma(phase);
 			phase += freq;
 			if (phase >= 1.f) phase -= 2.f;
 		);
 	} else {
 		LOOP1(inNumSamples,
-			ZXP(out) = phase;
+			ZXP(out) = ma(phase);
 			phase += freq;
 			if (phase <= -1.f) phase += 2.f;
 		);
@@ -584,23 +575,27 @@ void LFSaw_next_k(LFSaw *unit, int inNumSamples)
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFSaw, LFSaw_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFSaw, LFSaw_next_a, 2, a)
+
 void LFSaw_Ctor(LFSaw* unit)
 {
 	if (INRATE(0) == calc_FullRate)
-		SETCALC(LFSaw_next_a);
+		LFSaw_a_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LFSaw_next_k);
+		LFSaw_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 2.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1);
 
-	LFSaw_next_k(unit, 1);
+	LFSaw_k_Wrapper::run_1(unit);
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFPar_next_a(LFPar *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFPar_next_a(LFPar *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -623,13 +618,14 @@ void LFPar_next_a(LFPar *unit, int inNumSamples)
 		// Note: the following two lines were originally one, but seems to compile wrong on mac
 		float phaseadd = ZXP(freq);
 		phase += phaseadd * freqmul;
-		ZXP(out) = y;
+		ZXP(out) = ma(y);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFPar_next_k(LFPar *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFPar_next_k(LFPar *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -638,14 +634,14 @@ void LFPar_next_k(LFPar *unit, int inNumSamples)
 	LOOP1(inNumSamples,
 		if (phase < 1.f) {
 			float z = phase;
-			ZXP(out) = 1.f - z*z;
+			ZXP(out) = ma(1.f - z*z);
 		} else if (phase < 3.f) {
 			float z = phase - 2.f;
-			ZXP(out) = z*z - 1.f;
+			ZXP(out) = ma(z*z - 1.f);
 		} else {
 			phase -= 4.f;
 			float z = phase;
-			ZXP(out) = 1.f - z*z;
+			ZXP(out) = ma(1.f - z*z);
 		}
 		phase += freq;
 	);
@@ -653,24 +649,26 @@ void LFPar_next_k(LFPar *unit, int inNumSamples)
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFPar, LFPar_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFPar, LFPar_next_a, 2, a)
+
 void LFPar_Ctor(LFPar* unit)
 {
 	if (INRATE(0) == calc_FullRate)
-		SETCALC(LFPar_next_a);
+		LFPar_a_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LFPar_next_k);
+		LFPar_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 4.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1);
 
-	LFPar_next_k(unit, 1);
+	LFPar_k_Wrapper::run_1(unit);
 }
-
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFCub_next_a(LFCub *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFCub_next_a(LFCub *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -689,13 +687,14 @@ void LFCub_next_a(LFCub *unit, int inNumSamples)
 		}
 		float phaseadd = ZXP(freq);
 		phase += phaseadd * freqmul;
-		ZXP(out) = z * z * (6.f - 4.f * z) - 1.f;
+		ZXP(out) = ma(z * z * (6.f - 4.f * z) - 1.f);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFCub_next_k(LFCub *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFCub_next_k(LFCub *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -711,31 +710,35 @@ void LFCub_next_k(LFCub *unit, int inNumSamples)
 			phase -= 2.f;
 			z = phase;
 		}
-		ZXP(out) = z * z * (6.f - 4.f * z) - 1.f;
+		ZXP(out) = ma(z * z * (6.f - 4.f * z) - 1.f);
 		phase += freq;
 	);
 
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFCub, LFCub_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFCub, LFCub_next_a, 2, a)
+
 void LFCub_Ctor(LFCub* unit)
 {
 	if (INRATE(0) == calc_FullRate)
-		SETCALC(LFCub_next_a);
+		LFCub_a_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LFCub_next_k);
+		LFCub_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 2.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1) + 0.5;
 
-	LFCub_next_k(unit, 1);
+	LFCub_k_Wrapper::run_1(unit);
 }
 
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFTri_next_a(LFTri *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFTri_next_a(LFTri *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -746,13 +749,14 @@ void LFTri_next_a(LFTri *unit, int inNumSamples)
 		float z = phase > 1.f ? 2.f - phase : phase;
 		phase += ZXP(freq) * freqmul;
 		if (phase >= 3.f) phase -= 4.f;
-		ZXP(out) = z;
+		ZXP(out) = ma(z);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFTri_next_k(LFTri *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFTri_next_k(LFTri *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -762,24 +766,26 @@ void LFTri_next_k(LFTri *unit, int inNumSamples)
 		float z = phase > 1.f ? 2.f - phase : phase;
 		phase += freq;
 		if (phase >= 3.f) phase -= 4.f;
-		ZXP(out) = z;
+		ZXP(out) = ma(z);
 	);
 
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFTri, LFTri_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFTri, LFTri_next_a, 2, a)
+
 void LFTri_Ctor(LFTri* unit)
 {
-	if (INRATE(0) == calc_FullRate) {
-		SETCALC(LFTri_next_a);
-	} else {
-		SETCALC(LFTri_next_k);
-	}
+	if (INRATE(0) == calc_FullRate)
+		LFTri_a_Wrapper::setCalcFunc(unit);
+	else
+		LFTri_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 4.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1);
 
-	LFTri_next_k(unit, 1);
+	LFTri_k_Wrapper::run_1(unit);
 }
 
 
