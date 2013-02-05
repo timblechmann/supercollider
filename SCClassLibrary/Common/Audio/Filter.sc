@@ -180,11 +180,12 @@ LPF : Filter {
 }
 
 HPF : Filter {
+	classvar <hasIntrusiveMuladd = true;
 	*ar { arg in = 0.0, freq = 440.0, mul = 1.0, add = 0.0;
-		^this.multiNew('audio', in, freq).madd(mul, add)
+		^this.multiNewMulAdd('audio', in, freq, mul, add)
 	}
 	*kr { arg in = 0.0, freq = 440.0, mul = 1.0, add = 0.0;
-		^this.multiNew('control', in, freq).madd(mul, add)
+		^this.multiNewMulAdd('control', in, freq, mul, add)
 	}
 }
 
