@@ -216,7 +216,7 @@ struct LPF : public muladd_ugen
 	double m_y1, m_y2, m_a0, m_b1, m_b2;
 };
 
-struct HPF : public Unit
+struct HPF : public muladd_ugen
 {
 	float m_freq;
 	double m_y1, m_y2, m_a0, m_b1, m_b2;
@@ -2797,24 +2797,8 @@ void LPF_Ctor(LPF* unit)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void HPF_Ctor(HPF* unit)
-{
-	if (unit->mBufLength == 1)
-		SETCALC(HPF_next_1);
-	else
-		SETCALC(HPF_next);
-	unit->m_a0 = 0.;
-	unit->m_b1 = 0.;
-	unit->m_b2 = 0.;
-	unit->m_y1 = 0.;
-	unit->m_y2 = 0.;
-	unit->m_freq = uninitializedControl;
-
-	HPF_next_1(unit, 1);
-}
-
-
-void HPF_next(HPF* unit, int inNumSamples)
+template <typename MuladdHelper>
+void HPF_next(HPF* unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in = ZIN(0);
@@ -2847,13 +2831,13 @@ void HPF_next(HPF* unit, int inNumSamples)
 			double in2 = ZXP(in);
 
 			double y0 = in0 + b1 * y1 + b2 * y2;
-			ZXP(out) = a0 * (y0 - 2. * y1 + y2);
+			ZXP(out) = ma(a0 * (y0 - 2. * y1 + y2));
 
 			y2 = in1 + b1 * y0 + b2 * y1;
-			ZXP(out) = a0 * (y2 - 2. * y0 + y1);
+			ZXP(out) = ma(a0 * (y2 - 2. * y0 + y1));
 
 			y1 = in2 + b1 * y2 + b2 * y0;
-			ZXP(out) = a0 * (y1 - 2. * y2 + y0);
+			ZXP(out) = ma(a0 * (y1 - 2. * y2 + y0));
 
 			a0 += a0_slope;
 			b1 += b1_slope;
@@ -2861,7 +2845,7 @@ void HPF_next(HPF* unit, int inNumSamples)
 		);
 		LOOP(unit->mRate->mFilterRemain,
 			double y0 = ZXP(in) + b1 * y1 + b2 * y2;
-			ZXP(out) = a0 * (y0 - 2. * y1 + y2);
+			ZXP(out) = ma(a0 * (y0 - 2. * y1 + y2));
 			y2 = y1;
 			y1 = y0;
 		);
@@ -2877,17 +2861,17 @@ void HPF_next(HPF* unit, int inNumSamples)
 			double in2 = ZXP(in);
 
 			double y0 = in0 + b1 * y1 + b2 * y2;
-			ZXP(out) = a0 * (y0 - 2. * y1 + y2);
+			ZXP(out) = ma(a0 * (y0 - 2. * y1 + y2));
 
 			y2 = in1 + b1 * y0 + b2 * y1;
-			ZXP(out) = a0 * (y2 - 2. * y0 + y1);
+			ZXP(out) = ma(a0 * (y2 - 2. * y0 + y1));
 
 			y1 = in2 + b1 * y2 + b2 * y0;
-			ZXP(out) = a0 * (y1 - 2. * y2 + y0);
+			ZXP(out) = ma(a0 * (y1 - 2. * y2 + y0));
 		);
 		LOOP(unit->mRate->mFilterRemain,
 			double y0 = ZXP(in) + b1 * y1 + b2 * y2;
-			ZXP(out) = a0 * (y0 - 2. * y1 + y2);
+			ZXP(out) = ma(a0 * (y0 - 2. * y1 + y2));
 			y2 = y1;
 			y1 = y0;
 		);
@@ -2896,7 +2880,44 @@ void HPF_next(HPF* unit, int inNumSamples)
 	unit->m_y2 = zapgremlins(y2);
 }
 
-void HPF_next_1(HPF* unit, int inNumSamples)
+template <typename MuladdHelper>
+void HPF_next_i(HPF* unit, int inNumSamples, MuladdHelper & ma)
+{
+	float *out = ZOUT(0);
+	float *in = ZIN(0);
+
+	double y1 = unit->m_y1;
+	double y2 = unit->m_y2;
+	double a0 = unit->m_a0;
+	double b1 = unit->m_b1;
+	double b2 = unit->m_b2;
+
+	LOOP(unit->mRate->mFilterLoops,
+		double in0 = ZXP(in);
+		double in1 = ZXP(in);
+		double in2 = ZXP(in);
+
+		double y0 = in0 + b1 * y1 + b2 * y2;
+		ZXP(out) = ma(a0 * (y0 - 2. * y1 + y2));
+
+		y2 = in1 + b1 * y0 + b2 * y1;
+		ZXP(out) = ma(a0 * (y2 - 2. * y0 + y1));
+
+		y1 = in2 + b1 * y2 + b2 * y0;
+		ZXP(out) = ma(a0 * (y1 - 2. * y2 + y0));
+	);
+	LOOP(unit->mRate->mFilterRemain,
+		double y0 = ZXP(in) + b1 * y1 + b2 * y2;
+		ZXP(out) = ma(a0 * (y0 - 2. * y1 + y2));
+		y2 = y1;
+		y1 = y0;
+	);
+	unit->m_y1 = zapgremlins(y1);
+	unit->m_y2 = zapgremlins(y2);
+}
+
+template <typename MuladdHelper>
+void HPF_next_1(HPF* unit, int inNumSamples, MuladdHelper & ma)
 {
 	double in = ZIN0(0);
 	double freq = ZIN0(1);
@@ -2918,7 +2939,7 @@ void HPF_next_1(HPF* unit, int inNumSamples)
 		b2 = -(1. - sqrt2C + C2) * a0;
 
 		double y0 = in + b1 * y1 + b2 * y2;
-		ZOUT0(0) = a0 * (y0 - 2. * y1 + y2);
+		ZOUT0(0) = ma(a0 * (y0 - 2. * y1 + y2));
 		y2 = y1;
 		y1 = y0;
 
@@ -2928,7 +2949,7 @@ void HPF_next_1(HPF* unit, int inNumSamples)
 		unit->m_b2 = b2;
 	} else {
 		double y0 = in + b1 * y1 + b2 * y2;
-		ZOUT0(0) = a0 * (y0 - 2. * y1 + y2);
+		ZOUT0(0) = ma(a0 * (y0 - 2. * y1 + y2));
 		y2 = y1;
 		y1 = y0;
 	}
@@ -2936,6 +2957,34 @@ void HPF_next_1(HPF* unit, int inNumSamples)
 	unit->m_y1 = zapgremlins(y1);
 	unit->m_y2 = zapgremlins(y2);
 }
+
+DEFINE_UGEN_FUNCTION_WRAPPER(HPF, HPF_next, 2)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(HPF, HPF_next_i, 2, i)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(HPF, HPF_next_1, 2, 1)
+
+
+void HPF_Ctor(HPF* unit)
+{
+	if (unit->mBufLength == 1)
+		HPF_1_Wrapper::setCalcFunc(unit);
+	else {
+		if (INRATE(1) == calc_ScalarRate)
+			HPF_i_Wrapper::setCalcFunc(unit);
+		else
+			HPF_Wrapper::setCalcFunc(unit);
+	}
+
+	unit->m_a0 = 0.f;
+	unit->m_b1 = 0.f;
+	unit->m_b2 = 0.f;
+	unit->m_y1 = 0.f;
+	unit->m_y2 = 0.f;
+	unit->m_freq = uninitializedControl;
+	HPF_1_Wrapper::run_1(unit);
+}
+
+
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
