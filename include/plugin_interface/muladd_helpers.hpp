@@ -1,6 +1,6 @@
 //  muladd helper classes, broken out of nova
 //
-//  Copyright (C) 2010 Tim Blechmann
+//  Copyright (C) 2010-2013 Tim Blechmann
 //
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #define SC_MULADD_HELPERS_HPP
 
 #include "nova-simd/vec.hpp"
+#include "function_attributes.h"
 
 template <typename sample_type>
 inline nova::vec<sample_type> slope_vec(sample_type & value, sample_type slope)
@@ -437,19 +438,19 @@ namespace detail {
 template <typename T, typename UGenType, int MulIndex>
 struct muladd_helper
 {
-	static void next_nop(UGenType * unit, int num_samples)
+	HOT static void next_nop(UGenType * unit, int num_samples)
 	{
 		muladd_helper_nop<float> ma;
 		T::next(unit, num_samples, ma);
 	}
 
-	static void next_mul_i(UGenType * unit, int num_samples)
+	HOT static void next_mul_i(UGenType * unit, int num_samples)
 	{
 		muladd_helper_mul_c<float> ma(IN0(MulIndex));
 		T::next(unit, num_samples, ma);
 	}
 
-	static void next_mul_k(UGenType * unit, int num_samples)
+	HOT static void next_mul_k(UGenType * unit, int num_samples)
 	{
 		float mul = IN0(MulIndex);
 		if (mul == unit->mul) {
@@ -462,19 +463,19 @@ struct muladd_helper
 		}
 	}
 
-	static void next_mul_a(UGenType * unit, int num_samples)
+	HOT static void next_mul_a(UGenType * unit, int num_samples)
 	{
 		muladd_helper_mul_v<float> ma(IN(MulIndex));
 		T::next(unit, num_samples, ma);
 	}
 
-	static void next_add_i(UGenType * unit, int num_samples)
+	HOT static void next_add_i(UGenType * unit, int num_samples)
 	{
 		muladd_helper_add_c<float> ma(IN0(MulIndex+1));
 		T::next(unit, num_samples, ma);
 	}
 
-	static void next_add_k(UGenType * unit, int num_samples)
+	HOT static void next_add_k(UGenType * unit, int num_samples)
 	{
 		float add = IN0(MulIndex+1);
 		if (add == unit->add) {
@@ -487,20 +488,19 @@ struct muladd_helper
 		}
 	}
 
-	static void next_add_a(UGenType * unit, int num_samples)
+	HOT static void next_add_a(UGenType * unit, int num_samples)
 	{
 		muladd_helper_add_v<float> ma(IN(MulIndex+1));
 		T::next(unit, num_samples, ma);
 	}
 
-
-	static void next_mul_i_add_i(UGenType * unit, int num_samples)
+	HOT static void next_mul_i_add_i(UGenType * unit, int num_samples)
 	{
 		muladd_helper_mul_c_add_c<float> ma(IN0(MulIndex), IN0(MulIndex+1));
 		T::next(unit, num_samples, ma);
 	}
 
-	static void next_mul_i_add_k(UGenType * unit, int num_samples)
+	HOT static void next_mul_i_add_k(UGenType * unit, int num_samples)
 	{
 		float add = IN0(MulIndex+1);
 		if (add == unit->add) {
@@ -513,7 +513,7 @@ struct muladd_helper
 		}
 	}
 
-	static void next_mul_k_add_i(UGenType * unit, int num_samples)
+	HOT static void next_mul_k_add_i(UGenType * unit, int num_samples)
 	{
 		float mul = IN0(MulIndex);
 		if (mul == unit->mul) {
@@ -526,7 +526,7 @@ struct muladd_helper
 		}
 	}
 
-	static void next_mul_k_add_k(UGenType * unit, int num_samples)
+	HOT static void next_mul_k_add_k(UGenType * unit, int num_samples)
 	{
 		float mul = IN0(MulIndex);
 		float add = IN0(MulIndex+1);
@@ -550,19 +550,19 @@ struct muladd_helper
 		}
 	}
 
-	static void next_mul_i_add_a(UGenType * unit, int num_samples)
+	HOT static void next_mul_i_add_a(UGenType * unit, int num_samples)
 	{
 		muladd_helper_mul_c_add_v<float> ma(IN0(MulIndex), IN(MulIndex+1));
 		T::next(unit, num_samples, ma);
 	}
 
-	static void next_mul_a_add_i(UGenType * unit, int num_samples)
+	HOT static void next_mul_a_add_i(UGenType * unit, int num_samples)
 	{
 		muladd_helper_mul_v_add_c<float> ma(IN(MulIndex), IN0(MulIndex+1));
 		T::next(unit, num_samples, ma);
 	}
 
-	static void next_mul_a_add_k(UGenType * unit, int num_samples)
+	HOT static void next_mul_a_add_k(UGenType * unit, int num_samples)
 	{
 		float add = IN0(MulIndex+1);
 		if (add == unit->add) {
@@ -575,7 +575,7 @@ struct muladd_helper
 		}
 	}
 
-	static void next_mul_k_add_a(UGenType * unit, int num_samples)
+	HOT static void next_mul_k_add_a(UGenType * unit, int num_samples)
 	{
 		float mul = IN0(MulIndex);
 		if (mul == unit->mul) {
@@ -588,13 +588,13 @@ struct muladd_helper
 		}
 	}
 
-	static void next_mul_a_add_a(UGenType * unit, int num_samples)
+	HOT static void next_mul_a_add_a(UGenType * unit, int num_samples)
 	{
 		muladd_helper_mul_v_add_v<float> ma(IN(MulIndex), IN(MulIndex+1));
 		T::next(unit, num_samples, ma);
 	}
 
-	static UnitCalcFunc selectCalcFunc(const UGenType * unit)
+	HOT static UnitCalcFunc selectCalcFunc(const UGenType * unit)
 	{
 		assert(unit->mNumInputs == MulIndex + 2);
 		switch(INRATE(MulIndex))
@@ -703,26 +703,26 @@ fail:
  *
  */
 
-#define DEFINE_UGEN_FUNCTION_WRAPPER(TYPE, FUNCTION_NAME, INDEX)               \
-struct TYPE##_Wrapper:                                                         \
-	detail::muladd_helper<TYPE##_Wrapper, TYPE, INDEX>                         \
-{                                                                              \
-	template <typename MulAddHelper>                                           \
-	static inline void next(TYPE * unit, int inNumSamples, MulAddHelper & ma)  \
-	{                                                                          \
-		FUNCTION_NAME(unit, inNumSamples, ma);                                 \
-	}                                                                          \
+#define DEFINE_UGEN_FUNCTION_WRAPPER(TYPE, FUNCTION_NAME, INDEX)		\
+struct TYPE##_Wrapper:													\
+	detail::muladd_helper<TYPE##_Wrapper, TYPE, INDEX>					\
+{																		\
+	template <typename MulAddHelper>									\
+	HOT static inline void next(TYPE * unit, int inNumSamples, MulAddHelper & ma) \
+	{																	\
+		FUNCTION_NAME(unit, inNumSamples, ma);							\
+	}																	\
 };
 
-#define DEFINE_UGEN_FUNCTION_WRAPPER_TAG(TYPE, FUNCTION_NAME, INDEX, TAG)      \
-struct TYPE##_##TAG##_Wrapper:                                                 \
-	detail::muladd_helper<TYPE##_##TAG##_Wrapper, TYPE, INDEX>                 \
-{                                                                              \
-	template <typename MulAddHelper>                                           \
-	static inline void next(TYPE * unit, int inNumSamples, MulAddHelper & ma)  \
-	{                                                                          \
-		FUNCTION_NAME(unit, inNumSamples, ma);                                 \
-	}                                                                          \
+#define DEFINE_UGEN_FUNCTION_WRAPPER_TAG(TYPE, FUNCTION_NAME, INDEX, TAG) \
+struct TYPE##_##TAG##_Wrapper:											\
+	detail::muladd_helper<TYPE##_##TAG##_Wrapper, TYPE, INDEX>			\
+{																		\
+	template <typename MulAddHelper>									\
+	HOT static inline void next(TYPE * unit, int inNumSamples, MulAddHelper & ma) \
+	{																	\
+		FUNCTION_NAME(unit, inNumSamples, ma);							\
+	}																	\
 };
 
 #endif /* SC_MULADD_HELPERS_HPP */
