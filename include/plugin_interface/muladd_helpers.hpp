@@ -624,7 +624,7 @@ struct muladd_helper
 					return (UnitCalcFunc)(next_mul_i_add_a);
 
 			default:
-				assert(false);
+				goto fail;
 			}
 
 		case calc_BufRate:
@@ -643,7 +643,7 @@ struct muladd_helper
 				return (UnitCalcFunc)(next_mul_k_add_a);
 
 			default:
-				assert(false);
+				goto fail;
 			}
 
 		case calc_FullRate:
@@ -662,12 +662,19 @@ struct muladd_helper
 				return (UnitCalcFunc)(next_mul_a_add_a);
 
 			default:
-				assert(false);
+				goto fail;
 			}
 
 		default:
-			assert(false);
+			goto fail;
 		}
+
+fail:
+		assert(false);
+#if defined (__GNUC__) || defined (__CLANG__)
+		__builtin_unreachable();
+#endif
+		return NULL;
 	}
 
 	static void setCalcFunc(UGenType * unit)
