@@ -23,6 +23,8 @@
 #include <limits>
 #include <string.h>
 
+#include "muladd_helpers.hpp"
+
 static InterfaceTable *ft;
 
 struct BufUnit : public Unit
@@ -87,7 +89,7 @@ struct Shaper : public BufUnit
 	float mPrevIn;
 };
 
-struct FSinOsc : public Unit
+struct FSinOsc : public muladd_ugen
 {
 	double m_b1, m_y1, m_y2, m_freq;
 };
@@ -263,11 +265,6 @@ void IndexInBetween_Ctor(IndexInBetween *unit);
 void IndexInBetween_next_1(IndexInBetween *unit, int inNumSamples);
 void IndexInBetween_next_k(IndexInBetween *unit, int inNumSamples);
 void IndexInBetween_next_a(IndexInBetween *unit, int inNumSamples);
-
-
-void FSinOsc_Ctor(FSinOsc *unit);
-void FSinOsc_next(FSinOsc *unit, int inNumSamples);
-void FSinOsc_next_i(FSinOsc *unit, int inNumSamples);
 
 void PSinGrain_Ctor(PSinGrain *unit);
 void PSinGrain_next(PSinGrain *unit, int inNumSamples);
@@ -1199,25 +1196,41 @@ void Shaper_next_a(Shaper *unit, int inNumSamples)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void FSinOsc_Ctor(FSinOsc *unit)
+template <typename MuladdHelper>
+static inline void FSinOsc_loop(FSinOsc *unit, double b1, MuladdHelper & ma)
 {
-	if (INRATE(0) == calc_ScalarRate)
-		SETCALC(FSinOsc_next_i);
-	else
-		SETCALC(FSinOsc_next);
-	unit->m_freq = ZIN0(0);
-	float iphase = ZIN0(1);
-	float w = unit->m_freq * unit->mRate->mRadiansPerSample;
-	unit->m_b1 = 2. * cos(w);
-	unit->m_y1 = sin(iphase);
-	unit->m_y2 = sin(iphase - w);
-
-	ZOUT0(0) = unit->m_y1;
+	float  * __restrict__ out = ZOUT(0);
+	double y0;
+	double y1 = unit->m_y1;
+	double y2 = unit->m_y2;
+	//Print("y %g %g  b1 %g\n", y1, y2, b1);
+	//Print("%d %d\n", unit->mRate->mFilterLoops, unit->mRate->mFilterRemain);
+	LOOP(unit->mRate->mFilterLoops,
+		 y0 = b1 * y1 - y2;
+		 y2 = b1 * y0 - y1;
+		 y1 = b1 * y2 - y0;
+		 float out0 = ma(y0);
+		 float out1 = ma(y2);
+		 float out2 = ma(y1);
+		 ZXP(out) = out0;
+		 ZXP(out) = out1;
+		 ZXP(out) = out2;
+	);
+	LOOP(unit->mRate->mFilterRemain,
+		y0 = b1 * y1 - y2;
+		ZXP(out) = ma(y0);
+		y2 = y1;
+		y1 = y0;
+	);
+	//Print("y %g %g  b1 %g\n", y1, y2, b1);
+	unit->m_y1 = y1;
+	unit->m_y2 = y2;
 }
 
-void FSinOsc_next(FSinOsc *unit, int inNumSamples)
+
+template <typename MuladdHelper>
+static inline void FSinOsc_next(FSinOsc *unit, int inNumSamples, MuladdHelper & ma)
 {
-	float *out = ZOUT(0);
 	double freq = ZIN0(0);
 	double b1;
 	if (freq != unit->m_freq) {
@@ -1227,52 +1240,34 @@ void FSinOsc_next(FSinOsc *unit, int inNumSamples)
 	} else {
 		b1 = unit->m_b1;
 	}
-	double y0;
-	double y1 = unit->m_y1;
-	double y2 = unit->m_y2;
-	//Print("y %g %g  b1 %g\n", y1, y2, b1);
-	//Print("%d %d\n", unit->mRate->mFilterLoops, unit->mRate->mFilterRemain);
-	LOOP(unit->mRate->mFilterLoops,
-		ZXP(out) = y0 = b1 * y1 - y2;
-		ZXP(out) = y2 = b1 * y0 - y1;
-		ZXP(out) = y1 = b1 * y2 - y0;
-	);
-	LOOP(unit->mRate->mFilterRemain,
-		ZXP(out) = y0 = b1 * y1 - y2;
-		y2 = y1;
-		y1 = y0;
-	);
-	//Print("y %g %g  b1 %g\n", y1, y2, b1);
-	unit->m_y1 = y1;
-	unit->m_y2 = y2;
+	FSinOsc_loop(unit, b1, ma);
 }
 
-void FSinOsc_next_i(FSinOsc *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void FSinOsc_next_i(FSinOsc *unit, int inNumSamples, MuladdHelper & ma)
 {
-	float * __restrict__ out = ZOUT(0);
-	double b1 = unit->m_b1;
+	FSinOsc_loop(unit, unit->m_b1, ma);
+}
 
-	double y0;
-	double y1 = unit->m_y1;
-	double y2 = unit->m_y2;
-	//Print("y %g %g  b1 %g\n", y1, y2, b1);
-	//Print("%d %d\n", unit->mRate->mFilterLoops, unit->mRate->mFilterRemain);
-	LOOP(unit->mRate->mFilterLoops,
-		y0 = b1 * y1 - y2;
-		y2 = b1 * y0 - y1;
-		y1 = b1 * y2 - y0;
-		ZXP(out) = y0;
-		ZXP(out) = y2;
-		ZXP(out) = y1;
-	);
-	LOOP(unit->mRate->mFilterRemain,
-		ZXP(out) = y0 = b1 * y1 - y2;
-		y2 = y1;
-		y1 = y0;
-	);
-	//Print("y %g %g  b1 %g\n", y1, y2, b1);
-	unit->m_y1 = y1;
-	unit->m_y2 = y2;
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(FSinOsc, FSinOsc_next_i, 2, i)
+DEFINE_UGEN_FUNCTION_WRAPPER(FSinOsc, FSinOsc_next, 2)
+
+
+void FSinOsc_Ctor(FSinOsc *unit)
+{
+	if (INRATE(0) == calc_ScalarRate)
+		FSinOsc_i_Wrapper::setCalcFunc(unit);
+	else
+		FSinOsc_Wrapper::setCalcFunc(unit);
+
+	unit->m_freq = ZIN0(0);
+	float iphase = ZIN0(1);
+	float w = unit->m_freq * unit->mRate->mRadiansPerSample;
+	unit->m_b1 = 2. * cos(w);
+	unit->m_y1 = sin(iphase);
+	unit->m_y2 = sin(iphase - w);
+
+	FSinOsc_i_Wrapper::run_1(unit);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
