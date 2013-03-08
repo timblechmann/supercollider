@@ -82,11 +82,13 @@ void AudioStatusBox::onServerRunningChanged(bool running, const QString &, int)
 void AudioStatusBox::wheelEvent(QWheelEvent * event)
 {
     if (event->orientation() == Qt::Vertical) {
+        showContextMenu();
         if (event->delta() > 0)
-            mServer->increaseVolume();
+            mServer->changeVolume(0.2);
         else
-            mServer->decreaseVolume();
+            mServer->changeVolume(-0.2);
     }
+    StatusBox::wheelEvent(event);
 }
 
 } // namespace ScIDE

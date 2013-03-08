@@ -22,7 +22,7 @@
 
 namespace ScIDE {
 
-StatusBox::StatusBox(QWidget *parent) : QLabel(parent)
+StatusBox::StatusBox(QWidget *parent) : QLabel(parent), mMenu(0)
 {
     setAutoFillBackground(true);
     setMargin(3);
@@ -52,13 +52,19 @@ void StatusBox::setTextColor(const QColor & color)
 
 void StatusBox::showContextMenu()
 {
-    QList<QAction*> actions = this->actions();
-    if (actions.count()) {
-        StatusBoxMenu menu;
-        menu.addActions(actions);
-        menu.exec( mapToGlobal(QPoint(0, -menu.sizeHint().height() - 2)) );
+    if (!mMenu) {
+        QList<QAction*> actions = this->actions();
+        if (actions.count()) {
+            StatusBoxMenu * menu = new StatusBoxMenu;
+            menu->addActions(actions);
+            mMenu = menu;
+        }
     }
+
+    if (!mMenu->isVisible())
+        mMenu->popup(mapToGlobal(QPoint(0, -mMenu->sizeHint().height() - 2)) );
 }
+
 
 void StatusBox::mousePressEvent( QMouseEvent * )
 {

@@ -55,10 +55,12 @@ public:
     StatusBox(QWidget *parent = 0);
     void setBackground(const QBrush &);
     void setTextColor(const QColor &);
+
 protected:
     void addActionSeparator();
     void showContextMenu();
     virtual void mousePressEvent( QMouseEvent * );
+    StatusBoxMenu * mMenu;
 };
 
 } // namespace ScIDE
