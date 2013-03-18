@@ -174,6 +174,15 @@ Proutine : Prout {
 		this.deprecated(thisMethod);
 		^key.nearestInList(this) + root
 	}
+
+	transposeKey { arg amount, octave=12;
+		this.deprecated(thisMethod);
+		^((this + amount) % octave).sort
+	}
+	mode { arg degree, octave=12;
+		this.deprecated(thisMethod);
+		^(rotate(this, degree.neg) - this.wrapAt(degree)) % octave
+	}
 }
 
 

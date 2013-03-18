@@ -579,13 +579,6 @@ SequenceableCollection : Collection {
 		^this.collect({ arg item; list.at(list.indexIn(item)) })
 	}
 
-	transposeKey { arg amount, octave=12;
-		^((this + amount) % octave).sort
-	}
-	mode { arg degree, octave=12;
-		^(rotate(this, degree.neg) - this.wrapAt(degree)) % octave
-	}
-
 	// supports a variation of Mikael Laurson's rhythm list RTM-notation.
 	convertRhythm {
 		var list, tie;
