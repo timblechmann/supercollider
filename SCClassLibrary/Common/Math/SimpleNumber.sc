@@ -418,9 +418,10 @@ SimpleNumber : Number {
 
 
 	degreeToKey { arg scale, stepsPerOctave = 12;
-		var scaleDegree = this.round.asInteger;
-		var accidental = (this - scaleDegree) * 10.0;
-		^scale.performDegreeToKey(scaleDegree, stepsPerOctave, accidental)
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^this.degreeToNote(scale)
 	}
 
 	degreeToNote {|scale|

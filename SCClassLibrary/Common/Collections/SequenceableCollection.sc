@@ -553,13 +553,14 @@ SequenceableCollection : Collection {
 
 	// pitch operations
 	degreeToKey { arg scale, stepsPerOctave=12;
-		^this.collect({ arg scaleDegree;
-			scaleDegree.degreeToKey(scale, stepsPerOctave);
-		});
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^this.degreeToNote(scale)
 	}
-	keyToDegree { arg scale, stepsPerOctave=12;
-		^this.collect { arg val; val.keyToDegree(scale, stepsPerOctave) }
-	}
+	// keyToDegree { arg scale, stepsPerOctave=12;
+	// 	^this.collect { arg val; val.keyToDegree(scale, stepsPerOctave) }
+	// }
 
 	degreeToNote { arg scale;
 		^this.collect(_.degreeToNote(scale))

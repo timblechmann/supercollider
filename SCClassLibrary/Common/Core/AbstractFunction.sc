@@ -190,7 +190,10 @@ AbstractFunction {
 	}
 
 	degreeToKey { arg scale, stepsPerOctave=12;
-		^this.composeNAryOp('degreeToKey', [scale, stepsPerOctave])
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^this.degreeToNote(scale)
 	}
 
 	degreeToNote { arg scale;

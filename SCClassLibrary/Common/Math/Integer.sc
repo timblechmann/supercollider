@@ -23,7 +23,10 @@ Integer : SimpleNumber {
 		if (res == exclude, { ^this },{ ^res });
 	}
 	degreeToKey { arg scale, stepsPerOctave = 12;
-		^scale.performDegreeToKey(this, stepsPerOctave)
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^this.degreeToNote(scale)
 	}
 
 	degreeToNote { |scale|

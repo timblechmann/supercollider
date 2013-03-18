@@ -293,7 +293,10 @@ UGen : AbstractFunction {
 		});
 	}
 	degreeToKey { arg scale, stepsPerOctave=12;
-		^DegreeToKey.kr(scale, this, stepsPerOctave)
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^DegreeToKey.kr(scale, this, BufFrames.kr(scale))
 	}
 
 	outputIndex { ^0 }
