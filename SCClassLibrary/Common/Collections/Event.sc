@@ -158,24 +158,30 @@ Event : Environment {
 				octave: 5.0,
 				root: 0.0,					// root of the scale
 				degree: 0,
-				scale: #[0, 2, 4, 5, 7, 9, 11], 	// diatonic major scale
-				stepsPerOctave: nil,
+				scale: #[0, 2, 4, 5, 7, 9, 11],	// diatonic major scale
+				stepsPerOctave: nil,			// implicit default to 12
 				detune: 0.0,					// detune in Hertz
-				harmonic: 1.0,				// harmonic ratio
-				// octaveRatio: 2.0,
+				harmonic: 1.0,					// harmonic ratio
+				octaveRatio: nil,				// implicit default to 2
 
 				note: #{
-					// FIXME: we don't take octaveRatio into acount!
+					var tmpScale;
+					var scale = if (~scale.isKindOf(SequenceableCollection)) {
+						Scale(~scale, tuning: Tuning.et(~stepsPerOctave, ~octaveRatio))
+					} {
+						tmpScale = ~scale.asScale;
 
-					var scale = if (~stepsPerOctave.notNil) {
-						if (~scale.asScale.pitchesPerOctave != ~stepsPerOctave) {
+						if ( ~stepsPerOctave.notNil and: (tmpScale.stepsPerOctave != ~stepsPerOctave) ) {
 							Error("Mismatch between scale and stepsPerOctave").throw;
 						};
 
-						Scale(~scale, tuning: Tuning.et(~stepsPerOctave))
-					} {
-						~scale.asScale
+						if (~octaveRatio.notNil and: (tmpScale.octaveRatio != ~octaveRatio) ) {
+							Error("Mismatch between scale and octaveRatio").throw;
+						};
+
+						tmpScale;
 					};
+
 					~scale = scale;
 
 					(~degree + ~mtranspose).degreeToNote(scale)
