@@ -17,7 +17,7 @@ Scale {
 
 	init { | inDegrees, inPitchesPerOctave, inTuning, inName |
 		degrees = inDegrees;
-		inPitchesPerOctave = inPitchesPerOctave ? this.guessPPO(degrees);
+		inPitchesPerOctave = inPitchesPerOctave ? Scale.guessPPO(degrees);
 		name = inName;
 		^this.tuning_(inTuning ? Tuning.et(pitchesPerOctave));
 	}
@@ -57,7 +57,7 @@ Scale {
 		}
 	}
 
-	guessPPO {
+	*guessPPO {|degrees|
 		// most common flavors of ET
 		// pick the smallest one that contains all scale degrees
 		var etTypes = #[12, 19, 24, 53, 128];
@@ -67,6 +67,8 @@ Scale {
 	as { |class|
 		^this.semitones.as(class)
 	}
+
+	asScale { ^this }
 
 	size {
 		^degrees.size
@@ -302,6 +304,17 @@ Tuning {
 
 	storeArgs {
 		^[tuning, octaveRatio, name]
+	}
+
+	noteToFreq { | note, rootFreq, octave|
+		var ratio, freq;
+		var tuningSize = tuning.size;
+		octave = octave + (note div: tuningSize);
+		note   = note mod: tuningSize;
+
+		// FIXME: non-integer notes can only be mapped correctly in et tuning
+		ratio = this.ratios[note];
+		^rootFreq * ratio * (octaveRatio ** octave)
 	}
 
 	*names {
@@ -641,5 +654,15 @@ ScaleStream {
 
 		all = all.freezeAsParent;
 	}
+}
 
++Symbol {
+	asTuning { ^Tuning.at(this) }
+	asScale { ^Scale.at(this) }
+}
+
++SequenceableCollection {
+	asScale {
+		^Scale.new(this, Scale.guessPPO(this))
+	}
 }
