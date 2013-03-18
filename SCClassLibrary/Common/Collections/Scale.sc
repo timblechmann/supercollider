@@ -226,16 +226,20 @@ Tuning {
 		^this.et(pitchesPerOctave);
 	}
 
-	*et { |pitchesPerOctave = 12 |
-		^this.new(this.calcET(pitchesPerOctave), 2.0, this.etName(pitchesPerOctave));
+	*et { |pitchesPerOctave = 12, octaveRatio = 2.0 |
+		^this.new(this.calcET(pitchesPerOctave, octaveRatio), octaveRatio, this.etName(pitchesPerOctave, octaveRatio));
 	}
 
-	*calcET { | pitchesPerOctave |
-		^(0..(pitchesPerOctave - 1)) * (12/pitchesPerOctave)
+	*calcET { | pitchesPerOctave, octaveRatio = 2.0 |
+		^(0..(pitchesPerOctave - 1)) * (12 * octaveRatio/2 / pitchesPerOctave)
 	}
 
-	*etName { |pitchesPerOctave|
-		^"ET" ++ pitchesPerOctave.asString
+	*etName { |pitchesPerOctave, octaveRatio = 2.0|
+		if (octaveRatio == 2.0) {
+			^"ET" ++ pitchesPerOctave.asString
+		} {
+			^"ET% (octaveRatio %)".format(pitchesPerOctave.asString, octaveRatio)
+		}
 	}
 
 	*choose { |size = 12|
