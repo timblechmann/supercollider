@@ -71,7 +71,8 @@ Scale {
 		^this.semitones.as(class)
 	}
 
-	asScale { ^this }
+	asScale  { ^this }
+	asTuning { ^this.tuning }
 
 	size {
 		^degrees.size
@@ -318,6 +319,10 @@ Tuning {
 		// FIXME: non-integer notes can only be mapped correctly in et tuning
 		ratio = this.ratios[note];
 		^rootFreq * ratio * (octaveRatio ** octave)
+	}
+
+	noteToMidi { | note, octave |
+		^this.noteToFreq(note, 60.midicps, octave - 5).cpsmidi
 	}
 
 	*names {
