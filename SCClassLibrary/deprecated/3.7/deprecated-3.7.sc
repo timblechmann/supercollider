@@ -146,3 +146,87 @@ Proutine : Prout {
 		^GUI.cursorPosition
 	}
 }
+
+// degreeToKey should be implemented via Scale
++ SequenceableCollection {
+	performDegreeToKey { arg scaleDegree, stepsPerOctave = 12, accidental = 0;
+		var baseKey = (stepsPerOctave * (scaleDegree div: this.size)) + this.wrapAt(scaleDegree);
+		this.deprecated(thisMethod);
+
+		^if(accidental == 0) { baseKey } { baseKey + (accidental * (stepsPerOctave / 12.0)) }
+	}
+
+	performKeyToDegree { | degree, stepsPerOctave = 12 |
+		var n = degree div: stepsPerOctave * this.size;
+		var key = degree % stepsPerOctave;
+		this.deprecated(thisMethod);
+		^this.indexInBetween(key) + n
+	}
+
+	performNearestInList { | degree |
+		this.deprecated(thisMethod);
+		^this.at(this.indexIn(degree))
+	}
+
+	performNearestInScale { arg degree, stepsPerOctave=12; // collection is sorted
+		var root = degree.trunc(stepsPerOctave);
+		var key = degree % stepsPerOctave;
+		this.deprecated(thisMethod);
+		^key.nearestInList(this) + root
+	}
+}
+
+
++AbstractFunction {
+	performDegreeToKey { arg scaleDegree, stepsPerOctave = 12, accidental = 0;
+		this.deprecated(thisMethod);
+		^this.value(scaleDegree, stepsPerOctave, accidental)
+	}
+}
+
++Scale {
+	performDegreeToKey { | scaleDegree, stepsPerOctave, accidental = 0 |
+		var baseKey;
+		this.deprecated(thisMethod);
+		stepsPerOctave = stepsPerOctave ? tuning.stepsPerOctave;
+		baseKey = (stepsPerOctave * (scaleDegree div: this.size)) + this.wrapAt(scaleDegree);
+		^if(accidental == 0) { baseKey } { baseKey + (accidental * (stepsPerOctave / 12.0)) }
+	}
+
+	performKeyToDegree { | degree, stepsPerOctave = 12 |
+		this.deprecated(thisMethod);
+		^degrees.performKeyToDegree(degree, stepsPerOctave)
+	}
+
+	performNearestInList { | degree |
+		this.deprecated(thisMethod);
+		^degrees.performNearestInList(degree)
+	}
+
+	performNearestInScale { | degree, stepsPerOctave=12 | // collection is sorted
+		this.deprecated(thisMethod);
+		^degrees.performNearestInScale(degree, stepsPerOctave)
+	}
+}
+
++ScaleStream {
+	performDegreeToKey { | degree, stepsPerOctave, accidental = 0 |
+		this.deprecated(thisMethod);
+		^this.chooseScale(degree).performDegreeToKey(degree, stepsPerOctave, accidental);
+	}
+
+	performKeyToDegree { | degree, stepsPerOctave = 12 |
+		this.deprecated(thisMethod);
+		^this.chooseScale(degree).performKeyToDegree(degree, stepsPerOctave)
+	}
+
+	performNearestInList { | degree |
+		this.deprecated(thisMethod);
+		^this.chooseScale(degree).performNearestInList(degree)
+	}
+
+	performNearestInScale { | degree, stepsPerOctave=12 | // collection is sorted
+		this.deprecated(thisMethod);
+		^this.chooseScale(degree).performNearestInScale(degree, stepsPerOctave)
+	}
+}

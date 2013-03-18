@@ -102,25 +102,6 @@ Scale {
 		^tuning.wrapAt(degrees.wrapAt(index))
 	}
 
-	performDegreeToKey { | scaleDegree, stepsPerOctave, accidental = 0 |
-		var baseKey;
-		stepsPerOctave = stepsPerOctave ? tuning.stepsPerOctave;
-		baseKey = (stepsPerOctave * (scaleDegree div: this.size)) + this.wrapAt(scaleDegree);
-		^if(accidental == 0) { baseKey } { baseKey + (accidental * (stepsPerOctave / 12.0)) }
-	}
-
-	performKeyToDegree { | degree, stepsPerOctave = 12 |
-		^degrees.performKeyToDegree(degree, stepsPerOctave)
-	}
-
-	performNearestInList { | degree |
-		^degrees.performNearestInList(degree)
-	}
-
-	performNearestInScale { | degree, stepsPerOctave=12 | // collection is sorted
-		^degrees.performNearestInScale(degree, stepsPerOctave)
-	}
-
 	degreeToNote { | degree, accidental |
 		// FIXME: how to handle accidentals?
 
@@ -133,6 +114,16 @@ Scale {
 		var note = degrees.wrapAt(degree) + (octave * stepsPerOctave);
 
 		^note
+	}
+
+	noteToDegree { | note |
+		// FIXME: how to handle nodes which are not in the scale?
+		// FIXME: how to deal with octave wrap-around?
+		^degrees.at(note)
+	}
+
+	nearestInScale { | degree |
+		^degree.nearestInList(degrees)
 	}
 
 	degreeToRatio { |degree, octave = 0|
@@ -367,23 +358,6 @@ ScaleStream {
 
 	degreeToNote { | degree, accidental = 0 |
 		^this.chooseScale(degree).degreeToNote(degree, accidental);
-	}
-
-	performDegreeToKey { | degree, stepsPerOctave, accidental = 0 |
-		^this.chooseScale(degree).performDegreeToKey(degree, stepsPerOctave, accidental);
-	}
-
-
-	performKeyToDegree { | degree, stepsPerOctave = 12 |
-		^this.chooseScale(degree).performKeyToDegree(degree, stepsPerOctave)
-	}
-
-	performNearestInList { | degree |
-		^this.chooseScale(degree).performNearestInList(degree)
-	}
-
-	performNearestInScale { | degree, stepsPerOctave=12 | // collection is sorted
-		^this.chooseScale(degree).performNearestInScale(degree, stepsPerOctave)
 	}
 }
 

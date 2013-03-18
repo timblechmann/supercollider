@@ -220,12 +220,6 @@ Function : AbstractFunction {
 		^this.value(item)
 	}
 
-	// scale suppoert
-
-	performDegreeToKey { arg scaleDegree, stepsPerOctave = 12, accidental = 0;
-		^this.value(scaleDegree, stepsPerOctave, accidental)
-	}
-
 	// multichannel expand function return values
 
 	flop {

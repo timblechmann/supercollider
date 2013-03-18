@@ -558,19 +558,22 @@ SequenceableCollection : Collection {
 		};
 		^this.degreeToNote(scale)
 	}
-	// keyToDegree { arg scale, stepsPerOctave=12;
-	// 	^this.collect { arg val; val.keyToDegree(scale, stepsPerOctave) }
-	// }
+	keyToDegree { arg scale, stepsPerOctave=12;
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		this.degreeToNote(scale)
+	}
 
 	degreeToNote { arg scale;
 		^this.collect(_.degreeToNote(scale))
 	}
 
 	nearestInScale { arg scale, stepsPerOctave=12; // collection is sorted
-		var key, root;
-		root = this.trunc(stepsPerOctave);
-		key = this % stepsPerOctave;
-		^key.nearestInList(scale) + root
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^scale.nearestInScale(this)
 	}
 	nearestInList { arg list;  // collection is sorted
 		^this.collect({ arg item; list.at(list.indexIn(item)) })
@@ -581,27 +584,6 @@ SequenceableCollection : Collection {
 	}
 	mode { arg degree, octave=12;
 		^(rotate(this, degree.neg) - this.wrapAt(degree)) % octave
-	}
-
-	performDegreeToKey { arg scaleDegree, stepsPerOctave = 12, accidental = 0;
-		var baseKey = (stepsPerOctave * (scaleDegree div: this.size)) + this.wrapAt(scaleDegree);
-		^if(accidental == 0) { baseKey } { baseKey + (accidental * (stepsPerOctave / 12.0)) }
-	}
-
-	performKeyToDegree { | degree, stepsPerOctave = 12 |
-		var n = degree div: stepsPerOctave * this.size;
-		var key = degree % stepsPerOctave;
-		^this.indexInBetween(key) + n
-	}
-
-	performNearestInList { | degree |
-		^this.at(this.indexIn(degree))
-	}
-
-	performNearestInScale { arg degree, stepsPerOctave=12; // collection is sorted
-		var root = degree.trunc(stepsPerOctave);
-		var key = degree % stepsPerOctave;
-		^key.nearestInList(this) + root
 	}
 
 	// supports a variation of Mikael Laurson's rhythm list RTM-notation.

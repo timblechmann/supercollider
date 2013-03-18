@@ -432,15 +432,25 @@ SimpleNumber : Number {
 	}
 
 	keyToDegree { arg scale, stepsPerOctave=12;
-		^scale.performKeyToDegree(this, stepsPerOctave)
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^this.noteToDegree(scale)
+	}
+
+	noteToDegree { arg scale;
+		^scale.noteToDegree(this)
 	}
 
 	nearestInList { arg list;  // collection is sorted
-		^list.performNearestInList(this);
+		^list.at(list.indexIn(this))
 	}
 
 	nearestInScale { arg scale, stepsPerOctave=12; // collection is sorted
-		^scale.performNearestInScale(this, stepsPerOctave);
+		if (stepsPerOctave != 12) {
+			Error("stepsPerOctave argument is deprecated, use a Scale class instead");
+		};
+		^scale.nearestInScale(this);
 	}
 
 	partition { arg parts=2, min=1;
