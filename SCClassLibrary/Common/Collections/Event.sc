@@ -159,61 +159,39 @@ Event : Environment {
 				root: 0.0,					// root of the scale
 				degree: 0,
 				scale: #[0, 2, 4, 5, 7, 9, 11], 	// diatonic major scale
-				stepsPerOctave: 12.0,
+				stepsPerOctave: nil,
 				detune: 0.0,					// detune in Hertz
 				harmonic: 1.0,				// harmonic ratio
-				octaveRatio: 2.0,
+				// octaveRatio: 2.0,
 
 				note: #{
-					(~degree + ~mtranspose).degreeToKey(
-						~scale,
-						~scale.respondsTo(\stepsPerOctave).if(
-							{ ~scale.stepsPerOctave },
-							~stepsPerOctave
-						)
-					);
+					// FIXME: we don't take octaveRatio into acount!
+
+					var scale = if (~stepsPerOctave.notNil) {
+						if (~scale.asScale.pitchesPerOctave != ~stepsPerOctave) {
+							Error("Mismatch between scale and stepsPerOctave").throw;
+						};
+
+						Scale(~scale, tuning: Tuning.et(~stepsPerOctave))
+					} {
+						~scale.asScale
+					};
+					~scale = scale;
+
+					(~degree + ~mtranspose).degreeToNote(scale)
 				},
 				midinote: #{
-					(((~note.value + ~gtranspose + ~root) /
-						~scale.respondsTo(\stepsPerOctave).if(
-							{ ~scale.stepsPerOctave },
-							~stepsPerOctave) + ~octave - 5.0) *
-						(12.0 * ~scale.respondsTo(\octaveRatio).if
-							({ ~scale.octaveRatio }, ~octaveRatio).log2) + 60.0);
+					var note = ~note.value + ~ctranspose + ~root;
+					var tuning = ~scale.asTuning;
+
+					tuning.noteToMidi(note, ~octave)
+				},
+				freq: #{
+					(~midinote.value + ~gtranspose).midicps * ~harmonic;
 				},
 				detunedFreq: #{
 					~freq.value + ~detune
 				},
-				freq: #{
-					(~midinote.value + ~ctranspose).midicps * ~harmonic;
-				},
-				freqToNote: #{ arg self, freq; // conversion from frequency to note value
-					self.use {
-						var midinote;
-						var steps = ~scale.respondsTo(\stepsPerOctave).if(
-							{ ~scale.stepsPerOctave }, ~stepsPerOctave
-						);
-						midinote = cpsmidi((freq / ~harmonic) - ~ctranspose);
-						midinote / 12.0 - ~octave * steps - ~root - ~gtranspose
-					}
-				},
-				freqToScale: #{ arg self, freq;
-					// conversion from frequency to scale value.
-					self.use {
-						var steps = ~scale.respondsTo(\stepsPerOctave).if(
-							{ ~scale.stepsPerOctave }, ~stepsPerOctave
-						);
-						var degree = self.freqToNote(freq).keyToDegree(~scale, steps)
-						- ~mtranspose;
-						degree.asArray.collect {|x, i|
-							x = x.round(0.01);
-							if(x.floor != x) {
-								"could not translate: %\n".postf(freq[i]);
-								nil
-							} { x }
-						}.unbubble;
-					}
-				}
 			),
 
 			durEvent: (
