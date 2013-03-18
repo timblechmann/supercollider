@@ -364,6 +364,11 @@ ScaleStream {
 			^scale.descScale
 		}
 	}
+
+	degreeToNote { | degree, accidental = 0 |
+		^this.chooseScale(degree).degreeToNote(degree, accidental);
+	}
+
 	performDegreeToKey { | degree, stepsPerOctave, accidental = 0 |
 		^this.chooseScale(degree).performDegreeToKey(degree, stepsPerOctave, accidental);
 	}
