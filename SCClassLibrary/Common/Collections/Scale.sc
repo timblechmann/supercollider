@@ -1,17 +1,25 @@
 Scale {
-	var <degrees, <pitchesPerOctave, <tuning, <>name;
+	var <degrees, <tuning, <>name;
 	classvar <all;
 
 	*new { | degrees = \ionian, pitchesPerOctave, tuning, name = "Unknown Scale" |
 		if(degrees.isKindOf(Symbol)) { Error("Please use Scale.at(name) instead.").throw };
+
+		if (pitchesPerOctave.notNil) {
+			if (tuning.notNil) {
+				Error("Either define a tuning or a number of pitches per octave, but not both").throw;
+			};
+			tuning = Tuning.et(pitchesPerOctave);
+		};
+
 		^super.new.init(degrees, pitchesPerOctave, tuning, name);
 	}
 
 	init { | inDegrees, inPitchesPerOctave, inTuning, inName |
 		degrees = inDegrees;
-		pitchesPerOctave = inPitchesPerOctave ? this.guessPPO(degrees);
+		inPitchesPerOctave = inPitchesPerOctave ? this.guessPPO(degrees);
 		name = inName;
-		^this.tuning_(inTuning ? Tuning.default(pitchesPerOctave));
+		^this.tuning_(inTuning ? Tuning.et(pitchesPerOctave));
 	}
 
 	*at { |key|
@@ -37,7 +45,7 @@ Scale {
 	}
 
 	checkTuningForMismatch { |aTuning|
-		^pitchesPerOctave == aTuning.size;
+		^this.pitchesPerOctave == aTuning.size;
 	}
 
 	tuning_ { | inTuning |
@@ -45,7 +53,7 @@ Scale {
 		if(this.checkTuningForMismatch(inTuning)) {
 			tuning = inTuning
 		} {
-			"Scale steps per octave % does not match tuning size ".format(pitchesPerOctave).warn;
+			"Scale steps per octave % does not match tuning size ".format(this.pitchesPerOctave).warn;
 		}
 	}
 
@@ -73,7 +81,11 @@ Scale {
 	}
 
 	ratios {
-		^this.semitones.midiratio
+		^degrees.collect(tuning.ratios.wrapAt(_));
+	}
+
+	pitchesPerOctave {
+		^tuning.stepsPerOctave
 	}
 
 	at { |index|
@@ -162,8 +174,7 @@ Scale {
 		^this.names.collect({ |k| "\\ %: %".format(k, all.at(k).name) }).join("\n")
 	}
 
-	storeArgs { ^[degrees, pitchesPerOctave, tuning, name] }
-
+	storeArgs { ^[degrees, tuning, name] }
 
 	printOn { |stream|
 		this.storeOn(stream)
