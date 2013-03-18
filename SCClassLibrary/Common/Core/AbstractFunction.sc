@@ -193,6 +193,10 @@ AbstractFunction {
 		^this.composeNAryOp('degreeToKey', [scale, stepsPerOctave])
 	}
 
+	degreeToNote { arg scale;
+		^this.composeNAryOp('degreeToNote', [scale])
+	}
+
 	degrad { ^this.composeUnaryOp('degrad') }
 	raddeg { ^this.composeUnaryOp('raddeg') }
 

@@ -115,6 +115,20 @@ Scale {
 		^degrees.performNearestInScale(degree, stepsPerOctave)
 	}
 
+	degreeToNote { | degree, accidental |
+		// FIXME: how to handle accidentals?
+
+		var degreesPerOctave = degrees.size;
+		var stepsPerOctave = tuning.stepsPerOctave;
+
+		var octave = degree div: degreesPerOctave;
+		var degreeInOctave = degree mod: degreesPerOctave;
+
+		var note = degrees.wrapAt(degree) + (octave * stepsPerOctave);
+
+		^note
+	}
+
 	degreeToRatio { |degree, octave = 0|
 		octave = octave + (degree div: degrees.size);
 		^this.ratios.wrapAt(degree) * (this.octaveRatio ** octave);

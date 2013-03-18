@@ -423,6 +423,13 @@ SimpleNumber : Number {
 		^scale.performDegreeToKey(scaleDegree, stepsPerOctave, accidental)
 	}
 
+	degreeToNote {|scale|
+		var scaleDegree = this.round.asInteger;
+		var accidental = (this - scaleDegree) * 10.0;
+
+		^scale.degreeToNote(scaleDegree, accidental)
+	}
+
 	keyToDegree { arg scale, stepsPerOctave=12;
 		^scale.performKeyToDegree(this, stepsPerOctave)
 	}

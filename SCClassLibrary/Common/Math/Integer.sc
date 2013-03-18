@@ -26,6 +26,10 @@ Integer : SimpleNumber {
 		^scale.performDegreeToKey(this, stepsPerOctave)
 	}
 
+	degreeToNote { |scale|
+		^scale.degreeToNote(this);
+	}
+
 	// iteration
 	do { arg function;
 		// iterates function from 0 to this-1

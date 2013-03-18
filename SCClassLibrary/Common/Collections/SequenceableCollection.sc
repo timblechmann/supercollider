@@ -561,6 +561,10 @@ SequenceableCollection : Collection {
 		^this.collect { arg val; val.keyToDegree(scale, stepsPerOctave) }
 	}
 
+	degreeToNote { arg scale;
+		^this.collect(_.degreeToNote(scale))
+	}
+
 	nearestInScale { arg scale, stepsPerOctave=12; // collection is sorted
 		var key, root;
 		root = this.trunc(stepsPerOctave);
