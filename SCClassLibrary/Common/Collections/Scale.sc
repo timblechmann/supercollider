@@ -7,19 +7,22 @@ Scale {
 
 		if (pitchesPerOctave.notNil) {
 			if (tuning.notNil) {
-				Error("Either define a tuning or a number of pitches per octave, but not both").throw;
-			};
-			tuning = Tuning.et(pitchesPerOctave);
+				tuning = tuning.asTuning;
+
+				if (tuning.size != pitchesPerOctave) {
+					Error("Either define a tuning or a number of pitches per octave, but not both").throw;
+				}
+			} {
+				tuning = Tuning.et(pitchesPerOctave);
+			}
+		} {
+			if (tuning.isNil) {
+				pitchesPerOctave = Scale.guessPPO(degrees);
+				tuning           = Tuning.et(pitchesPerOctave);
+			}
 		};
 
-		^super.new.init(degrees, pitchesPerOctave, tuning, name);
-	}
-
-	init { | inDegrees, inPitchesPerOctave, inTuning, inName |
-		degrees = inDegrees;
-		inPitchesPerOctave = inPitchesPerOctave ? Scale.guessPPO(degrees);
-		name = inName;
-		^this.tuning_(inTuning ? Tuning.et(pitchesPerOctave));
+		^super.newCopyArgs(degrees, tuning, name);
 	}
 
 	*at { |key|
