@@ -209,11 +209,22 @@ Tuning {
 		^all.at(key).deepCopy
 	}
 
-	*default { | pitchesPerOctave |
+	*default { | pitchesPerOctave = 12 |
 		^this.et(pitchesPerOctave);
 	}
 
 	*et { |pitchesPerOctave = 12, octaveRatio = 2.0 |
+		if (octaveRatio == 2.0) {
+			// some et scales are predefined
+			switch (pitchesPerOctave,
+				12, {^all[\et12]},
+				22, {^all[\et22]},
+				24, {^all[\et24]},
+				31, {^all[\et31]},
+				41, {^all[\et41]},
+				53, {^all[\et53]});
+		};
+
 		^this.new(this.calcET(pitchesPerOctave, octaveRatio), octaveRatio, this.etName(pitchesPerOctave, octaveRatio));
 	}
 
