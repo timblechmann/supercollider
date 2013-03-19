@@ -113,8 +113,20 @@ Scale {
 
 	noteToDegree { | note |
 		// FIXME: how to handle nodes which are not in the scale?
-		// FIXME: how to deal with octave wrap-around?
-		^degrees.at(note)
+		//        we could either find nearest or use indexInBetween
+
+		var degree;
+		var notesInOctave = tuning.size;
+		var degreesInOctave = degrees.size;
+		var realNote = note mod: notesInOctave;
+		var octave   = note div: notesInOctave;
+
+		if (note.isKindOf(Collection)) {
+			degree = realNote.collect(degrees.indexOf(_))
+		} {
+			degree = degrees.indexOf(realNote)
+		};
+		^(degree + (degreesInOctave * octave))
 	}
 
 	nearestInScale { | degree |
