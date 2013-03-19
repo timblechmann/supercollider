@@ -166,17 +166,6 @@ Scale {
 		^this.instVarHash(#[\degrees, \tuning])
 	}
 
-	storeOn { |stream|
-		var storedKey = this.storedKey;
-		stream << this.class.name;
-		if(storedKey.notNil) { stream << "." << storedKey } { this.storeParamsOn(stream) }
-	}
-
-	storedKey {
-		// can be optimised later
-		^all.findKeyForValue(this)
-	}
-
 	*directory {
 		^this.names.collect({ |k| "\\ %: %".format(k, all.at(k).name) }).join("\n")
 	}
@@ -295,17 +284,6 @@ Tuning {
 
 	printOn { |stream|
 		this.storeOn(stream)
-	}
-
-	storeOn { |stream|
-		var storedKey = this.storedKey;
-		stream << this.class.name;
-		if(storedKey.notNil) { stream << "." << storedKey } { this.storeParamsOn(stream) }
-	}
-
-	storedKey {
-		// can be optimised later
-		^all.findKeyForValue(this)
 	}
 
 	storeArgs {
