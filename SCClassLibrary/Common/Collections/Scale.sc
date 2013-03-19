@@ -98,16 +98,15 @@ Scale {
 		^tuning.wrapAt(degrees.wrapAt(index))
 	}
 
-	degreeToNote { | degree, accidental |
-		// FIXME: how to handle accidentals?
-
+	degreeToNote { | degree, accidental = 0 |
 		var degreesPerOctave = degrees.size;
 		var stepsPerOctave = tuning.stepsPerOctave;
 
 		var octave = degree div: degreesPerOctave;
 		var degreeInOctave = degree mod: degreesPerOctave;
 
-		var note = degrees.wrapAt(degree) + (octave * stepsPerOctave);
+		var realDegree = degreeInOctave + (accidental * 0.1);
+		var note = degrees.blendAt(realDegree) + (octave * stepsPerOctave);
 
 		^note
 	}
