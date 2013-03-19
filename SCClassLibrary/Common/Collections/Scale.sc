@@ -154,6 +154,8 @@ Scale {
 	}
 
 	stepsPerOctave {
+		// FIXME: according to the docs, this is based on an octave as in 2/1,
+		//        while pitchesPerOctave uses an octave of octaveRatio
 		^tuning.stepsPerOctave
 	}
 
@@ -189,12 +191,8 @@ Tuning {
 	}
 
 	*doesNotUnderstand { |selector, args|
-		var tuning = this.newFromKey(selector, args).deepCopy;
-		^tuning ?? { super.doesNotUnderstand(selector, args) }
-	}
-
-	*newFromKey { | key |
-		^all.at(key).deepCopy
+		var tuning = all.at(selector).deepCopy;
+		^(tuning ?? { super.doesNotUnderstand(selector, args) })
 	}
 
 	*default { | pitchesPerOctave = 12 |
