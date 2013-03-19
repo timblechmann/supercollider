@@ -291,17 +291,17 @@ Tuning {
 	}
 
 	noteToFreq { | note, rootFreq, octave|
-		var ratio, freq;
+		var ratio;
 		var tuningSize = tuning.size;
 		octave = octave + (note div: tuningSize);
 		note   = note mod: tuningSize;
 
-		// FIXME: non-integer notes can only be mapped correctly in et tuning
-		ratio = this.ratios[note];
+		ratio = this.at(note).midiratio;
+
 		^rootFreq * ratio * (octaveRatio ** octave)
 	}
 
-	noteToMidi { | note, octave |
+	noteToMidi { | note = 0, octave = 5 |
 		^this.noteToFreq(note, 60.midicps, octave - 5).cpsmidi
 	}
 
