@@ -2,7 +2,7 @@ Scale {
 	var <degrees, <tuning, <>name;
 	classvar <all;
 
-	*new { | degrees = \ionian, pitchesPerOctave, tuning, name = "Unknown Scale" |
+	*new { | degrees = (#[0,2,4,5,7,9,11]), pitchesPerOctave, tuning, name = "Unknown Scale" |
 		if(degrees.isKindOf(Symbol)) { Error("Please use Scale.at(name) instead.").throw };
 
 		if (pitchesPerOctave.notNil) {
@@ -47,13 +47,9 @@ Scale {
 		^Scale.new(Array.series(steps), steps, tuningObject, name: "Chromatic % (%)".format(steps, tuningObject.name))
 	}
 
-	checkTuningForMismatch { |aTuning|
-		^this.pitchesPerOctave == aTuning.size;
-	}
-
 	tuning_ { | inTuning |
 		inTuning = inTuning.asTuning;
-		if(this.checkTuningForMismatch(inTuning)) {
+		if ( tuning.stepsPerOctave == inTuning.stepsPerOctave ) {
 			tuning = inTuning
 		} {
 			"Scale steps per octave % does not match tuning size ".format(this.pitchesPerOctave).warn;
