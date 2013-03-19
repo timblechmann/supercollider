@@ -338,7 +338,6 @@ ScaleAD : Scale {
 	}
 	asStream { ^ScaleStream(this, 0) }
 	embedInStream { ScaleStream(this).yield }
-
 }
 
 ScaleStream {
@@ -363,9 +362,7 @@ ScaleStream {
 
 
 + Scale {
-
 	*initClass {
-
 		Class.initClassTree(Tuning);
 
 		all = IdentityDictionary[
@@ -556,9 +553,7 @@ ScaleStream {
 }
 
 + Tuning {
-
 	*initClass {
-
 		all = IdentityDictionary[
 
 			//TWELVE-TONE TUNINGS
