@@ -16,17 +16,17 @@ endif()
 
 # here we choose who provides us with the FFT lib
 if (APPLE)
-	add_definitions("-DSC_FFT_VDSP")
+	add_definitions("-DSC_FFT_VDSP=1")
 else()
     find_package(FFTW3f 3.3)
 
 	if (NOT FFTW3F_FOUND OR FFT_GREEN)
 		message(STATUS "using green fft")
 		set(FFT_GREEN 1)
-		add_definitions("-DSC_FFT_GREEN")
+		add_definitions("-DSC_FFT_GREEN=1")
 	else()
 		message(STATUS "using fftw3f")
-		add_definitions("-DSC_FFT_FFTW")
+		add_definitions("-DSC_FFT_FFTW=1")
 	endif()
 endif()
 
