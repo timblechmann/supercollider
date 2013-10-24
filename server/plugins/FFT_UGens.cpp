@@ -22,10 +22,12 @@
 
 #include "FFT_UGens.h"
 
-// We include vDSP even if not using for FFT, since we want to use some vectorised add/mul tricks
-#if defined(__APPLE__) && !defined(SC_IPHONE)
-#include "vecLib/vDSP.h"
-#endif
+#include <boost/simd/sdk/simd/algorithm.hpp>
+#include <boost/simd/sdk/simd/transform.hpp>
+#include <boost/simd/memory/aligned_input_iterator.hpp>
+#include <boost/simd/memory/aligned_output_iterator.hpp>
+#include <boost/simd/memory/is_aligned.hpp>
+#include <boost/phoenix.hpp>
 
 struct FFTBase : public Unit
 {
@@ -317,15 +319,16 @@ void IFFT_next(IFFT *unit, int wrongNumSamples)
 		if(hopsamps != audiosize)  // There's only copying to be done if the position isn't all the way to the end of the buffer
 			memmove(olabuf, olabuf+hopsamps, shuntsamps * sizeof(float));
 
-		// Then mix the "new" time-domain data in - adding at first, then just setting (copying) where the "old" is supposed to be zero.
-		#if defined(__APPLE__) && !defined(SC_IPHONE)
-			vDSP_vadd(olabuf, 1, fftbuf, 1, olabuf, 1, shuntsamps);
-		#else
-			// NB we re-use the "pos" variable temporarily here for write rather than read
-			for(pos = 0; pos < shuntsamps; ++pos){
-				olabuf[pos] += fftbuf[pos];
-			}
-		#endif
+		using boost::phoenix::arg_names::arg1;
+		using boost::phoenix::arg_names::arg2;
+		using namespace boost::simd;
+
+		if ( is_aligned(olabuf, 16) && is_aligned(shuntsamps, 16) && is_aligned(fftbuf, 16) )
+			boost::simd::transform( aligned_input_begin(olabuf), aligned_input_end(olabuf + shuntsamps),
+									aligned_input_begin(fftbuf), aligned_output_begin(olabuf), arg1 + arg2 );
+		else
+			boost::simd::transform( olabuf, olabuf + shuntsamps, fftbuf, olabuf, arg1 + arg2 );
+
 		memcpy(olabuf + shuntsamps, fftbuf + shuntsamps, (hopsamps) * sizeof(float));
 
 		// Move the pointer back to zero, which is where playback will next begin
