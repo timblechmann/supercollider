@@ -4,3 +4,6 @@
 [submodule "external_libraries/nova-tt"]
 	path = external_libraries/nova-tt
 	url = git://github.com/timblechmann/nova-tt.git
+[submodule "external_libraries/nt2"]
+	path = external_libraries/nt2
+	url = https://github.com/MetaScale/nt2.git
