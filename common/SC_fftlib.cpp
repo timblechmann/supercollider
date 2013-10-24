@@ -336,7 +336,7 @@ static void scfft_dowindowing(float *data, unsigned int winsize, unsigned int fu
 		if (scalefactor == 1.f) {
 			if (is_aligned(data, 16) && is_aligned(winsize, 16))
 				transform ( aligned_input_begin<16>(data), aligned_input_end<16>(data + winsize),
-							aligned_input_begin<16>(win), aligned_output_begin<16>(data), std::multiplies<pack<float, 16>>() );
+							aligned_input_begin<16>(win), aligned_output_begin<16>(data), arg1 * arg2 );
 			else
 				boost::simd::transform ( data, data + winsize, win, data, arg1 * arg2 );
 		} else {
