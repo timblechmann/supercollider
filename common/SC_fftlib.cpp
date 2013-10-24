@@ -34,16 +34,20 @@ For speed we keep this global, although this makes the code non-thread-safe.
 
 #include "SC_fftlib.h"
 #include "../server/supernova/utilities/malloc_aligned.hpp"
+#include "../include/plugin_interface/SC_Constants.h"
 
-#ifdef NOVA_SIMD
-#include "simd_binary_arithmetic.hpp"
-#endif
+#include <boost/simd/include/pack.hpp>
+#include <boost/simd/include/functions/multiplies.hpp>
+#include <boost/simd/sdk/simd/algorithm.hpp>
+#include <boost/simd/sdk/simd/transform.hpp>
+#include <boost/simd/memory/aligned_input_iterator.hpp>
+#include <boost/simd/memory/aligned_output_iterator.hpp>
+#include <boost/simd/memory/is_aligned.hpp>
+#include <boost/phoenix.hpp>
 
 
 // We include vDSP even if not using for FFT, since we want to use some vectorised add/mul tricks
-#if defined(__APPLE__) && !defined(SC_IPHONE)
-	#include "vecLib/vDSP.h"
-#elif defined(SC_IPHONE)
+#if defined(__APPLE__)
 	#include <Accelerate/Accelerate.h>
 #endif
 
@@ -117,14 +121,10 @@ static fftwf_plan precompiledForwardPlansInPlace[SC_FFT_LOG2_ABSOLUTE_MAXSIZE_PL
 static fftwf_plan precompiledBackwardPlansInPlace[SC_FFT_LOG2_ABSOLUTE_MAXSIZE_PLUS1];
 #endif
 
-#define pi 3.1415926535898f
-#define twopi 6.28318530717952646f
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Functions
 
 #if SC_FFT_GREEN
-static float* create_cosTable(int log2n);
 static float* create_cosTable(int log2n)
 {
 	int size = 1 << log2n;
@@ -259,10 +259,6 @@ scfft * scfft_create(size_t fullsize, size_t winsize, SCFFT_WindowFunction winty
 	float *trbuf = (float*)(chunk + sizeof(scfft));
 	trbuf = (float*) ((size_t)((char*)trbuf + (alignment - 1)) & -alignment); // FIXME: should be intptr_t instead of size_t once we use c++11
 
-#ifdef NOVA_SIMD
-	assert(nova::vec<float>::is_aligned(trbuf));
-#endif
-
 	f->nfull = fullsize;
 	f->nwin  =  winsize;
 	f->log2nfull = LOG2CEIL(fullsize);
@@ -329,36 +325,31 @@ void scfft_ensurewindow(unsigned short log2_fullsize, unsigned short log2_winsiz
 
 // these do the main jobs.
 static void scfft_dowindowing(float *data, unsigned int winsize, unsigned int fullsize, unsigned short log2_winsize,
-							  short wintype, float scalefac)
+							  short wintype, float scalefactor)
 {
+	using namespace boost::phoenix::arg_names;
 	if (wintype != kRectWindow) {
 		float *win = fftWindow[wintype][log2_winsize];
 		if (!win) return;
-#if SC_FFT_VDSP
-		vDSP_vmul(data, 1, win, 1, data, 1, winsize);
-#elif defined (NOVA_SIMD)
-		using namespace nova;
-		if (((vec<float>::objects_per_cacheline & winsize) == 0) && vec<float>::is_aligned(data))
-			times_vec_simd(data, data, win, winsize);
-		else
-			times_vec(data, data, win, winsize);
-#else
-		--win;
-		float *in = data - 1;
-		for (int i=0; i< winsize ; ++i) {
-			*++in *= *++win;
-		}
-#endif
-	}
 
-	// scale factor is different for different libs. But the compiler switch here is about using vDSP's fast multiplication method.
-	if (scalefac != 1.f) {
-#if SC_FFT_VDSP
-		vDSP_vsmul(data, 1, &scalefac, data, 1, winsize);
-#else
-		for(unsigned int i=0; i<winsize; ++i)
-			data[i] *= scalefac;
-#endif
+        using namespace boost::simd;
+		if (scalefactor == 1.f) {
+			if (is_aligned(data, 16) && is_aligned(winsize, 16))
+				transform ( aligned_input_begin<16>(data), aligned_input_end<16>(data + winsize),
+							aligned_input_begin<16>(win), aligned_output_begin<16>(data), std::multiplies<pack<float, 16>>() );
+			else
+				boost::simd::transform ( data, data + winsize, win, data, arg1 * arg2 );
+		} else {
+			if (is_aligned(data, 16) && is_aligned(winsize, 16))
+				transform ( aligned_input_begin<16>(data), aligned_input_end<16>(data + winsize),
+							aligned_input_begin<16>(win), aligned_output_begin<16>(data), arg1 * arg2 * scalefactor );
+			else
+				boost::simd::transform ( data, data + winsize, win, data, arg1 * arg2 * scalefactor );
+
+		}
+	} else {
+		if (scalefactor != 1.f)
+			boost::simd::transform ( data, data + winsize, data, arg1 * scalefactor );
 	}
 
 	// Zero-padding:
