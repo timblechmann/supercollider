@@ -195,12 +195,30 @@ if(MINGW)
 endif(MINGW)
 
 
+if(APPLE)
+  # bundle resources
+
+  # icon
+  set(MACOSX_BUNDLE_ICON_FILE ../../icons/SCcube.icns) # set how it shows up in the Info.plist file
+  set_source_files_properties( ${MACOSX_BUNDLE_ICON_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+
+  # sounds
+  file(GLOB sounds ../../sounds/*)
+  set_source_files_properties( ${sounds} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/sounds)
+
+  # translations
+  set_source_files_properties( ${translations} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/translations)
+
+  # additional sources which are copied to the bundle
+  set(BUNDLE_RESOURCES ${MACOSX_BUNDLE_ICON_FILE} ${sounds})
+endif()
+
 # final builds of the IDE seem to be broken atm
 if(0 AND FINAL_BUILD)
   CREATE_FINAL_FILE(scide_final.cpp ${ide_sources})
-  add_executable( ${ide_name} MACOSX_BUNDLE scide_final.cpp ${ide_rc_sources} ${RES_FILES})
+  add_executable( ${ide_name} MACOSX_BUNDLE scide_final.cpp ${ide_rc_sources} ${RES_FILES} ${BUNDLE_RESOURCES})
 else()
-  add_executable( ${ide_name} MACOSX_BUNDLE ${ide_sources} ${ide_rc_sources} ${RES_FILES} )
+  add_executable( ${ide_name} MACOSX_BUNDLE ${ide_sources} ${ide_rc_sources} ${RES_FILES} ${BUNDLE_RESOURCES})
 endif()
 
 
@@ -252,23 +270,15 @@ if(APPLE)
         set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/Install" CACHE PATH "Install path prefix" FORCE)
     endif()
 
-    # set how it shows up in the Info.plist file
-    SET(MACOSX_BUNDLE_ICON_FILE ../../icons/SCcube.icns)
-    
-    install(FILES ${MACOSX_BUNDLE_ICON_FILE} DESTINATION ${scappauxresourcesdir}/) 
-
-    install(FILES ${translations}
-            DESTINATION ${scappauxresourcesdir}/translations)
-
-    install(TARGETS ${ide_name}
-        DESTINATION ${scappbundlename}
-        )
-
     # for processing into the plist:
     set_property(TARGET ${ide_name}
 	    PROPERTY MACOSX_BUNDLE_BUNDLE_NAME ${scappbundlename})
 
     set(MACOSX_BUNDLE_BUNDLE_NAME "${scappbundlename}")
+
+    install(TARGETS ${ide_name}
+        DESTINATION ${scappbundlename}
+        )
 
     include(InstallRequiredSystemLibraries)
 

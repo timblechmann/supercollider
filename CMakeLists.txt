@@ -277,6 +277,7 @@ endif()
 configure_file(common/SC_Version.hpp.in common/SC_Version.hpp)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/common)
 
+
 add_subdirectory(server)
 add_subdirectory(lang)
 add_subdirectory(editors)
@@ -369,9 +370,10 @@ else()
 	)
 endif()
 
-install(DIRECTORY sounds
-	DESTINATION ${auxresourcesdir}
-)
+if (NOT APPLE) # sounds are directly copied to the bundle
+    install(DIRECTORY sounds
+        DESTINATION ${auxresourcesdir})
+endif()
 
 if(APPLE AND ("${standalone}" STREQUAL ""))
 	set(exampledir "${scappbundlename}")
