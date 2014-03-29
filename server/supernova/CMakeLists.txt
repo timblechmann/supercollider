@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
+
 if(CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftemplate-depth-4096")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -fomit-frame-pointer")
@@ -26,23 +28,6 @@ if(NOVA_SIMD)
     add_definitions(-DNOVA_SIMD)
 endif()
 
-
-include_directories(${CMAKE_SOURCE_DIR}/external_libraries/boost_endian
-                    ${CMAKE_SOURCE_DIR}/external_libraries/oscpack_1_1_0
-                    ${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src
-                    )
-
-if(APPLE)
-    include_directories(${CMAKE_SOURCE_DIR}/external_libraries/libsndfile)
-endif()
-
-include_directories(${CMAKE_SOURCE_DIR}/include/plugin_interface
-                    ${CMAKE_SOURCE_DIR}/include/common
-                    ${CMAKE_SOURCE_DIR}/common
-                    ${CMAKE_SOURCE_DIR}/include/server
-                    ${CMAKE_SOURCE_DIR}/server/scsynth
-                    .
-                    )
 
 set(libsupernova_src
     sc/sc_synth_definition.cpp
@@ -152,6 +137,27 @@ target_link_libraries(supernova libsupernova)
 if(WIN32)
     target_link_libraries(libsupernova wsock32 ws2_32 winmm)
 endif()
+
+
+
+
+target_include_directories(libsupernova PUBLIC
+  ${CMAKE_SOURCE_DIR}/external_libraries/boost_endian
+  ${CMAKE_SOURCE_DIR}/external_libraries/boost_sync/include
+  ${CMAKE_SOURCE_DIR}/external_libraries/oscpack_1_1_0
+  ${CMAKE_SOURCE_DIR}/external_libraries/TLSF-2.4.6/src
+  ${CMAKE_SOURCE_DIR}/include/plugin_interface
+  ${CMAKE_SOURCE_DIR}/include/common
+  ${CMAKE_SOURCE_DIR}/common
+  ${CMAKE_SOURCE_DIR}/include/server
+  ${CMAKE_SOURCE_DIR}/server/scsynth
+  .
+)
+
+if(APPLE)
+    include_directories(${CMAKE_SOURCE_DIR}/external_libraries/libsndfile)
+endif()
+
 
 if(APPLE)
 	# determines the app name and app install location (scappbundlename, scappdir):

@@ -31,7 +31,7 @@
 #include "osc_dispatcher.hpp"
 
 #include "static_allocator.hpp"
-#include "nova-tt/semaphore.hpp"
+#include "boost/sync/semaphore.hpp"
 #include "nova-tt/thread_priority.hpp"
 #include "nova-tt/name_thread.hpp"
 
@@ -92,7 +92,7 @@ protected:
     io_service io_service_;
 
 private:
-    semaphore sem;
+    boost::sync::semaphore sem;
     std::thread thread_;
 };
 

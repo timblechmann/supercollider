@@ -139,7 +139,7 @@ option(ENABLE_TESTSUITE "Compile testsuite." ON)
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     option(SUPERNOVA "Build with supernova as optional audio synthesis server" ON)
-elseif()
+else()
     option(SUPERNOVA "Build with supernova as optional audio synthesis server" OFF)
 endif()
 

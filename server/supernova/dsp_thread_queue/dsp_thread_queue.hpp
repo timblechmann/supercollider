@@ -20,15 +20,15 @@
 #define DSP_THREAD_QUEUE_DSP_THREAD_QUEUE_HPP
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <iostream>
 #include <memory>
 #include <thread>
 #include <vector>
 
-#include <boost/atomic.hpp>
-#include <cstdio>
 
 #ifdef DEBUG_DSP_THREADS
 #include <cstdio>
@@ -38,7 +38,7 @@
 #include <boost/mpl/if.hpp>
 
 #include "nova-tt/pause.hpp"
-#include "nova-tt/semaphore.hpp"
+#include "boost/sync/semaphore.hpp"
 
 #include "utilities/branch_hints.hpp"
 #include "utilities/utils.hpp"
@@ -161,7 +161,7 @@ public:
     void reset_activation_count(void)
     {
         assert(activation_count == 0);
-        activation_count.store(activation_limit, boost::memory_order_release);
+        activation_count.store(activation_limit, std::memory_order_release);
     }
 
     runnable const & get_job(void) const
@@ -228,7 +228,7 @@ private:
             return NULL;
     }
 
-    boost::atomic<activation_limit_t> activation_count; /**< current activation count */
+    std::atomic<activation_limit_t> activation_count; /**< current activation count */
 
     runnable job;
     const successor_list successors;                           /**< list of successing nodes */
@@ -368,7 +368,7 @@ public:
         /* reset node count */
         assert(node_count == 0);
         assert(runnable_set.empty());
-        node_count.store(queue->get_total_node_count(), boost::memory_order_release);
+        node_count.store(queue->get_total_node_count(), std::memory_order_release);
 
         for (size_t i = 0; i != queue->initially_runnable_items.size(); ++i)
             mark_as_runnable(queue->initially_runnable_items[i]);
@@ -512,7 +512,7 @@ private:
         int poll_counts = 0;
 
         for (;;) {
-            if (!node_count.load(boost::memory_order_acquire))
+            if (!node_count.load(std::memory_order_acquire))
                 return;
 
             /* we still have some nodes to process */
@@ -563,7 +563,7 @@ private:
         backoff_t b(8, 32768);
         const int iterations = watchdog_iterations * 2;
         int count = 0;
-        while (node_count.load(boost::memory_order_acquire) != 0) {
+        while (node_count.load(std::memory_order_acquire) != 0) {
             b.run();
             ++count;
             if (!YieldBackoff && (count == iterations)) {
@@ -588,7 +588,7 @@ private:
             consumed += 1;
         } while (item != NULL);
 
-        node_count_t remaining = node_count.fetch_sub(consumed, boost::memory_order_release);
+        node_count_t remaining = node_count.fetch_sub(consumed, std::memory_order_release);
 
         assert (remaining >= consumed);
 
@@ -618,7 +618,7 @@ private:
     thread_count_t used_helper_threads; /* number of helper threads, which are actually used */
 
     boost::lockfree::stack<dsp_thread_queue_item*,  boost::lockfree::capacity<32768> > runnable_set;
-    boost::atomic<node_count_t> node_count; /* number of nodes, that need to be processed during this tick */
+    std::atomic<node_count_t> node_count; /* number of nodes, that need to be processed during this tick */
     int watchdog_iterations;
     bool yield_if_busy;
 };
