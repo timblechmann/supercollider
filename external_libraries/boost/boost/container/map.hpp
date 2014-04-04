@@ -1,6 +1,6 @@
 //////////////////////////////////////////////////////////////////////////////
 //
-// (C) Copyright Ion Gaztanaga 2005-2012. Distributed under the Boost
+// (C) Copyright Ion Gaztanaga 2005-2013. Distributed under the Boost
 // Software License, Version 1.0. (See accompanying file
 // LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
@@ -39,49 +39,42 @@
 namespace boost {
 namespace container {
 
-/// @cond
-// Forward declarations of operators == and <, needed for friend declarations.
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator==(const map<Key,T,Compare,Allocator>& x,
-                       const map<Key,T,Compare,Allocator>& y);
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator<(const map<Key,T,Compare,Allocator>& x,
-                      const map<Key,T,Compare,Allocator>& y);
-/// @endcond
+#ifdef BOOST_CONTAINER_DOXYGEN_INVOKED
 
 //! A map is a kind of associative container that supports unique keys (contains at
 //! most one of each key value) and provides for fast retrieval of values of another
 //! type T based on the keys. The map class supports bidirectional iterators.
 //!
 //! A map satisfies all of the requirements of a container and of a reversible
-//! container and of an associative container. For a
-//! map<Key,T> the key_type is Key and the value_type is std::pair<const Key,T>.
+//! container and of an associative container. The <code>value_type</code> stored
+//! by this container is the value_type is std::pair<const Key, T>.
 //!
-//! Compare is the ordering function for Keys (e.g. <i>std::less<Key></i>).
-//!
-//! Allocator is the allocator to allocate the value_types
-//! (e.g. <i>allocator< std::pair<const Key, T> > </i>).
-#ifdef BOOST_CONTAINER_DOXYGEN_INVOKED
-template <class Key, class T, class Compare = std::less<Key>, class Allocator = std::allocator< std::pair< const Key, T> > >
+//! \tparam Key is the key_type of the map
+//! \tparam Value is the <code>mapped_type</code>
+//! \tparam Compare is the ordering function for Keys (e.g. <i>std::less<Key></i>).
+//! \tparam Allocator is the allocator to allocate the <code>value_type</code>s
+//!   (e.g. <i>allocator< std::pair<const Key, T> > </i>).
+//! \tparam MapOptions is an packed option type generated using using boost::container::tree_assoc_options.
+template < class Key, class T, class Compare = std::less<Key>
+         , class Allocator = std::allocator< std::pair< const Key, T> >, class MapOptions = tree_assoc_defaults >
 #else
-template <class Key, class T, class Compare, class Allocator>
+template <class Key, class T, class Compare, class Allocator, class MapOptions>
 #endif
 class map
 {
-   /// @cond
+   #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
    private:
    BOOST_COPYABLE_AND_MOVABLE(map)
 
    typedef std::pair<const Key, T>  value_type_impl;
-   typedef container_detail::rbtree
-      <Key, value_type_impl, container_detail::select1st<value_type_impl>, Compare, Allocator> tree_t;
+   typedef container_detail::tree
+      <Key, value_type_impl, container_detail::select1st<value_type_impl>, Compare, Allocator, MapOptions> tree_t;
    typedef container_detail::pair <Key, T> movable_value_type_impl;
    typedef container_detail::tree_value_compare
       < Key, value_type_impl, Compare, container_detail::select1st<value_type_impl>
       >  value_compare_impl;
    tree_t m_tree;  // red-black tree representing map
-   /// @endcond
+   #endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
    public:
    //////////////////////////////////////////////
@@ -755,13 +748,55 @@ class map
    std::pair<const_iterator,const_iterator> equal_range(const key_type& x) const
    {  return m_tree.equal_range(x); }
 
-   /// @cond
-   template <class K1, class T1, class C1, class A1>
-   friend bool operator== (const map<K1, T1, C1, A1>&,
-                           const map<K1, T1, C1, A1>&);
-   template <class K1, class T1, class C1, class A1>
-   friend bool operator< (const map<K1, T1, C1, A1>&,
-                          const map<K1, T1, C1, A1>&);
+   //! <b>Effects</b>: Rebalances the tree. It's a no-op for Red-Black and AVL trees.
+   //!
+   //! <b>Complexity</b>: Linear
+   void rebalance()
+   {  return m_tree.rebalance(); }
+
+   //! <b>Effects</b>: Returns true if x and y are equal
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator==(const map& x, const map& y)
+   {  return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin());  }
+
+   //! <b>Effects</b>: Returns true if x and y are unequal
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator!=(const map& x, const map& y)
+   {  return !(x == y); }
+
+   //! <b>Effects</b>: Returns true if x is less than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator<(const map& x, const map& y)
+   {  return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());  }
+
+   //! <b>Effects</b>: Returns true if x is greater than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator>(const map& x, const map& y)
+   {  return y < x;  }
+
+   //! <b>Effects</b>: Returns true if x is equal or less than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator<=(const map& x, const map& y)
+   {  return !(y < x);  }
+
+   //! <b>Effects</b>: Returns true if x is equal or greater than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator>=(const map& x, const map& y)
+   {  return !(x < y);  }
+
+   //! <b>Effects</b>: x.swap(y)
+   //!
+   //! <b>Complexity</b>: Constant.
+   friend void swap(map& x, map& y)
+   {  x.swap(y);  }
+
+   #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
    private:
    mapped_type& priv_subscript(const key_type &k)
    {
@@ -790,54 +825,11 @@ class map
       return (*i).second;
    }
 
-   /// @endcond
+   #endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 };
 
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator==(const map<Key,T,Compare,Allocator>& x,
-                       const map<Key,T,Compare,Allocator>& y)
-   {  return x.m_tree == y.m_tree;  }
 
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator<(const map<Key,T,Compare,Allocator>& x,
-                      const map<Key,T,Compare,Allocator>& y)
-   {  return x.m_tree < y.m_tree;   }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator!=(const map<Key,T,Compare,Allocator>& x,
-                       const map<Key,T,Compare,Allocator>& y)
-   {  return !(x == y); }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator>(const map<Key,T,Compare,Allocator>& x,
-                      const map<Key,T,Compare,Allocator>& y)
-   {  return y < x;  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator<=(const map<Key,T,Compare,Allocator>& x,
-                       const map<Key,T,Compare,Allocator>& y)
-   {  return !(y < x);  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator>=(const map<Key,T,Compare,Allocator>& x,
-                       const map<Key,T,Compare,Allocator>& y)
-   {  return !(x < y);  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline void swap(map<Key,T,Compare,Allocator>& x, map<Key,T,Compare,Allocator>& y)
-   {  x.swap(y);  }
-
-/// @cond
-
-// Forward declaration of operators < and ==, needed for friend declaration.
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator==(const multimap<Key,T,Compare,Allocator>& x,
-                       const multimap<Key,T,Compare,Allocator>& y);
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator<(const multimap<Key,T,Compare,Allocator>& x,
-                      const multimap<Key,T,Compare,Allocator>& y);
+#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
 }  //namespace container {
 
@@ -851,7 +843,9 @@ struct has_trivial_destructor_after_move<boost::container::map<K, T, C, Allocato
 
 namespace container {
 
-/// @endcond
+#endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
+
+#ifdef BOOST_CONTAINER_DOXYGEN_INVOKED
 
 //! A multimap is a kind of associative container that supports equivalent keys
 //! (possibly containing multiple copies of the same key value) and provides for
@@ -859,33 +853,35 @@ namespace container {
 //! supports bidirectional iterators.
 //!
 //! A multimap satisfies all of the requirements of a container and of a reversible
-//! container and of an associative container. For a
-//! map<Key,T> the key_type is Key and the value_type is std::pair<const Key,T>.
+//! container and of an associative container. The <code>value_type</code> stored
+//! by this container is the value_type is std::pair<const Key, T>.
 //!
-//! Compare is the ordering function for Keys (e.g. <i>std::less<Key></i>).
-//!
-//! Allocator is the allocator to allocate the value_types
-//!(e.g. <i>allocator< std::pair<<b>const</b> Key, T> ></i>).
-#ifdef BOOST_CONTAINER_DOXYGEN_INVOKED
-template <class Key, class T, class Compare = std::less<Key>, class Allocator = std::allocator< std::pair< const Key, T> > >
+//! \tparam Key is the key_type of the map
+//! \tparam Value is the <code>mapped_type</code>
+//! \tparam Compare is the ordering function for Keys (e.g. <i>std::less<Key></i>).
+//! \tparam Allocator is the allocator to allocate the <code>value_type</code>s
+//!   (e.g. <i>allocator< std::pair<const Key, T> > </i>).
+//! \tparam MultiMapOptions is an packed option type generated using using boost::container::tree_assoc_options.
+template < class Key, class T, class Compare = std::less<Key>
+         , class Allocator = std::allocator< std::pair< const Key, T> >, class MultiMapOptions = tree_assoc_defaults>
 #else
-template <class Key, class T, class Compare, class Allocator>
+template <class Key, class T, class Compare, class Allocator, class MultiMapOptions>
 #endif
 class multimap
 {
-   /// @cond
+   #ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
    private:
    BOOST_COPYABLE_AND_MOVABLE(multimap)
 
    typedef std::pair<const Key, T>  value_type_impl;
-   typedef container_detail::rbtree
-      <Key, value_type_impl, container_detail::select1st<value_type_impl>, Compare, Allocator> tree_t;
+   typedef container_detail::tree
+      <Key, value_type_impl, container_detail::select1st<value_type_impl>, Compare, Allocator, MultiMapOptions> tree_t;
    typedef container_detail::pair <Key, T> movable_value_type_impl;
    typedef container_detail::tree_value_compare
       < Key, value_type_impl, Compare, container_detail::select1st<value_type_impl>
       >  value_compare_impl;
    tree_t m_tree;  // red-black tree representing map
-   /// @endcond
+   #endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
    public:
    //////////////////////////////////////////////
@@ -1463,52 +1459,56 @@ class multimap
    std::pair<const_iterator,const_iterator> equal_range(const key_type& x) const
    {  return m_tree.equal_range(x);   }
 
-   /// @cond
-   template <class K1, class T1, class C1, class A1>
-   friend bool operator== (const multimap<K1, T1, C1, A1>& x,
-                           const multimap<K1, T1, C1, A1>& y);
+   //! <b>Effects</b>: Rebalances the tree. It's a no-op for Red-Black and AVL trees.
+   //!
+   //! <b>Complexity</b>: Linear
+   void rebalance()
+   {  return m_tree.rebalance(); }
 
-   template <class K1, class T1, class C1, class A1>
-   friend bool operator< (const multimap<K1, T1, C1, A1>& x,
-                          const multimap<K1, T1, C1, A1>& y);
-   /// @endcond
+   //! <b>Effects</b>: Returns true if x and y are equal
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator==(const multimap& x, const multimap& y)
+   {  return x.size() == y.size() && std::equal(x.begin(), x.end(), y.begin());  }
+
+   //! <b>Effects</b>: Returns true if x and y are unequal
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator!=(const multimap& x, const multimap& y)
+   {  return !(x == y); }
+
+   //! <b>Effects</b>: Returns true if x is less than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator<(const multimap& x, const multimap& y)
+   {  return std::lexicographical_compare(x.begin(), x.end(), y.begin(), y.end());  }
+
+   //! <b>Effects</b>: Returns true if x is greater than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator>(const multimap& x, const multimap& y)
+   {  return y < x;  }
+
+   //! <b>Effects</b>: Returns true if x is equal or less than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator<=(const multimap& x, const multimap& y)
+   {  return !(y < x);  }
+
+   //! <b>Effects</b>: Returns true if x is equal or greater than y
+   //!
+   //! <b>Complexity</b>: Linear to the number of elements in the container.
+   friend bool operator>=(const multimap& x, const multimap& y)
+   {  return !(x < y);  }
+
+   //! <b>Effects</b>: x.swap(y)
+   //!
+   //! <b>Complexity</b>: Constant.
+   friend void swap(multimap& x, multimap& y)
+   {  x.swap(y);  }
 };
 
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator==(const multimap<Key,T,Compare,Allocator>& x,
-                       const multimap<Key,T,Compare,Allocator>& y)
-{  return x.m_tree == y.m_tree;  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator<(const multimap<Key,T,Compare,Allocator>& x,
-                      const multimap<Key,T,Compare,Allocator>& y)
-{  return x.m_tree < y.m_tree;   }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator!=(const multimap<Key,T,Compare,Allocator>& x,
-                       const multimap<Key,T,Compare,Allocator>& y)
-{  return !(x == y);  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator>(const multimap<Key,T,Compare,Allocator>& x,
-                      const multimap<Key,T,Compare,Allocator>& y)
-{  return y < x;  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator<=(const multimap<Key,T,Compare,Allocator>& x,
-                       const multimap<Key,T,Compare,Allocator>& y)
-{  return !(y < x);  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline bool operator>=(const multimap<Key,T,Compare,Allocator>& x,
-                       const multimap<Key,T,Compare,Allocator>& y)
-{  return !(x < y);  }
-
-template <class Key, class T, class Compare, class Allocator>
-inline void swap(multimap<Key,T,Compare,Allocator>& x, multimap<Key,T,Compare,Allocator>& y)
-{  x.swap(y);  }
-
-/// @cond
+#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
 }  //namespace container {
 
@@ -1522,7 +1522,7 @@ struct has_trivial_destructor_after_move<boost::container::multimap<K, T, C, All
 
 namespace container {
 
-/// @endcond
+#endif   //#ifndef BOOST_CONTAINER_DOXYGEN_INVOKED
 
 }}
 

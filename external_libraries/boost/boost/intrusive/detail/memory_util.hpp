@@ -17,7 +17,7 @@
 #ifndef BOOST_INTRUSIVE_ALLOCATOR_MEMORY_UTIL_HPP
 #define BOOST_INTRUSIVE_ALLOCATOR_MEMORY_UTIL_HPP
 
-#if (defined _MSC_VER) && (_MSC_VER >= 1200)
+#if defined(_MSC_VER)
 #  pragma once
 #endif
 
@@ -118,25 +118,25 @@ struct LowPriorityConversion
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME pointer_to
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_BEGIN namespace boost { namespace intrusive { namespace detail {
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_END   }}}
-#define BOOST_PP_ITERATION_PARAMS_1 (3, (0, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
+#define BOOST_PP_ITERATION_PARAMS_1 (3, (1, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
 #include BOOST_PP_ITERATE()
 
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME static_cast_from
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_BEGIN namespace boost { namespace intrusive { namespace detail {
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_END   }}}
-#define BOOST_PP_ITERATION_PARAMS_1 (3, (0, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
+#define BOOST_PP_ITERATION_PARAMS_1 (3, (1, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
 #include BOOST_PP_ITERATE()
 
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME const_cast_from
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_BEGIN namespace boost { namespace intrusive { namespace detail {
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_END   }}}
-#define BOOST_PP_ITERATION_PARAMS_1 (3, (0, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
+#define BOOST_PP_ITERATION_PARAMS_1 (3, (1, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
 #include BOOST_PP_ITERATE()
 
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_FUNCNAME dynamic_cast_from
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_BEGIN namespace boost { namespace intrusive { namespace detail {
 #define BOOST_INTRUSIVE_HAS_MEMBER_FUNCTION_CALLABLE_WITH_NS_END   }}}
-#define BOOST_PP_ITERATION_PARAMS_1 (3, (0, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
+#define BOOST_PP_ITERATION_PARAMS_1 (3, (1, 1, <boost/intrusive/detail/has_member_function_callable_with.hpp>))
 #include BOOST_PP_ITERATE()
 
 namespace boost {
@@ -186,11 +186,7 @@ template <typename Ptr, typename T>
 struct type_has_rebind
 {
    template <typename X>
-   #if !defined (__SUNPRO_CC)
    static char test(int, typename X::template rebind<T>*);
-   #else
-   static char test(int, typename X::rebind<T>*);
-   #endif
 
    template <typename X>
    static int test(boost::intrusive::detail::LowPriorityConversion<int>, void*);
@@ -202,11 +198,7 @@ template <typename Ptr, typename T>
 struct type_has_rebind_other
 {
    template <typename X>
-   #if !defined (__SUNPRO_CC)
    static char test(int, typename X::template rebind<T>::other*);
-   #else
-   static char test(int, typename X::rebind<T>::other*);
-   #endif
 
    template <typename X>
    static int test(boost::intrusive::detail::LowPriorityConversion<int>, void*);

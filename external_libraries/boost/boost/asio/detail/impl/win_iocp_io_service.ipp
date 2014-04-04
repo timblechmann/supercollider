@@ -29,8 +29,6 @@
 
 #include <boost/asio/detail/push_options.hpp>
 
-#include <algorithm> // for std::min
-
 namespace boost {
 namespace asio {
 namespace detail {

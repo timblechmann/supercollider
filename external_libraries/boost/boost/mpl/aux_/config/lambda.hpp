@@ -10,9 +10,9 @@
 //
 // See http://www.boost.org/libs/mpl for documentation.
 
-// $Id: lambda.hpp 49267 2008-10-11 06:19:02Z agurtovoy $
-// $Date: 2008-10-10 23:19:02 -0700 (Fri, 10 Oct 2008) $
-// $Revision: 49267 $
+// $Id$
+// $Date$
+// $Revision$
 
 #include <boost/mpl/aux_/config/ttp.hpp>
 #include <boost/mpl/aux_/config/ctps.hpp>
@@ -22,7 +22,6 @@
 
 #if    !defined(BOOST_MPL_CFG_NO_FULL_LAMBDA_SUPPORT) \
     && (   defined(BOOST_MPL_CFG_NO_TEMPLATE_TEMPLATE_PARAMETERS) \
-        || defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION) \
         )
 
 #   define BOOST_MPL_CFG_NO_FULL_LAMBDA_SUPPORT

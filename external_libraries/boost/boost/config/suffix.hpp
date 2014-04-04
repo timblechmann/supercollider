@@ -122,39 +122,6 @@
 #  endif
 
 //
-// Without partial specialization, can't test for partial specialisation bugs:
-//
-#  if defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION) \
-      && !defined(BOOST_BCB_PARTIAL_SPECIALIZATION_BUG)
-#     define BOOST_BCB_PARTIAL_SPECIALIZATION_BUG
-#  endif
-
-//
-// Without partial specialization, we can't have array-type partial specialisations:
-//
-#  if defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION) \
-      && !defined(BOOST_NO_ARRAY_TYPE_SPECIALIZATIONS)
-#     define BOOST_NO_ARRAY_TYPE_SPECIALIZATIONS
-#  endif
-
-//
-// Without partial specialization, std::iterator_traits can't work:
-//
-#  if defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION) \
-      && !defined(BOOST_NO_STD_ITERATOR_TRAITS)
-#     define BOOST_NO_STD_ITERATOR_TRAITS
-#  endif
-
-//
-// Without partial specialization, partial
-// specialization with default args won't work either:
-//
-#  if defined(BOOST_NO_TEMPLATE_PARTIAL_SPECIALIZATION) \
-      && !defined(BOOST_NO_PARTIAL_SPECIALIZATION_IMPLICIT_DEFAULT_ARGS)
-#     define BOOST_NO_PARTIAL_SPECIALIZATION_IMPLICIT_DEFAULT_ARGS
-#  endif
-
-//
 // Without member template support, we can't have template constructors
 // in the standard library either:
 //
@@ -591,7 +558,13 @@ namespace std{ using ::type_info; }
 #    define BOOST_NOINLINE __declspec(noinline)
 #  elif defined(__GNUC__) && __GNUC__ > 3
      // Clang also defines __GNUC__ (as 4)
-#    define BOOST_NOINLINE __attribute__ ((__noinline__))
+#    if defined(__CUDACC__)
+       // nvcc doesn't always parse __noinline__, 
+       // see: https://svn.boost.org/trac/boost/ticket/9392
+#      define BOOST_NOINLINE __attribute__ ((noinline))
+#    else
+#      define BOOST_NOINLINE __attribute__ ((__noinline__))
+#    endif
 #  else
 #    define BOOST_NOINLINE
 #  endif
