@@ -691,7 +691,11 @@ Event : Environment {
 
 					bus: #{|server|
 						var array;
-						array = ~array.asArray;
+
+						~freq = ~detunedFreq.value;
+						~amp = ~amp.value;
+
+						array = ~array.value.asArray;
 						~schedBundle.value(~lag, ~timingOffset, server,
 							[\c_setn, ~out.asControlInput, array.size] ++ array);
 					},
