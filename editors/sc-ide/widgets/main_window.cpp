@@ -1181,7 +1181,7 @@ void MainWindow::openStartupFile()
         file.close();
     }
 
-    mMain->documentManager()->open( filePath );
+    mMain->documentManager()->open( filePath, -1, 0, false );
 }
 
 void MainWindow::openUserSupportDirectory()
