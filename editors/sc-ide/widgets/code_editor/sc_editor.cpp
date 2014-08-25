@@ -53,6 +53,8 @@ ScCodeEditor::ScCodeEditor( Document *doc, QWidget *parent ) :
     connect( Main::instance(), SIGNAL(applySettingsRequest(Settings::Manager*)),
              this, SLOT(applySettings(Settings::Manager*)) );
 
+    connect( this, SIGNAL(cursorPositionChanged()), this, SLOT(onCursorPositionChanged()) );
+
     mAutoCompleter->documentChanged(textDocument());
 
     applySettings( Main::settings() );
@@ -121,6 +123,14 @@ void ScCodeEditor::keyPressEvent( QKeyEvent *e )
     if (cursorMoved) {
         setTextCursor( cursor );
         doKeyAction(e);
+        return;
+    }
+
+    if( (e->key() == Qt::Key_Up) && (mCursorPositionBeforeLineEvaluation != -1) ) {
+        // move to position before line evaluation
+        cursor.setPosition(mCursorPositionBeforeLineEvaluation);
+        setTextCursor( cursor );
+        e->accept();
         return;
     }
 
@@ -1325,6 +1335,7 @@ void ScCodeEditor::evaluateLine()
 
         if( mStepForwardEvaluation ) {
             QTextCursor newCursor = cursor;
+
             newCursor.movePosition(QTextCursor::NextBlock);
             newCursor.setVerticalMovementX( cursor.verticalMovementX() );
             setTextCursor(newCursor);
@@ -1367,6 +1378,7 @@ void ScCodeEditor::evaluateRegion()
                 newCursor.movePosition(QTextCursor::NextBlock);
                 newCursor.setVerticalMovementX( cursor.verticalMovementX() );
                 setTextCursor(newCursor);
+                mCursorPositionBeforeLineEvaluation = cursor.position();
             }
             // Adjust cursor for code blinking:
             cursor.movePosition(QTextCursor::StartOfBlock);
@@ -1388,6 +1400,11 @@ void ScCodeEditor::evaluateDocument()
 {
     QString documentText = textDocument()->toPlainText();
     Main::evaluateCode(documentText);
+}
+
+void ScCodeEditor::onCursorPositionChanged()
+{
+    mCursorPositionBeforeLineEvaluation = -1;
 }
 
 QTextCursor ScCodeEditor::cursorAt(const TokenIterator it, int offset)
