@@ -75,6 +75,8 @@ public slots:
     void evaluateRegion();
     void evaluateDocument();
 
+    void onCursorPositionChanged();
+
 protected:
     virtual bool event( QEvent * );
     virtual void keyPressEvent( QKeyEvent * );
@@ -128,6 +130,8 @@ private:
     bool mMouseBracketMatch;
 
     class AutoCompleter *mAutoCompleter;
+
+    int mCursorPositionBeforeLineEvaluation = -1;
 };
 
 } // namespace ScIDE
