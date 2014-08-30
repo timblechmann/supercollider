@@ -235,7 +235,7 @@ else()
   add_executable( SuperCollider MACOSX_BUNDLE ${ide_sources} ${ide_rc_sources} ${RES_FILES} ${AdditionalBundleSources})
 endif()
 
-qt5_use_modules( ${ide_name} Core Network Gui WebKit WebKitWidgets Widgets)
+qt5_use_modules( SuperCollider Core Network Gui WebKit WebKitWidgets Widgets)
 
 if(APPLE)
     set_target_properties(SuperCollider PROPERTIES OUTPUT_NAME "${ide_name}")
