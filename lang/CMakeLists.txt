@@ -170,14 +170,16 @@ if(SC_WII)
 	endif()
 endif()
 
-include(../SCDoc/CMakeLists.txt)
-list(APPEND sclang_sources ${SCDOC_SRCS})
+if(SC_IDE OR SC_QT)
+	find_package(Qt5Core REQUIRED)
+	find_package(Qt5Network REQUIRED)
+	find_package(Qt5Gui REQUIRED)
+endif()
 
 if(SC_IDE)
 	add_definitions(-DSC_IDE -DQT_NO_KEYWORDS)
-	find_package( Qt4 4.7 REQUIRED QtCore QtNetwork QtGui)
-	include( ${QT_USE_FILE} )
-	qt4_wrap_cpp( SCLANG_MOC_SRCS ../editors/sc-ide/primitives/sc_ipc_client.hpp )
+
+	qt5_wrap_cpp( SCLANG_MOC_SRCS ../editors/sc-ide/primitives/sc_ipc_client.hpp )
 	list(APPEND sclang_sources ../editors/sc-ide/primitives/sc_ipc_client.cpp)
 	list(APPEND sclang_sources ${SCLANG_MOC_SRCS})
 endif()
@@ -188,11 +190,21 @@ if(SC_QT)
 	list(APPEND sclang_sources ${QT_COLLIDER_SRCS})
 endif()
 
+include(../SCDoc/CMakeLists.txt)
+list(APPEND sclang_sources ${SCDOC_SRCS})
+
 if(0 AND FINAL_BUILD) # sclang final-builds are broken
 	CREATE_FINAL_FILE(libsclang_final.cpp ${sclang_sources})
 	add_library(libsclang STATIC libsclang_final.cpp ${sclang_parser_source})
 else()
 	add_library(libsclang STATIC ${sclang_sources} ${sclang_parser_source})
+endif()
+
+if(SC_IDE OR SC_QT)
+	qt5_use_modules(libsclang Core Network Gui WebKit Widgets WebKitWidgets)
+	if (APPLE)
+		qt5_use_modules(libsclang MacExtras)
+	endif()
 endif()
 
 target_compile_definitions(libsclang PRIVATE YYSTACK_USE_ALLOC BUILDING_SUPERCOLLIDER)
@@ -207,8 +219,6 @@ endif()
 if(HID_LIBUSB)
   target_link_libraries( libsclang ${LIBUSB_1_LIBRARIES})
 endif()
-
-
 
 if (SC_WII OR APPLE)
 	if (BLUETOOTH_FOUND AND CWIID_FOUND)
@@ -311,7 +321,14 @@ if(LTO)
 					APPEND PROPERTY LINK_FLAGS "-flto -flto-report -fwhole-program")
 endif()
 
-if(WIN32)
+if(APPLE)
+	# determines the app name and app install location (scappbundlename, scappdir):
+	include (${CMAKE_SOURCE_DIR}/cmake_modules/MacAppFolder.cmake)
+
+	install(TARGETS sclang
+			DESTINATION "${scappbindir}"
+			PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+elseif(WIN32)
 	install(TARGETS sclang
 			DESTINATION "SuperCollider"
 			PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
