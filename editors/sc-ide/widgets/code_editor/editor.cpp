@@ -905,7 +905,7 @@ void GenericCodeEditor::paintLineIndicator( QPaintEvent *e )
     QRect r( e->rect() );
     QPainter p( mLineIndicator );
 
-    p.fillRect( r, plt.color( QPalette::Mid ) );
+    p.fillRect( r, plt.color( QPalette::Window ) );
     p.setPen( plt.color(QPalette::Dark) );
     p.drawLine( r.topRight(), r.bottomRight() );
 
