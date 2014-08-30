@@ -44,6 +44,9 @@ ScIDE {
 		.put(\default, { | server, what, newServer |
 			("changed default server to:" + newServer.name).postln;
 			this.defaultServer = newServer;
+		})
+		.put(\dumpOSC, { | volume, what, code |
+			this.prSend( if(code.asBoolean, \dumpOSCStarted, \dumpOSCStopped) );
 		});
 
 		volumeController.remove;
@@ -64,9 +67,11 @@ ScIDE {
 
 		this.prSend(\defaultServerRunningChanged, [
 			server.serverRunning, server.addr.hostname, server.addr.port]);
-		this.prSend( if (server.volume.isMuted, \serverMuted, \serverUnmuted) );
+		this.prSend( if(server.volume.isMuted, \serverMuted, \serverUnmuted) );
+		this.prSend( if(server.dumpMode.asBoolean, \dumpOSCStarted, \dumpOSCStopped) );
 		this.prSend( \serverAmpRange, "%,%".format(server.volume.min, server.volume.max) );
 		this.prSend( \serverAmp, server.volume.volume.asString );
+
 	}
 
 	*request { |id, command, data|
@@ -440,6 +445,8 @@ Document {
 		var doc;
 		isEdited = isEdited.booleanValue;
 		chars = String.fill(chars.size, {|i| chars[i].asAscii});
+		title = String.fill(title.size, {|i| title[i].asAscii});
+		path = String.fill(path.size, {|i| path[i].asAscii});
 		if((doc = this.findByQUuid(quuid)).isNil, {
 			doc = super.new.initFromIDE(quuid, title, chars, isEdited, path);
 			allDocuments = allDocuments.add(doc);
