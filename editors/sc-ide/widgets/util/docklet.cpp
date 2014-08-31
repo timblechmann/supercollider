@@ -41,7 +41,19 @@ namespace ScIDE {
 
 DocketToolButton::DocketToolButton(QWidget *parent):
     QToolButton(parent)
-{}
+{
+    QString style =
+            QString(
+                "QToolButton         { background-color: %1; border: none; margin-bottom: 1}"
+                "QToolButton:hovered { background-color: %2}"
+                "QToolButton:checked { background-color: %3}"
+                )
+            .arg(QPalette().color(QPalette::Window).name())
+            .arg(QPalette().color(QPalette::AlternateBase).name())
+            .arg(QPalette().color(QPalette::Button).lighter(20).name())
+            ;
+    setStyleSheet(style);
+}
 
 
 void DocketToolButton::mouseDoubleClickEvent(QMouseEvent *event)
