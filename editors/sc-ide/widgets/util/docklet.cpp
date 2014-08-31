@@ -95,6 +95,9 @@ DockletToolBar::DockletToolBar(const QString &title)
     l->addWidget( optionsBtn );
     l->addWidget( titleLabel );
     setLayout(l);
+
+
+
 }
 
 void DockletToolBar::addAction (QAction *action)
@@ -113,24 +116,6 @@ void DockletToolBar::addWidget (QWidget *widget, int stretch)
 {
     static_cast<QHBoxLayout*>(layout())->addWidget(widget, stretch);
 }
-
-void DockletToolBar::paintEvent( QPaintEvent *event )
-{
-    QPainter painter(this);
-
-    QRect r = rect();
-
-    painter.setBrush( palette().color(QPalette::Mid) );
-    painter.setPen(Qt::NoPen);
-    painter.drawRect(r);
-
-    painter.setPen( palette().color(QPalette::Shadow) );
-    painter.drawLine( r.bottomLeft(), r.bottomRight() );
-
-    //painter.setPen( palette().color(QPalette::Mid).lighter(120) );
-    //painter.drawLine( r.topLeft(), r.topRight() );
-}
-
 
 static void updateWindowState( QWidget * window, QDockWidget::DockWidgetFeatures features )
 {
