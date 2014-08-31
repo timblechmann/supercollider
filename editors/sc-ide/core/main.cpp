@@ -38,6 +38,7 @@
 #include <QDir>
 #include <QFileOpenEvent>
 #include <QLibraryInfo>
+#include <QStyleFactory>
 #include <QTranslator>
 #include <QDebug>
 
@@ -82,6 +83,8 @@ int main( int argc, char *argv[] )
     // Set up style
 
     app.setStyle( new ScIDE::Style(app.style()) );
+
+
 
     // Go...
 
@@ -214,6 +217,8 @@ Main::Main(void) :
     connect(mScProcess, SIGNAL(response(QString,QString)),
             mDocManager, SLOT(handleScLangMessage(QString,QString)));
 
+    setDarkPalette();
+
     qApp->installEventFilter(this);
 }
 
@@ -244,6 +249,35 @@ bool Main::eventFilter(QObject *object, QEvent *event)
 
     return QObject::eventFilter(object, event);
 }
+
+
+void Main::setDarkPalette()
+{
+    qApp->setStyle(QStyleFactory::create("Fusion"));
+
+    QPalette darkPalette;
+    darkPalette.setColor(QPalette::Window,        QColor(20, 20, 20));
+    darkPalette.setColor(QPalette::WindowText,    Qt::white);
+    darkPalette.setColor(QPalette::Base,          QColor(10, 10, 10));
+    darkPalette.setColor(QPalette::AlternateBase, QColor(15, 15, 15));
+    darkPalette.setColor(QPalette::ToolTipBase,   Qt::white);
+    darkPalette.setColor(QPalette::ToolTipText,   Qt::white);
+    darkPalette.setColor(QPalette::Text,          Qt::white);
+    darkPalette.setColor(QPalette::Button,        QColor(30, 30, 30));
+    darkPalette.setColor(QPalette::ButtonText,    Qt::white);
+    darkPalette.setColor(QPalette::BrightText,    Qt::red);
+    darkPalette.setColor(QPalette::Link,          QColor(42, 130, 218));
+
+    darkPalette.setColor(QPalette::Highlight,     QColor(42, 130, 218));
+    darkPalette.setColor(QPalette::HighlightedText, Qt::black);
+
+    darkPalette.setColor(QPalette::Mid, QColor(27, 27, 27));
+
+    qApp->setPalette(darkPalette);
+
+    qApp->setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }");
+}
+
 
 bool Main::openDocumentation(const QString & string)
 {
