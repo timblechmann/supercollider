@@ -295,10 +295,10 @@ void Main::setDarkPalette()
     darkPalette.setColor(QPalette::WindowText,    Qt::white);
     darkPalette.setColor(QPalette::Base,          QColor(10, 10, 10));
     darkPalette.setColor(QPalette::AlternateBase, QColor(15, 15, 15));
-    darkPalette.setColor(QPalette::ToolTipBase,   Qt::white);
+    darkPalette.setColor(QPalette::ToolTipBase,   QColor(30, 30, 30));
     darkPalette.setColor(QPalette::ToolTipText,   Qt::white);
     darkPalette.setColor(QPalette::Text,          Qt::white);
-    darkPalette.setColor(QPalette::Button,        QColor(30, 30, 30));
+    darkPalette.setColor(QPalette::Button,        QColor(22, 22, 22));
     darkPalette.setColor(QPalette::ButtonText,    Qt::white);
     darkPalette.setColor(QPalette::BrightText,    Qt::red);
     darkPalette.setColor(QPalette::Link,          QColor(42, 130, 218));
@@ -309,8 +309,6 @@ void Main::setDarkPalette()
     darkPalette.setColor(QPalette::Mid, QColor(27, 27, 27));
 
     qApp->setPalette(darkPalette);
-
-    qApp->setStyleSheet("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }");
 }
 
 
