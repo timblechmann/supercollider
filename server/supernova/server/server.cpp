@@ -248,10 +248,11 @@ static bool set_realtime_priority(int thread_index)
                                      AudioConvertNanosToHostTime(ns_per_block - 1),
                                      false);
 
+#elif defined(__linux__)
+    // Note: SCHED_DEADLINE is not exactly suited for real-time audio
+	success = false; // thread_set_priority_rt(ns_per_block, ns_per_block - 2, ns_per_block - 1, false);
 #else
-
     success = thread_set_priority_rt(ns_per_block, ns_per_block - 2, ns_per_block - 1, false);
-
 #endif
 
     if (!success)
