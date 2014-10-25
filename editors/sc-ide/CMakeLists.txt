@@ -135,6 +135,7 @@ set ( ide_src
     widgets/style/style.cpp
 
     ${CMAKE_SOURCE_DIR}/QtCollider/widgets/web_page.cpp
+    ${CMAKE_SOURCE_DIR}/QtCollider/hacks/hacks_mac.mm
 
     ${CMAKE_SOURCE_DIR}/common/SC_TextUtils.cpp
 )
@@ -254,6 +255,7 @@ endif()
 
 if(APPLE)
     target_link_libraries( ${ide_name} "-framework CoreServices -framework Foundation")
+    target_link_libraries( ${ide_name} "-framework Cocoa" )
 elseif(WIN32)
     target_link_libraries( SuperCollider wsock32 )
     # The following prevents a Windows console from showing up
