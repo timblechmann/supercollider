@@ -336,13 +336,21 @@ if(APPLE)
     install(DIRECTORY "${QT_PLUGINS_DIR}/" DESTINATION ${plugin_dest_dir} COMPONENT Runtime
                        FILES_MATCHING REGEX "(platforms)/[^_]*\\.dylib")
 
+    set( bundledTools scsynth;sclang )
+    if(SUPERNOVA)
+      list(APPEND bundledTools supernova)
+    endif()
+
+    foreach( tool ${bundledTools} )
+      list(APPEND installedTools ${CMAKE_INSTALL_PREFIX}/SuperCollider/SuperCollider.app/Contents/Resources/${tool})
+    endforeach()
+
     install(CODE "
            file(GLOB_RECURSE QTPLUGINS
                   \"${plugin_dest_dir}/*.dylib\")
                 include(BundleUtilities)
-                fixup_bundle(\"${CMAKE_INSTALL_PREFIX}/SuperCollider/SuperCollider.app\" \"\${QTPLUGINS}\" \"${QT_LIBRARY_DIR}\")
+                fixup_bundle(\"${CMAKE_INSTALL_PREFIX}/SuperCollider/SuperCollider.app\" \"\${QTPLUGINS};${installedTools}\" \"${QT_LIBRARY_DIR}\")
                 " COMPONENT Runtime)
-
 
 elseif(WIN32)
 	install(TARGETS SuperCollider

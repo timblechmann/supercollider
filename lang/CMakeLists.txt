@@ -322,12 +322,7 @@ if(LTO)
 endif()
 
 if(APPLE)
-	# determines the app name and app install location (scappbundlename, scappdir):
-	include (${CMAKE_SOURCE_DIR}/cmake_modules/MacAppFolder.cmake)
-
-	install(TARGETS sclang
-			DESTINATION "${scappbindir}"
-			PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+	# TODO allow apple users to install to fhs-ish path if INSTALL_FHS option is enabled
 elseif(WIN32)
 	install(TARGETS sclang
 			DESTINATION "SuperCollider"

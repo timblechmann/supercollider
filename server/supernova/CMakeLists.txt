@@ -144,13 +144,7 @@ target_link_libraries(supernova libsupernova)
 
 
 if(APPLE)
-	# determines the app name and app install location (scappbundlename, scappdir):
-	include (${CMAKE_SOURCE_DIR}/cmake_modules/MacAppFolder.cmake)
-
-	install(TARGETS supernova
-			DESTINATION ${scappauxresourcesdir}
-			PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE OWNER_WRITE)
-
+	# TODO allow apple users to install to fhs-ish path if INSTALL_FHS option is enabled
 elseif(WIN32)
 	install(TARGETS supernova
         DESTINATION "SuperCollider"
