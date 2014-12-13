@@ -479,11 +479,13 @@ void ScServer::onRunningStateChanged( bool running, QString const & hostName, in
     if (running) {
         mServerAddress = QHostAddress(hostName);
         mPort = port;
+        mUdpSocket->connectToHost(mServerAddress, mPort);
     } else {
         mServerAddress.clear();
         mPort = 0;
         mIsRecording = false;
         mRecordTimer.stop();
+        mUdpSocket->disconnectFromHost();
     }
 
     updateToggleRunningAction();
@@ -518,11 +520,11 @@ void ScServer::processServerStatusMessage(const osc::ReceivedMessage &message )
     if (!isRunning())
         return;
 
-    int	unused;
-    int	ugenCount;
-    int	synthCount;
-    int	groupCount;
-    int	defCount;
+    osc::int32 unused;
+    osc::int32 ugenCount;
+    osc::int32 synthCount;
+    osc::int32 groupCount;
+    osc::int32 defCount;
     float avgCPU;
     float peakCPU;
 

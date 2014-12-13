@@ -57,8 +57,10 @@ else()
   add_library (libsupernova STATIC ${libsupernova_src})
 endif()
 
-set_property(TARGET libsupernova
-             PROPERTY OUTPUT_NAME supernova)
+if(NOT WIN32)
+  set_property(TARGET libsupernova
+               PROPERTY OUTPUT_NAME supernova)
+endif()
 
 target_link_libraries(libsupernova oscpack tlsf ${PTHREADS_LIBRARIES})
 
@@ -155,7 +157,7 @@ elseif(WIN32)
 	install(TARGETS supernova
         DESTINATION "SuperCollider"
         PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-else()
+elseif(NOT APPLE)
   install(TARGETS supernova
           DESTINATION "bin"
           PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)

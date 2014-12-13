@@ -73,8 +73,8 @@ set(scsynth_sources
 
 if(APPLE)
 	set_property(SOURCE ${CMAKE_SOURCE_DIR}/common/SC_DirUtils.cpp PROPERTY COMPILE_FLAGS -xobjective-c++)
-	
-	list(APPEND scsynth_sources 
+
+	list(APPEND scsynth_sources
 		${CMAKE_SOURCE_DIR}/common/SC_Apple.mm
 	)
 	set_source_files_properties( ${CMAKE_SOURCE_DIR}/common/SC_Apple.mm
@@ -112,20 +112,27 @@ endif()
 
 set (FINAL_BUILD 0) # disable final build for scsynth
 
-if (LIBSCSYNTH)
+if(LIBSCSYNTH)
 	set (LIBSCSYNTH_TYPE SHARED)
 else()
 	set (LIBSCSYNTH_TYPE STATIC)
 endif()
 
+file(GLOB_RECURSE all_headers ./*.h*)
+
 if (FINAL_BUILD)
-	CREATE_FINAL_FILE(libscsynth_final.cpp ${scsynth_sources})
+	CREATE_FINAL_FILE(libscsynth_final.cpp ${scsynth_sources} ${all_headers})
 	add_library(libscsynth ${LIBSCSYNTH_TYPE} libscsynth_final.cpp)
 else()
-	add_library(libscsynth ${LIBSCSYNTH_TYPE} ${scsynth_sources})
+	add_library(libscsynth ${LIBSCSYNTH_TYPE} ${scsynth_sources} ${all_headers})
 endif()
 
-target_compile_definitions(libscsynth PRIVATE BUILDING_SUPERCOLLIDER)
+
+if(LIBSCSYNTH)
+        target_compile_definitions(libscsynth PRIVATE   BUILDING_SCSYNTH)
+        target_compile_definitions(libscsynth INTERFACE BUILDING_SCSYNTH)
+endif()
+
 target_compile_definitions(libscsynth PUBLIC  SC_MEMORY_ALIGNMENT=32)
 
 target_link_libraries(libscsynth tlsf)
@@ -183,8 +190,9 @@ if (WIN32)
 	target_link_libraries(libscsynth wsock32 ws2_32 winmm)
 endif()
 
-
-set_property(TARGET libscsynth PROPERTY OUTPUT_NAME scsynth)
+if(NOT WIN32)
+  set_property(TARGET libscsynth PROPERTY OUTPUT_NAME scsynth)
+endif()
 
 if (LIBSCSYNTH)
 	# These two properties are ABI version info, not sc version:
@@ -205,9 +213,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
 	target_link_libraries(libscsynth rt)
 endif()
 
-file(GLOB_RECURSE all_headers ../../*hpp)
-
-add_executable(scsynth scsynth_main.cpp ${all_headers})
+add_executable(scsynth scsynth_main.cpp)
 target_link_libraries(scsynth libscsynth)
 
 if (PTHREADS_FOUND)
