@@ -14,10 +14,6 @@ if(NOT Boost_FOUND) # we compile boost ourselves
 		message(SEND_ERROR "we need to implement boost_thread")
 	endif()
 
-	aux_source_directory(boost/libs/system/src/ boost_system )
-	add_library(boost_system STATIC EXCLUDE_FROM_ALL ${boost_system})
-	target_include_directories(boost_system PUBLIC boost)
-
 	aux_source_directory(boost/libs/program_options/src/ boost_program_options )
 	add_library(boost_program_options STATIC EXCLUDE_FROM_ALL ${boost_program_options})
 	target_include_directories(boost_program_options PUBLIC boost)
@@ -27,16 +23,15 @@ if(NOT Boost_FOUND) # we compile boost ourselves
 	target_include_directories(boost_filesystem PUBLIC boost)
 
 	if(LTO)
-		set_property(TARGET boost_program_options boost_system boost_filesystem
+		set_property(TARGET boost_program_options boost_filesystem
 					 APPEND PROPERTY COMPILE_FLAGS "-flto -flto-report")
 
-		set_property(TARGET boost_program_options boost_system boost_filesystem
+		set_property(TARGET boost_program_options boost_filesystem
 					 APPEND PROPERTY LINK_FLAGS "-flto -flto-report")
 	endif()
 
 	# still required by threadpool
 	add_library(boost_thread STATIC EXCLUDE_FROM_ALL ${boost_thread_src} ${boost_thread_platform})
-	target_link_libraries(boost_thread boost_system)
 #	target_compile_definitions(boost_thread PUBLIC BOOST_THREAD_DONT_PROVIDE_INTERRUPTIONS)
 	target_include_directories(boost_thread PUBLIC boost)
 
@@ -98,7 +93,7 @@ if(NOT YAMLCPP_FOUND)
 endif()
 
 
-set_property( TARGET oscpack tlsf boost_thread boost_program_options boost_system boost_filesystem PROPERTY FOLDER 3rdparty )
+set_property( TARGET oscpack tlsf boost_thread boost_program_options boost_filesystem PROPERTY FOLDER 3rdparty )
 
 
 ##### HID_API #######
