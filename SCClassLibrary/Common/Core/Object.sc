@@ -33,6 +33,7 @@ Object  {
 	gcDumpSet { arg set; _GCDumpSet }
 	gcInfo { _GCInfo }
 	gcSanity { _GCSanity }
+	gcFullCollection { _GCFullCollection }
 	canCallOS { _CanCallOS }
 
 

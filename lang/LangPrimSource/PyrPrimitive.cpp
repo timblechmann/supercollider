@@ -1992,6 +1992,12 @@ int prGCSanity(struct VMGlobals *g, int numArgsPushed)
 	return errNone;
 }
 
+static int prGCFullCollection(struct VMGlobals *g, int numArgsPushed)
+{
+	g->gc->FullCollection();
+	return errNone;
+}
+
 #if GCDEBUG
 int prTraceAllPathsTo(struct VMGlobals *g, int numArgsPushed);
 int prTraceAllPathsTo(struct VMGlobals *g, int numArgsPushed)
@@ -4076,6 +4082,8 @@ void initPrimitives()
 	definePrimitive(base, index++, "_GCDumpGrey", dumpGCdumpGrey, 1, 0);
 	definePrimitive(base, index++, "_GCDumpSet", dumpGCdumpSet, 2, 0);
 	definePrimitive(base, index++, "_GCSanity", prGCSanity, 1, 0);
+	definePrimitive(base, index++, "_GCFullCollection", prGCFullCollection, 1, 0);
+
 #if GCDEBUG
 	definePrimitive(base, index++, "_TraceAllPathsTo", prTraceAllPathsTo, 1, 0);
 	definePrimitive(base, index++, "_TraceAnyPathsTo", prTraceAnyPathsTo, 1, 0);

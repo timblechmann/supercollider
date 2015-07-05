@@ -664,7 +664,7 @@ void PyrGC::Flip()
 
 void PyrGC::FullCollection()
 {
-	Collect(100000000);	// collect space
+	Collect(std::numeric_limits<int32>::max());	// collect space
 	SweepBigObjects();
 }
 
