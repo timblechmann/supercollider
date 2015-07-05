@@ -10,9 +10,14 @@ find_package(Qt5LinguistTools)
 find_package(Qt5WebKitWidgets)
 find_package(Qt5OpenGL)
 find_package(Qt5PrintSupport)
+find_package(Qt5Sensors)
+find_package(Qt5Quick)
+find_package(Qt5Qml)
+find_package(Qt5Sql)
+find_package(Qt5Positioning)
 
-set(QT_IDE_LIBRARIES
-    Qt5::Core Qt5::WebKitWidgets Qt5::OpenGL Qt5::PrintSupport)
+set(QT_IDE_LIBRARIES 
+    Qt5::Core Qt5::WebKitWidgets Qt5::OpenGL Qt5::PrintSupport Qt5::Sensors Qt5::Quick Qt5::Qml Qt5::Sql Qt5::Positioning)
 
 if(${CMAKE_COMPILER_IS_GNUCXX})
     add_definitions(-Wreorder)
