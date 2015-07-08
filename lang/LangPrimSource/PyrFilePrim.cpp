@@ -1271,7 +1271,7 @@ int prPipeOpen(struct VMGlobals *g, int numArgsPushed)
 	if (slotRawObject(c)->size > 11) return errFailed;
 	pfile = (PyrFile*)slotRawObject(a);
 
-        char *commandLine = (char*)malloc(slotRawObject(b)->size + 1);
+	char *commandLine = (char*)malloc(slotRawObject(b)->size + 1);
 	memcpy(commandLine, slotRawString(b)->s, slotRawObject(b)->size);
 	commandLine[slotRawString(b)->size] = 0;
 
@@ -1478,6 +1478,8 @@ int prSFOpenRead(struct VMGlobals *g, int numArgsPushed)
 		//headerFormatToString(&info, &headerstr);
 		PyrString *hpstr = newPyrString(g->gc, headerstr, 0, true);
 		SetObject(slotRawObject(a)->slots+1, hpstr);
+		g->gc->GCWrite( a, hpstr );
+
 		PyrString *smpstr = newPyrString(g->gc, sampleformatstr, 0, true);
 		SetObject(slotRawObject(a)->slots+2, smpstr);
 		SetInt(slotRawObject(a)->slots + 3, info.frames);
