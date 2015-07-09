@@ -1478,7 +1478,6 @@ int prSFOpenRead(struct VMGlobals *g, int numArgsPushed)
 		//headerFormatToString(&info, &headerstr);
 		PyrString *hpstr = newPyrString(g->gc, headerstr, 0, true);
 		SetObject(slotRawObject(a)->slots+1, hpstr);
-		g->gc->GCWrite( a, hpstr );
 
 		PyrString *smpstr = newPyrString(g->gc, sampleformatstr, 0, true);
 		SetObject(slotRawObject(a)->slots+2, smpstr);
