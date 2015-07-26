@@ -135,7 +135,7 @@ else()
     target_link_libraries(libsupernova boost_system boost_filesystem boost_program_options boost_thread)
 endif()
 
-if( ${CMAKE_COMPILER_IS_GNUCXX} )
+if( CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG )
     target_compile_options( libsupernova PUBLIC -std=c++1y )
 endif()
 
