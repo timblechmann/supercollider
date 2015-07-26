@@ -135,6 +135,9 @@ else()
     target_link_libraries(libsupernova boost_system boost_filesystem boost_program_options boost_thread)
 endif()
 
+if( ${CMAKE_COMPILER_IS_GNUCXX} )
+    target_compile_options( libsupernova PUBLIC -std=c++1y )
+endif()
 
 if(WIN32)
     target_link_libraries(libsupernova wsock32 ws2_32 winmm)
