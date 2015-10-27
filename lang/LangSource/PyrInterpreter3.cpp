@@ -2703,7 +2703,7 @@ void DumpSimpleBackTrace(VMGlobals *g)
 
 	for (i=0; i<16; ++i) {
 		char str[256];
-		slotOneWord(&frame->method, str);
+		slotOneWord(&frame->method, str, 256);
 		post("%s ip %d\n", str, (char*)slotRawPtr(&frame->ip) - (char*)slotRawObject(&slotRawMethod(&frame->method)->code)->slots);
 		frame = slotRawFrame(&frame->caller);
 		if (!frame) break;
@@ -2771,7 +2771,7 @@ void DumpStack(VMGlobals *g, PyrSlot *sp)
 	slot = sp - 64;
 	if (slot < g->gc->Stack()->slots) slot = g->gc->Stack()->slots;
 	for (size_t i=slot - g->gc->Stack()->slots; slot<=sp; slot++, ++i) {
-		slotString(slot, str);
+		slotString(slot, str, 128);
 		post("   %2d  %s\n", i, str);
 	}
 }

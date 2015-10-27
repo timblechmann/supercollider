@@ -361,17 +361,15 @@ int prDebugger(struct VMGlobals *g, int numArgsPushed)
 
 int prObjectString(struct VMGlobals *g, int numArgsPushed)
 {
-	PyrSlot *a;
-	PyrString *string;
 	char str[256];
 
-	a = g->sp;
+	PyrSlot * a = g->sp;
 	if (IsSym(a)) {
-		string = newPyrString(g->gc, slotRawSymbol(a)->name, 0, true);
+		PyrString * string = newPyrString(g->gc, slotRawSymbol(a)->name, 0, true);
 		SetObject(a, string);
 		return errNone;
-	} else if (postString(a, str)) {
-		string = newPyrString(g->gc, str, 0, true);
+	} else if (postString(a, str, 256)) {
+		PyrString * string = newPyrString(g->gc, str, 0, true);
 		SetObject(a, string);
 		return errNone;
 	} else {
@@ -399,14 +397,11 @@ int prFloat_AsStringPrec(struct VMGlobals *g, int numArgsPushed)
 
 }
 
-int prAsCompileString(struct VMGlobals *g, int numArgsPushed);
 int prAsCompileString(struct VMGlobals *g, int numArgsPushed)
 {
-	PyrSlot *a;
-	PyrString *string;
-	int err = errNone;
+	PyrString *string = nullptr;
+	PyrSlot * a = g->sp;
 
-	a = g->sp;
 	if (IsSym(a)) {
 		int len = strlen(slotRawSymbol(a)->name) + 1;
 		if (len < 255) {
@@ -419,14 +414,31 @@ int prAsCompileString(struct VMGlobals *g, int numArgsPushed)
 			string = newPyrString(g->gc, str, 0, true);
 			free(str);
 		}
+	} else if (IsObj(a)) {
+		return errFailed;
 	} else {
 		char str[256];
-		err = asCompileString(a, str);
-		if (err) return err;
-		string = newPyrString(g->gc, str, 0, true);
+		int status = asCompileString(a, str, 256);
+		if( status < 0 )
+			return errFailed;
+		if( status < 256) {
+			string = newPyrString(g->gc, str, 0, true);
+		} else {
+			for( int size : {1024, 2048, 4096, 8192} ) {
+				char * heapString = (char*)malloc(size);
+				status = asCompileString(a, heapString, size);
+				if( status != size )
+					string = newPyrString(g->gc, heapString, 0, true);
+				free(heapString);
+				if( string )
+					break;
+			}
+			if( !string )
+				return errFailed;
+		}
 	}
 	SetObject(a, string);
-	return err;
+	return errNone;
 }
 
 

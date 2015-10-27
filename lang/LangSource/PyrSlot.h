@@ -47,11 +47,11 @@ extern PyrSymbol *s_this; // "this"
 extern PyrSymbol *s_super; // "super"
 
 void dumpPyrSlot(PyrSlot* slot);
-void slotString(PyrSlot *slot, char *str);
-void slotOneWord(PyrSlot *slot, char *str);
-bool postString(PyrSlot *slot, char *str);
+int slotString(PyrSlot *slot, char *str, size_t size);
+int slotOneWord(PyrSlot *slot, char *str, size_t size);
+int postString(PyrSlot *slot, char *str, size_t size);
 const char *slotSymString(PyrSlot* slot);
-int asCompileString(PyrSlot *slot, char *str);
+int asCompileString(PyrSlot *slot, char *str, size_t size);
 
 int slotIntVal(PyrSlot* slot, int *value);
 int slotFloatVal(PyrSlot* slot, float *value);

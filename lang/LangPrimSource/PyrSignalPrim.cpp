@@ -90,7 +90,7 @@ int prSignalString(struct VMGlobals *g, int numArgsPushed)
 	char str[128];
 
 	a = g->sp;
-	slotString(a, str);
+	slotString(a, str, 128);
 
 	signal = slotRawObject(a);
 	if (signal->size) {

@@ -120,7 +120,7 @@ unsigned char* dumpOneByteCode(PyrBlock *theBlock, PyrClass* theClass, unsigned 
 			op2 = *ip++; // get literal index
 			// push a block if it is one
 			slot = slotRawObject(&theBlock->selectors)->slots + op2;
-			slotString(slot, str);
+			slotString(slot, str, 256);
 			post(" %02X    PushLiteralX %s\n", op2, str);
 			break;
 		case 5 : // Extended, PushClassVar
@@ -249,7 +249,7 @@ unsigned char* dumpOneByteCode(PyrBlock *theBlock, PyrClass* theClass, unsigned 
 			op5 = *ip++;
 			ival = op5;
 			slot = slotRawObject(&theBlock->constants)->slots + ival;
-			slotString(slot, str);
+			slotString(slot, str, 256);
 			post(" %02X    PushConstant %s\n", op5, str);
 			break;
 
@@ -258,7 +258,7 @@ unsigned char* dumpOneByteCode(PyrBlock *theBlock, PyrClass* theClass, unsigned 
 			op5 = *ip++;
 			ival = (op4 << 8) | op5;
 			slot = slotRawObject(&theBlock->constants)->slots + ival;
-			slotString(slot, str);
+			slotString(slot, str, 256);
 			post(" %02X %02X PushConstant %s\n", op4, op5, str);
 			break;
 
@@ -268,7 +268,7 @@ unsigned char* dumpOneByteCode(PyrBlock *theBlock, PyrClass* theClass, unsigned 
 			op5 = *ip++;
 			ival = (op3 << 16) | (op4 << 8) | op5;
 			slot = slotRawObject(&theBlock->constants)->slots + ival;
-			slotString(slot, str);
+			slotString(slot, str, 256);
 			post(" %02X %02X %02X PushConstant %s\n", op3, op4, op5, str);
 			break;
 
@@ -279,7 +279,7 @@ unsigned char* dumpOneByteCode(PyrBlock *theBlock, PyrClass* theClass, unsigned 
 			op5 = *ip++;
 			ival = (op2 << 24) | (op3 << 16) | (op4 << 8) | op5;
 			slot = slotRawObject(&theBlock->constants)->slots + ival;
-			slotString(slot, str);
+			slotString(slot, str, 256);
 			post(" %02X %02X %02X %02X PushConstant %s\n", op2, op3, op4, op5, str);
 			break;
 
@@ -339,7 +339,7 @@ unsigned char* dumpOneByteCode(PyrBlock *theBlock, PyrClass* theClass, unsigned 
 		case 76 :	case 77 :	case 78 :	case 79 :
 			op2 = op1 & 15; // get temp var level
 			slot = slotRawObject(&theBlock->constants)->slots + op2;
-			slotString(slot, str);
+			slotString(slot, str, 256);
 			post("       PushLiteral %s\n", str);
 			break;
 

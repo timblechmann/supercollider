@@ -1919,7 +1919,7 @@ void dumpObject(PyrObject *obj)
 	if (obj->obj_format == obj_notindexed) {
 		post("  instance variables [%d]\n", obj->size);
 		for (i=0; i<obj->size; ++i) {
-			slotString(obj->slots + i, str);
+			slotString(obj->slots + i, str, 256);
 			post("    %s : %s\n", slotRawSymbolArray(&classobj->instVarNames)->symbols[i]->name, str);
 		}
 	} else {
@@ -1929,7 +1929,7 @@ void dumpObject(PyrObject *obj)
 		switch (obj->obj_format) {
 			case obj_slot :
 				for (i=0; i<maxsize; ++i) {
-					slotString(obj->slots + i, str);
+					slotString(obj->slots + i, str, 256);
 					post("    %3d : %s\n", i, str);
 				}
 				break;
@@ -2012,7 +2012,7 @@ void dumpBadObject(PyrObject *obj)
 	if (obj->obj_format == obj_notindexed) {
 		postfl("  instance variables [%d]\n", obj->size);
 		for (i=0; i<obj->size; ++i) {
-			slotString(obj->slots + i, str);
+			slotString(obj->slots + i, str, 128);
 			postfl("    %s : %s\n", slotRawSymbolArray(&classobj->instVarNames)->symbols[i]->name, str);
 		}
 	} else {
@@ -2023,7 +2023,7 @@ void dumpBadObject(PyrObject *obj)
 		switch (obj->obj_format) {
 			case obj_slot :
 				for (i=0; i<maxsize; ++i) {
-					slotString(obj->slots + i, str);
+					slotString(obj->slots + i, str, 128);
 					postfl("    %3d : %s\n", i, str);
 				}
 				break;
@@ -2096,7 +2096,7 @@ void dumpObjectSlot(PyrSlot *slot)
 void dumpSlotOneWord(const char *tagstr, PyrSlot *slot)
 {
 	char str[256];
-	slotOneWord(slot, str);
+	slotOneWord(slot, str, 256);
 	post("%s %s\n", tagstr, str);
 }
 
@@ -2172,7 +2172,7 @@ void DumpFrame(PyrFrame *frame)
 		post("FRAME CORRUPTED\n");
 		return;
 	}
-	slotOneWord(&frame->method, str);
+	slotOneWord(&frame->method, str, 256);
 	//slotString(&frame->method, str);
 
 	meth = slotRawMethod(&frame->method);
@@ -2181,7 +2181,7 @@ void DumpFrame(PyrFrame *frame)
 		post("\t%s   %p\n", str, frame);
 		numargs = methraw->numargs + methraw->varargs;
 		for (i=0; i<methraw->numtemps; ++i) {
-			slotOneWord(frame->vars + i, str);
+			slotOneWord(frame->vars + i, str, 256);
 			//slotString(frame->vars + i, str);
 			if (i < numargs) {
 				post("\t\targ %s = %s\n", slotRawSymbolArray(&meth->argNames)->symbols[i]->name, str);
@@ -2209,7 +2209,7 @@ void DumpDetailedFrame(PyrFrame *frame)
 		post("FRAME CORRUPTED\n");
 		return;
 	}
-	slotOneWord(&frame->method, mstr);
+	slotOneWord(&frame->method, mstr, 256);
 	//slotString(&frame->method, str);
 
 	meth = slotRawMethod(&frame->method);
@@ -2219,7 +2219,7 @@ void DumpDetailedFrame(PyrFrame *frame)
 		post("\t%s\n", mstr);
 		numargs = methraw->numargs + methraw->varargs;
 		for (i=0; i<methraw->numtemps; ++i) {
-			slotOneWord(frame->vars + i, str);
+			slotOneWord(frame->vars + i, str, 256);
 			//slotString(frame->vars + i, str);
 			if (i < numargs) {
 				post("\t\targ %s = %s\n", slotRawSymbolArray(&meth->argNames)->symbols[i]->name, str);
@@ -2236,11 +2236,11 @@ void DumpDetailedFrame(PyrFrame *frame)
 	post("\t\tnumtemps  = %d\n", methraw->numtemps);
 	post("\t\tpopSize  = %d\n", methraw->popSize);
 
-	slotString(&frame->method, str);		post("\t\tmethod  = %s\n", str);
-	slotString(&frame->caller, str);		post("\t\tcaller  = %s\n", str);
-	slotString(&frame->context, str);		post("\t\tcontext = %s\n", str);
-	slotString(&frame->homeContext, str);	post("\t\thomeCtx = %s\n", str);
-	slotString(&frame->ip, str);			post("\t\tip      = %s\n", str);
+	slotString(&frame->method, str, 256);		post("\t\tmethod  = %s\n", str);
+	slotString(&frame->caller, str, 256);		post("\t\tcaller  = %s\n", str);
+	slotString(&frame->context, str, 256);		post("\t\tcontext = %s\n", str);
+	slotString(&frame->homeContext, str, 256);	post("\t\thomeCtx = %s\n", str);
+	slotString(&frame->ip, str, 256);			post("\t\tip      = %s\n", str);
 
 	if (IsPtr(&frame->ip)) {
 		post("ipoffset = %d\n", (char*)slotRawPtr(&frame->ip) - (char*)slotRawInt8Array(&meth->code)->b);
