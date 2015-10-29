@@ -402,19 +402,7 @@ int prAsCompileString(struct VMGlobals *g, int numArgsPushed)
 	PyrString *string = nullptr;
 	PyrSlot * a = g->sp;
 
-	if (IsSym(a)) {
-		int len = strlen(slotRawSymbol(a)->name) + 1;
-		if (len < 255) {
-			char str[256];
-			sprintf(str, "'%s'", slotRawSymbol(a)->name);
-			string = newPyrString(g->gc, str, 0, true);
-		} else {
-			char *str = (char*)malloc(len+2);
-			sprintf(str, "'%s'", slotRawSymbol(a)->name);
-			string = newPyrString(g->gc, str, 0, true);
-			free(str);
-		}
-	} else if (IsObj(a)) {
+	if (IsObj(a)) {
 		return errFailed;
 	} else {
 		char str[256];

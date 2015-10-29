@@ -655,7 +655,7 @@ int asCompileString(PyrSlot *slot, char *str, size_t size)
 	switch (GetTag(slot)) {
 	case tagInt   : printed = printSlotInt<intRaw>(slot, str, size); break;
 	case tagChar  : printed = printSlotChar<charCompileString>( slot, str, size); break;
-	case tagSym :
+	case tagSym   : printed = printSlotSymbol<symbolCompileString>( slot, str, size); break;
 	case tagObj :
 		return errFailed;
 	case tagNil   : printed = printSlotNil(str, size);   break;

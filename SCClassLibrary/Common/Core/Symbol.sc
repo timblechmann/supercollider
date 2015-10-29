@@ -14,7 +14,6 @@ Symbol {
 	ascii { ^this.asString.ascii }
 
 	// the primitive fails to escape '
-	asCompileString { ^("'" ++ super.asString.escapeChar($') ++ "'") }
 	asClass {
 		_SymbolClass
 		// if Symbol represents a class name then return the class, else return nil.
