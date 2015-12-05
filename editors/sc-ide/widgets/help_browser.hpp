@@ -165,9 +165,10 @@ public:
     HelpBrowser *browser() { return mHelpBrowser; }
 
 private slots:
-    void onInterpreterStart() {
-        if (isVisible() && mHelpBrowser->url().isEmpty())
-            mHelpBrowser->goHome();
+    void onInterpreterStart()
+    {
+//        if (dockWidget()->isVisible() && mHelpBrowser->url().isEmpty())
+//            mHelpBrowser->goHome();
     }
 
 private:
