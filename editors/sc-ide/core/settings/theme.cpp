@@ -146,7 +146,7 @@ void Theme::fillDefault()
 
 void Theme::fillDark()
 {
-    addToTheme(mFormats, "text",               QColor("#ffa4e2"), Qt::black);
+    addToTheme(mFormats, "text",               QColor("#ffffff"), Qt::black);
     addToTheme(mFormats, "currentLine",        QColor("#e4e4e4"), QColor("#393939"));
     addToTheme(mFormats, "searchResult",       QColor("#e4e4e4"), QColor("#194c7f"));
     addToTheme(mFormats, "matchingBrackets",   QColor("#ff5500"), QColor("#001d49"), true);
