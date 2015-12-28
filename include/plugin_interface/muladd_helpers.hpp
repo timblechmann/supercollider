@@ -214,7 +214,7 @@ struct muladd_helper_mul_c_add_c
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * factor + offset;
+		return madd(sample, factor, offset);
 	}
 
 	sample_type factor, offset;
@@ -239,7 +239,7 @@ struct muladd_helper_mul_c_add_l
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * factor + slope_vec(offset, offset_slope);
+		return madd(sample, factor, slope_vec(offset, offset_slope));
 	}
 
 	sample_type factor, offset, offset_slope;
@@ -262,7 +262,7 @@ struct muladd_helper_mul_c_add_v
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * vec(factor) + signal_vec(offsets);
+		return madd(sample, vec(factor), signal_vec(offsets));
 	}
 
 	sample_type factor;
@@ -290,7 +290,7 @@ struct muladd_helper_mul_l_add_c
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * slope_vec(factor, factor_slope) + offset;
+		return madd(sample, slope_vec(factor, factor_slope), offset);
 	}
 
 	sample_type factor, factor_slope, offset;
@@ -316,7 +316,7 @@ struct muladd_helper_mul_l_add_l
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * slope_vec(factor, factor_slope) + slope_vec(offset, offset_slope);
+		return madd( sample, slope_vec(factor, factor_slope), slope_vec(offset, offset_slope) );
 	}
 
 	sample_type factor, factor_slope, offset, offset_slope;
@@ -342,7 +342,7 @@ struct muladd_helper_mul_l_add_v
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * slope_vec(factor, factor_slope) + signal_vec(offsets);
+		return madd(sample, slope_vec(factor, factor_slope), signal_vec(offsets));
 	}
 
 	sample_type factor, factor_slope;
@@ -368,7 +368,7 @@ struct muladd_helper_mul_v_add_c
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * signal_vec(factors) + offset;
+		return madd(sample, signal_vec(factors), offset);
 	}
 
 	const sample_type * factors;
@@ -394,7 +394,7 @@ struct muladd_helper_mul_v_add_l
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * signal_vec(factors) + slope_vec(offset, offset_slope);
+		return madd(sample, signal_vec(factors), slope_vec(offset, offset_slope));
 	}
 
 	const sample_type * factors;
@@ -419,7 +419,7 @@ struct muladd_helper_mul_v_add_v
 	typedef nova::vec<sample_type> vec;
 	vec operator()(vec sample)
 	{
-		return sample * signal_vec(factors) + signal_vec(offsets);
+		return madd(sample, signal_vec(factors), signal_vec(offsets));
 	}
 
 	const sample_type * factors;
