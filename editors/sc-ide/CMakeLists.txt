@@ -334,21 +334,27 @@ if(APPLE)
 
     include(InstallRequiredSystemLibraries)
 
-    include(DeployQt5)
-    install_qt5_executable("${scappbundlename}/${scappbundlename}.app" "" "" "${CMAKE_BINARY_DIR}/lang/sclang;${CMAKE_BINARY_DIR}/server/scsynth;${CMAKE_BINARY_DIR}/external_libraries")
-
-    # install Qt plugins (adapted from kvirc)
-    set(plugin_dest_dir ${CMAKE_INSTALL_PREFIX}/SuperCollider/SuperCollider.app/Contents/Plugins)
     set(QT_PLUGINS_DIR "${Qt5Widgets_DIR}/../../../plugins")
-    install(DIRECTORY "${QT_PLUGINS_DIR}/" DESTINATION ${plugin_dest_dir} COMPONENT Runtime
-                       FILES_MATCHING REGEX "(platforms)/[^_]*\\.dylib")
+    set(DebugGenex "$<$<CONFIG:DEBUG>:_debug>" )
+
+    # deploy qt plugins
+    add_custom_command( TARGET SuperCollider POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:SuperCollider>/../PlugIns/platforms/ )
+
+    add_custom_command( TARGET SuperCollider POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:SuperCollider>/../PlugIns/imageformats/ )
+
+    add_custom_command( TARGET SuperCollider POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${QT_PLUGINS_DIR}/platforms/libqcocoa${DebugGenex}.dylib $<TARGET_FILE_DIR:SuperCollider>/../PlugIns/platforms/ )
+
+    foreach( format icns ico jp2 jpeg mng svg tga tiff wbmp webp )
+      add_custom_command( TARGET SuperCollider POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${QT_PLUGINS_DIR}/imageformats/libq${format}${DebugGenex}.dylib $<TARGET_FILE_DIR:SuperCollider>/../PlugIns/imageformats/ )
+    endforeach()
 
     install(CODE "
-           file(GLOB_RECURSE QTPLUGINS
-                  \"${plugin_dest_dir}/*.dylib\")
                 include(BundleUtilities)
                 fixup_bundle(\"${CMAKE_INSTALL_PREFIX}/SuperCollider/SuperCollider.app\" \"\${QTPLUGINS}\" \"${QT_LIBRARY_DIR}\")
-                #fixup_qt5_executable(\"${CMAKE_INSTALL_PREFIX}/SuperCollider/SuperCollider.app\")
                 " COMPONENT Runtime)
 
 elseif(WIN32)
