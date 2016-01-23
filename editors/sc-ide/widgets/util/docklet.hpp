@@ -53,7 +53,6 @@ public:
     QMenu *optionsMenu () { return mOptionsMenu; }
 
 protected:
-    virtual void paintEvent( QPaintEvent *event );
     QMenu *mOptionsMenu;
 };
 
