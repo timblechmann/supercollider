@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <cstdio>
 #include "function_attributes.h"
+#include "muladd_helpers.hpp"
 
 static InterfaceTable *ft;
 
@@ -40,25 +41,25 @@ struct LFPulse : public Unit
 	float mFreqMul, mDuty;
 };
 
-struct LFSaw : public Unit
+struct LFSaw : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
 };
 
-struct LFPar : public Unit
+struct LFPar : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
 };
 
-struct LFCub : public Unit
+struct LFCub : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
 };
 
-struct LFTri : public Unit
+struct LFTri : public muladd_ugen
 {
 	double mPhase;
 	float mFreqMul;
@@ -108,7 +109,7 @@ struct Cutoff : public Unit
 	int mWaitCounter;
 };
 
-struct LinExp : public Unit
+struct LinExp : public muladd_ugen
 {
 	float m_dstratio, m_rsrcrange, m_rrminuslo, m_dstlo;
 };
@@ -207,20 +208,9 @@ extern "C"
 	void LFPulse_next_k(LFPulse *unit, int inNumSamples);
 	void LFPulse_Ctor(LFPulse* unit);
 
-	void LFSaw_next_a(LFSaw *unit, int inNumSamples);
-	void LFSaw_next_k(LFSaw *unit, int inNumSamples);
 	void LFSaw_Ctor(LFSaw* unit);
-
-	void LFTri_next_a(LFTri *unit, int inNumSamples);
-	void LFTri_next_k(LFTri *unit, int inNumSamples);
 	void LFTri_Ctor(LFTri* unit);
-
-	void LFPar_next_a(LFPar *unit, int inNumSamples);
-	void LFPar_next_k(LFPar *unit, int inNumSamples);
 	void LFPar_Ctor(LFPar* unit);
-
-	void LFCub_next_a(LFCub *unit, int inNumSamples);
-	void LFCub_next_k(LFCub *unit, int inNumSamples);
 	void LFCub_Ctor(LFCub* unit);
 
 	void LFGauss_next_a(LFGauss *unit, int inNumSamples);
@@ -517,7 +507,8 @@ void LFPulse_Ctor(LFPulse* unit)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFSaw_next_a(LFSaw *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFSaw_next_a(LFSaw *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -529,13 +520,14 @@ void LFSaw_next_a(LFSaw *unit, int inNumSamples)
 		phase += ZXP(freq) * freqmul;
 		if (phase >= 1.f) phase -= 2.f;
 		else if (phase <= -1.f) phase += 2.f;
-		ZXP(out) = z;
+		ZXP(out) = ma(z);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFSaw_next_k(LFSaw *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFSaw_next_k(LFSaw *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -543,13 +535,13 @@ void LFSaw_next_k(LFSaw *unit, int inNumSamples)
 	double phase = unit->mPhase;
 	if (freq >= 0.f) {
 		LOOP1(inNumSamples,
-			ZXP(out) = phase;
+			ZXP(out) = ma(phase);
 			phase += freq;
 			if (phase >= 1.f) phase -= 2.f;
 		);
 	} else {
 		LOOP1(inNumSamples,
-			ZXP(out) = phase;
+			ZXP(out) = ma(phase);
 			phase += freq;
 			if (phase <= -1.f) phase += 2.f;
 		);
@@ -558,23 +550,27 @@ void LFSaw_next_k(LFSaw *unit, int inNumSamples)
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFSaw, LFSaw_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFSaw, LFSaw_next_a, 2, a)
+
 void LFSaw_Ctor(LFSaw* unit)
 {
 	if (INRATE(0) == calc_FullRate)
-		SETCALC(LFSaw_next_a);
+		LFSaw_a_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LFSaw_next_k);
+		LFSaw_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 2.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1);
 
-	LFSaw_next_k(unit, 1);
+	LFSaw_k_Wrapper::run_1(unit);
 }
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFPar_next_a(LFPar *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFPar_next_a(LFPar *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -597,13 +593,14 @@ void LFPar_next_a(LFPar *unit, int inNumSamples)
 		// Note: the following two lines were originally one, but seems to compile wrong on mac
 		float phaseadd = ZXP(freq);
 		phase += phaseadd * freqmul;
-		ZXP(out) = y;
+		ZXP(out) = ma(y);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFPar_next_k(LFPar *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFPar_next_k(LFPar *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -612,14 +609,14 @@ void LFPar_next_k(LFPar *unit, int inNumSamples)
 	LOOP1(inNumSamples,
 		if (phase < 1.f) {
 			float z = phase;
-			ZXP(out) = 1.f - z*z;
+			ZXP(out) = ma(1.f - z*z);
 		} else if (phase < 3.f) {
 			float z = phase - 2.f;
-			ZXP(out) = z*z - 1.f;
+			ZXP(out) = ma(z*z - 1.f);
 		} else {
 			phase -= 4.f;
 			float z = phase;
-			ZXP(out) = 1.f - z*z;
+			ZXP(out) = ma(1.f - z*z);
 		}
 		phase += freq;
 	);
@@ -627,24 +624,26 @@ void LFPar_next_k(LFPar *unit, int inNumSamples)
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFPar, LFPar_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFPar, LFPar_next_a, 2, a)
+
 void LFPar_Ctor(LFPar* unit)
 {
 	if (INRATE(0) == calc_FullRate)
-		SETCALC(LFPar_next_a);
+		LFPar_a_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LFPar_next_k);
+		LFPar_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 4.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1);
 
-	LFPar_next_k(unit, 1);
+	LFPar_k_Wrapper::run_1(unit);
 }
-
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFCub_next_a(LFCub *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFCub_next_a(LFCub *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -663,13 +662,14 @@ void LFCub_next_a(LFCub *unit, int inNumSamples)
 		}
 		float phaseadd = ZXP(freq);
 		phase += phaseadd * freqmul;
-		ZXP(out) = z * z * (6.f - 4.f * z) - 1.f;
+		ZXP(out) = ma(z * z * (6.f - 4.f * z) - 1.f);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFCub_next_k(LFCub *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFCub_next_k(LFCub *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -685,31 +685,35 @@ void LFCub_next_k(LFCub *unit, int inNumSamples)
 			phase -= 2.f;
 			z = phase;
 		}
-		ZXP(out) = z * z * (6.f - 4.f * z) - 1.f;
+		ZXP(out) = ma(z * z * (6.f - 4.f * z) - 1.f);
 		phase += freq;
 	);
 
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFCub, LFCub_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFCub, LFCub_next_a, 2, a)
+
 void LFCub_Ctor(LFCub* unit)
 {
 	if (INRATE(0) == calc_FullRate)
-		SETCALC(LFCub_next_a);
+		LFCub_a_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LFCub_next_k);
+		LFCub_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 2.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1) + 0.5;
 
-	LFCub_next_k(unit, 1);
+	LFCub_k_Wrapper::run_1(unit);
 }
 
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-void LFTri_next_a(LFTri *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFTri_next_a(LFTri *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *freq = ZIN(0);
@@ -720,13 +724,14 @@ void LFTri_next_a(LFTri *unit, int inNumSamples)
 		float z = phase > 1.f ? 2.f - phase : phase;
 		phase += ZXP(freq) * freqmul;
 		if (phase >= 3.f) phase -= 4.f;
-		ZXP(out) = z;
+		ZXP(out) = ma(z);
 	);
 
 	unit->mPhase = phase;
 }
 
-void LFTri_next_k(LFTri *unit, int inNumSamples)
+template <typename MuladdHelper>
+static inline void LFTri_next_k(LFTri *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float freq = ZIN0(0) * unit->mFreqMul;
@@ -736,24 +741,26 @@ void LFTri_next_k(LFTri *unit, int inNumSamples)
 		float z = phase > 1.f ? 2.f - phase : phase;
 		phase += freq;
 		if (phase >= 3.f) phase -= 4.f;
-		ZXP(out) = z;
+		ZXP(out) = ma(z);
 	);
 
 	unit->mPhase = phase;
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFTri, LFTri_next_k, 2, k)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LFTri, LFTri_next_a, 2, a)
+
 void LFTri_Ctor(LFTri* unit)
 {
-	if (INRATE(0) == calc_FullRate) {
-		SETCALC(LFTri_next_a);
-	} else {
-		SETCALC(LFTri_next_k);
-	}
+	if (INRATE(0) == calc_FullRate)
+		LFTri_a_Wrapper::setCalcFunc(unit);
+	else
+		LFTri_k_Wrapper::setCalcFunc(unit);
 
 	unit->mFreqMul = 4.0 * unit->mRate->mSampleDur;
 	unit->mPhase = ZIN0(1);
 
-	LFTri_next_k(unit, 1);
+	LFTri_k_Wrapper::run_1(unit);
 }
 
 
@@ -2460,7 +2467,8 @@ void InRect_Ctor(InRect* unit)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-void LinExp_next(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2471,14 +2479,16 @@ void LinExp_next(LinExp *unit, int inNumSamples)
 	float rrminuslo = unit->m_rrminuslo;
 
 	LOOP1(inNumSamples,
-		ZXP(out) = dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
 #ifdef NOVA_SIMD
+template <typename MuladdHelper>
 static inline void LinExp_next_nova_loop(float * out, const float * in, int inNumSamples,
 										 nova::vec<float> dstlo, nova::vec<float> dstratio,
-										 nova::vec<float> rsrcrange, nova::vec<float> rrminuslo)
+										 nova::vec<float> rsrcrange, nova::vec<float> rrminuslo,
+										 MuladdHelper & ma)
 {
 	const int vecSize = nova::vec<float>::size;
 	int unroll = inNumSamples / (2*vecSize);
@@ -2489,8 +2499,8 @@ static inline void LinExp_next_nova_loop(float * out, const float * in, int inNu
 		val0.load_aligned(in);
 		val1.load_aligned(in + vecSize);
 
-		val0 = dstlo * pow(dstratio, val0 * rsrcrange + rrminuslo);
-		val1 = dstlo * pow(dstratio, val1 * rsrcrange + rrminuslo);
+		val0 = ma(dstlo * pow(dstratio, val0 * rsrcrange + rrminuslo));
+		val1 = ma(dstlo * pow(dstratio, val1 * rsrcrange + rrminuslo));
 
 		val0.store_aligned(out);
 		val1.store_aligned(out + vecSize);
@@ -2500,15 +2510,18 @@ static inline void LinExp_next_nova_loop(float * out, const float * in, int inNu
 	} while (--unroll);
 }
 
-FLATTEN static void LinExp_next_nova(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline FLATTEN static void LinExp_next_nova(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = OUT(0);
 	float *in   = IN(0);
 
-	LinExp_next_nova_loop(out, in, inNumSamples, unit->m_dstlo, unit->m_dstratio, unit->m_rsrcrange, unit->m_rrminuslo);
+	LinExp_next_nova_loop(out, in, inNumSamples, unit->m_dstlo, unit->m_dstratio, unit->m_rsrcrange, unit->m_rrminuslo, ma);
 }
 
-FLATTEN static void LinExp_next_nova_kk(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline
+FLATTEN static void LinExp_next_nova_kk(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = OUT(0);
 	float *in  = IN(0);
@@ -2521,12 +2534,13 @@ FLATTEN static void LinExp_next_nova_kk(LinExp *unit, int inNumSamples)
 	float rsrcrange = sc_reciprocal(srchi - srclo);
 	float rrminuslo = rsrcrange * -srclo;
 
-	LinExp_next_nova_loop(out, in, inNumSamples, dstlo, dstratio, rsrcrange, rrminuslo);
+	LinExp_next_nova_loop(out, in, inNumSamples, dstlo, dstratio, rsrcrange, rrminuslo, ma);
 }
 
 #endif
 
-void LinExp_next_kk(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_kk(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2539,11 +2553,28 @@ void LinExp_next_kk(LinExp *unit, int inNumSamples)
 	float rrminuslo = rsrcrange * -srclo;
 
 	LOOP1(inNumSamples,
-		ZXP(out) = dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
-void LinExp_next_aa(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_1(LinExp *unit, int inNumSamples, MuladdHelper & ma)
+{
+	float *out = ZOUT(0);
+	float *in   = ZIN(0);
+	float srclo = ZIN0(1);
+	float srchi = ZIN0(2);
+	float dstlo = ZIN0(3);
+	float dsthi = ZIN0(4);
+	float dstratio = dsthi * sc_reciprocal(dstlo);
+	float rsrcrange = sc_reciprocal(srchi - srclo);
+	float rrminuslo = rsrcrange * -srclo;
+
+	ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
+}
+
+template <typename MuladdHelper>
+inline void LinExp_next_aa(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2561,11 +2592,12 @@ void LinExp_next_aa(LinExp *unit, int inNumSamples)
 		float dstratio = zdsthi/zdstlo;
 		float rsrcrange = sc_reciprocal(zsrchi - zsrclo);
 		float rrminuslo = rsrcrange * -zsrclo;
-		ZXP(out) = zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
-void LinExp_next_ak(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_ak(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2581,11 +2613,12 @@ void LinExp_next_ak(LinExp *unit, int inNumSamples)
 
 		float rsrcrange = sc_reciprocal(zsrchi - zsrclo);
 		float rrminuslo = rsrcrange * -zsrclo;
-		ZXP(out) = dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(dstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
-void LinExp_next_ka(LinExp *unit, int inNumSamples)
+template <typename MuladdHelper>
+inline void LinExp_next_ka(LinExp *unit, int inNumSamples, MuladdHelper & ma)
 {
 	float *out = ZOUT(0);
 	float *in   = ZIN(0);
@@ -2600,22 +2633,37 @@ void LinExp_next_ka(LinExp *unit, int inNumSamples)
 		float zdsthi = ZXP(dsthi);
 		float zdstlo = ZXP(dstlo);
 		float dstratio = zdsthi/zdstlo;
-		ZXP(out) = zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo);
+		ZXP(out) = ma(zdstlo * pow(dstratio, ZXP(in) * rsrcrange + rrminuslo));
 	);
 }
 
+DEFINE_UGEN_FUNCTION_WRAPPER(LinExp, LinExp_next, 5)
+
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_aa, 5, aa)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_ak, 5, ak)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_ka, 5, ka)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_kk, 5, kk)
+
+#ifdef NOVA_SIMD
+
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_nova, 5, nova)
+DEFINE_UGEN_FUNCTION_WRAPPER_TAG(LinExp, LinExp_next_nova_kk, 5, nova_kk)
+
+#endif
 
 static void LinExp_SetCalc(LinExp* unit)
 {
 	if(INRATE(1) == calc_FullRate || INRATE(2) == calc_FullRate) {
 		if(INRATE(3) == calc_FullRate || INRATE(4) == calc_FullRate) {
-			SETCALC(LinExp_next_aa); return;
+			LinExp_aa_Wrapper::setCalcFunc(unit);
+			return;
 		} else {
-			SETCALC(LinExp_next_ak); return;
+			LinExp_ak_Wrapper::setCalcFunc(unit);
+			return;
 		}
 	} else {
 		if(INRATE(3) == calc_FullRate || INRATE(4) == calc_FullRate) {
-			SETCALC(LinExp_next_ka); return;
+			LinExp_ka_Wrapper::setCalcFunc(unit); return;
 		}
 	}
 
@@ -2630,32 +2678,22 @@ static void LinExp_SetCalc(LinExp* unit)
 #ifdef NOVA_SIMD
 	if ((BUFLENGTH % (2*nova::vec<float>::size)) == 0)
 		if (allScalar)
-			SETCALC(LinExp_next_nova);
+			LinExp_nova_Wrapper::setCalcFunc(unit);
 		else
-			SETCALC(LinExp_next_nova_kk);
+			LinExp_nova_kk_Wrapper::setCalcFunc(unit);
 	else
 #endif
 	if (allScalar)
-		SETCALC(LinExp_next);
+		LinExp_Wrapper::setCalcFunc(unit);
 	else
-		SETCALC(LinExp_next_kk);
+		LinExp_kk_Wrapper::setCalcFunc(unit);
 
 	if (!allScalar)
 		return;
-
-	float srclo = ZIN0(1);
-	float srchi = ZIN0(2);
-	float dstlo = ZIN0(3);
-	float dsthi = ZIN0(4);
-	unit->m_dstlo = dstlo;
-	unit->m_dstratio = dsthi/dstlo;
-	unit->m_rsrcrange = sc_reciprocal(srchi - srclo);
-	unit->m_rrminuslo = unit->m_rsrcrange * -srclo;
 }
 
 void LinExp_Ctor(LinExp* unit)
 {
-	LinExp_SetCalc(unit);
 	float srclo = ZIN0(1);
 	float srchi = ZIN0(2);
 	float dstlo = ZIN0(3);
@@ -2664,7 +2702,9 @@ void LinExp_Ctor(LinExp* unit)
 	unit->m_dstratio = dsthi/dstlo;
 	unit->m_rsrcrange = 1. / (srchi - srclo);
 	unit->m_rrminuslo = unit->m_rsrcrange * -srclo;
-	LinExp_next(unit, 1);
+	LinExp_SetCalc(unit);
+
+	LinExp_Wrapper::run_1(unit);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////

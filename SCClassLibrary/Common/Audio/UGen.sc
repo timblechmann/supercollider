@@ -38,6 +38,63 @@ UGen : AbstractFunction {
 		^results
 	}
 
+
+	*multiNewMulAdd { arg ... args;
+		var addIndex = args.lastIndex;
+		var mulIndex = addIndex - 1;
+		^this.multiNewListMulAdd(args.drop(-2), args[mulIndex], args[addIndex]);
+	}
+
+	*multiNewListMulAdd { arg args, mul, add;
+		var size = 0, newArgs, results;
+		var mulsize = 0, addsize = 0;
+		args = args.asUGenInput(this);
+		args.do({ arg item;
+			(item.class == Array).if({ size = max(size, item.size) });
+		});
+
+		if (size == 0) {
+			// we expand arrayed muladd in a new ugen
+			if (mul.isArray || add.isArray) {
+				args = args ++ #[1.0, 0.0];
+				^this.new1( *args ).madd(mul, add)
+			} {
+				args = args ++ [mul, add];
+				^this.new1( *args )
+			}
+		};
+
+		(mul.class == Array).if({ mulsize = max(size, mul.size) });
+		(add.class == Array).if({ addsize = max(size, add.size) });
+
+		if (mulsize > size || addsize > size) {
+			// add muladd ugen
+			args = args ++ #[1.0, 0.0];
+			newArgs = Array.newClear(args.size);
+			results = Array.newClear(size);
+			size.do({ arg i;
+				args.do({ arg item, j;
+					newArgs.put(j, if (item.class == Array, { item.wrapAt(i) },{ item }));
+				});
+				results.put(i, this.multiNewList(newArgs));
+			});
+			^results.madd(mul, add)
+		} {
+			// treat muladd args like normal adruments
+			args = args ++ [mul, add];
+			newArgs = Array.newClear(args.size);
+			results = Array.newClear(size);
+			size.do({ arg i;
+				args.do({ arg item, j;
+					newArgs.put(j, if (item.class == Array, { item.wrapAt(i) },{ item }));
+				});
+				results.put(i, this.multiNewList(newArgs));
+			});
+
+			^results
+		}
+	}
+
 	init { arg ... theInputs;
 		// store the inputs as an array
 		inputs = theInputs;
@@ -191,8 +248,11 @@ UGen : AbstractFunction {
 	}
 
 	linexp { arg inMin, inMax, outMin, outMax, clip = \minmax;
-		^LinExp.multiNew(this.rate, this.prune(inMin, inMax, clip),
-						inMin, inMax, outMin, outMax)
+		if (this.rate == \audio) {
+			^LinExp.ar(this.prune(inMin, inMax, clip), inMin, inMax, outMin, outMax)
+		} {
+			^LinExp.kr(this.prune(inMin, inMax, clip), inMin, inMax, outMin, outMax)
+		}
 	}
 	explin { arg inMin, inMax, outMin, outMax, clip = \minmax;
 		^(log(this.prune(inMin, inMax, clip)/inMin))
@@ -571,5 +631,12 @@ OutputProxy : UGen {
 
 	dumpName {
 		^this.source.dumpName ++ "[" ++ outputIndex ++ "]"
+	}
+}
+
+
++Object {
+	*hasIntrusiveMuladd {
+		^false
 	}
 }

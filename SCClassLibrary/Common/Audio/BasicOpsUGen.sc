@@ -116,6 +116,11 @@ BinaryOpUGen : BasicOpUGen {
 			^this;
 		};
 
+		if (operator == '*') {
+			this.optimizeMul;
+			^this;
+		};
+
 		if (operator == '-') {
 			this.optimizeSub
 		};
@@ -124,8 +129,12 @@ BinaryOpUGen : BasicOpUGen {
 	optimizeAdd {
 		var optimizedUGen;
 
+		optimizedUGen = this.optimizeAddToIntrusiveMuladd;
+
 		// create a Sum3 if possible.
-		optimizedUGen = this.optimizeToSum3;
+		if (optimizedUGen.isNil) {
+			optimizedUGen = this.optimizeToSum3;
+		};
 
 		// create a Sum4 if possible.
 		if (optimizedUGen.isNil) {
@@ -263,6 +272,78 @@ BinaryOpUGen : BasicOpUGen {
 		^nil
 	}
 
+	optimizeMul {
+		var a, b, aInputs, optimizedUGen;
+		#a, b = inputs;
+
+		if (a.class.hasIntrusiveMuladd) {
+			if ((a.descendants.size == 1) and: (a.rate <= this.rate) ) {
+				if ((a.inputs.wrapAt(-2) == 1) and: ( a.inputs.wrapAt(-1) == 0) ) {
+					aInputs = a.inputs;
+					aInputs = aInputs.wrapPut(-2, b);
+
+					optimizedUGen = a.class.new1(a.rate, *aInputs);
+
+					synthDef.replaceUGen(this, optimizedUGen);
+					synthDef.removeUGen(a);
+					optimizedUGen.optimizeGraph;
+				}
+			}
+		} {
+			if (b.class.hasIntrusiveMuladd) {
+				if ((b.descendants.size == 1) and: (b.rate <= this.rate) ) {
+					if ((b.inputs.wrapAt(-2) == 1) and: ( b.inputs.wrapAt(-1) == 0) ) {
+						aInputs = b.inputs;
+						aInputs = aInputs.wrapPut(-2, a);
+
+						optimizedUGen = b.class.new1(b.rate, *aInputs);
+
+						synthDef.replaceUGen(this, optimizedUGen);
+						synthDef.removeUGen(b);
+						optimizedUGen.optimizeGraph;
+					}
+				}
+			}
+		}
+	}
+
+	optimizeAddToIntrusiveMuladd {
+		var a, b, aInputs, optimizedUGen;
+		#a, b = inputs;
+
+		if (a.class.hasIntrusiveMuladd) {
+			if ((a.descendants.size == 1) and: (a.rate <= this.rate) ) {
+				if ( a.inputs.wrapAt(-1) == 0) {
+					aInputs = a.inputs;
+					aInputs = aInputs.wrapPut(-1, b);
+
+					optimizedUGen = a.class.new1(a.rate, *aInputs);
+
+					synthDef.replaceUGen(this, optimizedUGen);
+					synthDef.removeUGen(a);
+					optimizedUGen.optimizeGraph;
+				}
+			}
+		} {
+			if (b.class.hasIntrusiveMuladd) {
+				if ((b.descendants.size == 1) and: (b.rate <= this.rate) ) {
+					if ( b.inputs.wrapAt(-1) == 0) {
+						aInputs = b.inputs;
+						aInputs = aInputs.wrapPut(-1, a);
+
+						optimizedUGen = b.class.new1(b.rate, *aInputs);
+
+						synthDef.replaceUGen(this, optimizedUGen);
+						synthDef.removeUGen(b);
+						optimizedUGen.optimizeGraph;
+					}
+				}
+			}
+		}
+		^optimizedUGen
+	}
+
+
 	constantFolding {
 		var a, b, aa, bb, cc, dd, temp, ac_ops, value;
 
@@ -396,6 +477,25 @@ MulAdd : UGen {
 		inputs = [in, mul, add];
 		rate = inputs.rate;
 	}
+
+	optimizeGraph {
+		var a, b, c, aInputs;
+		#a, b, c = inputs;
+
+		if (a.class.hasIntrusiveMuladd and:
+			(a.descendants.size == 1) and:
+			(a.rate <= this.rate)) {
+				if ((a.inputs.wrapAt(-2) == 1) and: ( a.inputs.wrapAt(-1) == 0) ) {
+					aInputs = a.inputs;
+					aInputs = aInputs.wrapPut(-2, inputs.wrapAt(-2));
+					aInputs = aInputs.wrapPut(-1, inputs.wrapAt(-1));
+
+					synthDef.replaceUGen(this, a.class.new1(a.rate, *aInputs));
+					synthDef.removeUGen(a)
+				}
+		}
+	}
+
 
 	*canBeMulAdd { arg in, mul, add;
 		// see if these inputs satisfy the constraints of a MulAdd ugen.
