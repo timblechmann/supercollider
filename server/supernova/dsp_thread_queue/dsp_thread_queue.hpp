@@ -610,11 +610,12 @@ private:
         wait_for_end<YieldBackoff>();
         assert(runnable_items.empty());
 #else
+        backoff b( 2, 32 );
         while( node_count.load() ) {
-            if( sem.try_wait() )
+            if( sem.try_wait() ) {
+                b.reset();
                 run_next_item( 0 );
-            else {
-                backoff b( 8, 32 );
+            } else {
                 b.run();
             }
         }
