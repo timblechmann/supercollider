@@ -143,25 +143,16 @@ private:
     {
         thread_init_functor::operator()(index);
 
-#if 0
         for (;;) {
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
             cycle_sem.wait();
+#endif
+
             if (unlikely(stop.load(std::memory_order_relaxed)))
                 return;
 
             interpreter.tick(index);
         }
-#else
-        for (;;) {
-            if (unlikely(stop.load(std::memory_order_relaxed)))
-                return;
-
-            interpreter.sem.wait();
-            interpreter.run_next_item( index );
-
-        }
-#endif
-
     }
 
     static void * run_static(void* arg)
@@ -219,7 +210,10 @@ public:
     {
         const bool run_tick = interpreter.init_tick();
         if( likely(run_tick) ) {
-//            wake_threads();
+
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
+            wake_threads();
+#endif
             interpreter.tick_master();
         }
     }
