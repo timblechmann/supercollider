@@ -38,6 +38,8 @@
 #include "utilities/branch_hints.hpp"
 #include "utilities/utils.hpp"
 
+#include <boost/sync/semaphore.hpp>
+
 namespace nova {
 
 template <typename runnable, typename Alloc>
@@ -461,6 +463,9 @@ public:
             run_item<false>(thread_index);
     }
 
+
+    boost::sync::semaphore sem;
+
 private:
     static const int max_backup_loops = 16384;
 
@@ -530,6 +535,7 @@ private:
         watchdog_iterations = (seconds(timeout_in_seconds) / median) * backoff_iterations;
     }
 
+#if 0
     template <bool YieldBackoff>
     void run_item(thread_count_t index)
     {
@@ -574,6 +580,17 @@ private:
             }
         }
     }
+#else
+    template <bool YieldBackoff>
+    void run_item(thread_count_t index)
+    {
+        while( node_count.load() ) {
+            sem.wait();
+            run_next_item( index );
+        }
+    }
+#endif
+
 
 public:
     void tick_master(void)
@@ -588,9 +605,20 @@ private:
     template <bool YieldBackoff>
     void run_item_master(void)
     {
+#if 0
         run_item<YieldBackoff>(0);
         wait_for_end<YieldBackoff>();
         assert(runnable_items.empty());
+#else
+        while( node_count.load() ) {
+            if( sem.try_wait() )
+                run_next_item( 0 );
+            else {
+                backoff b( 8, 32 );
+                b.run();
+            }
+        }
+#endif
     }
 
     template <bool YieldBackoff>
@@ -610,6 +638,7 @@ private:
         } // busy-wait for helper threads to finish
     }
 
+public:
     HOT int run_next_item(thread_count_t index)
     {
         dsp_thread_queue_item * item;
@@ -638,6 +667,7 @@ private:
     void mark_as_runnable(dsp_thread_queue_item * item)
     {
         runnable_items.push(item);
+        sem.post();
     }
 
     friend class nova::dsp_thread_queue_item<runnable, Alloc>;
