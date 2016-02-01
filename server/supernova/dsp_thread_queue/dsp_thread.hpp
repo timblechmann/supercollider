@@ -143,6 +143,7 @@ private:
     {
         thread_init_functor::operator()(index);
 
+#if 0
         for (;;) {
             cycle_sem.wait();
             if (unlikely(stop.load(std::memory_order_relaxed)))
@@ -150,6 +151,17 @@ private:
 
             interpreter.tick(index);
         }
+#else
+        for (;;) {
+            if (unlikely(stop.load(std::memory_order_relaxed)))
+                return;
+
+            interpreter.sem.wait();
+            interpreter.run_next_item( index );
+
+        }
+#endif
+
     }
 
     static void * run_static(void* arg)
@@ -207,7 +219,7 @@ public:
     {
         const bool run_tick = interpreter.init_tick();
         if( likely(run_tick) ) {
-            wake_threads();
+//            wake_threads();
             interpreter.tick_master();
         }
     }
