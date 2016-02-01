@@ -38,7 +38,12 @@
 #include "utilities/branch_hints.hpp"
 #include "utilities/utils.hpp"
 
+
 #include <boost/sync/semaphore.hpp>
+
+#ifdef __APPLE__
+#define SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
+#endif
 
 namespace nova {
 
@@ -457,14 +462,22 @@ public:
 
     void tick(thread_count_t thread_index)
     {
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
         if (yield_if_busy)
             run_item<true>(thread_index);
         else
             run_item<false>(thread_index);
+#else
+        for (;;) {
+            bool success = sem.wait_for( std::chrono::milliseconds( 500 ) );
+
+            if( !success )
+                return;
+
+            run_next_item( thread_index );
+        }
+#endif
     }
-
-
-    boost::sync::semaphore sem;
 
 private:
     static const int max_backup_loops = 16384;
@@ -605,7 +618,7 @@ private:
     template <bool YieldBackoff>
     void run_item_master(void)
     {
-#if 0
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
         run_item<YieldBackoff>(0);
         wait_for_end<YieldBackoff>();
         assert(runnable_items.empty());
@@ -689,6 +702,8 @@ private:
     std::atomic<node_count_t> node_count = {0}; /* number of nodes, that need to be processed during this tick */
     int watchdog_iterations;
     bool yield_if_busy;
+
+    boost::sync::semaphore sem;
 };
 
 } /* namespace nova */
