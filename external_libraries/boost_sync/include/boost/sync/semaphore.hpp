@@ -138,7 +138,7 @@ public:
 #if defined(BOOST_SYNC_DETAIL_PLATFORM_WINAPI)
 #include <boost/sync/detail/semaphore/semaphore_windows.hpp>
 #elif defined(BOOST_SYNC_DETAIL_USE_DISPATCH_SEMAPHORES)
-#include <boost/sync/detail/semaphore/semaphore_dispatch.hpp>
+#include <boost/sync/detail/semaphore/semaphore_mach.hpp>
 #elif defined(BOOST_SYNC_DETAIL_USE_POSIX_SEMAPHORES)
 #include <boost/sync/detail/semaphore/semaphore_posix.hpp>
 #else
