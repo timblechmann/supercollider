@@ -40,6 +40,7 @@
 
 
 #include <boost/sync/semaphore.hpp>
+#include <boost/sync/support/std_chrono.hpp>
 
 #ifdef __APPLE__
 #define SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
