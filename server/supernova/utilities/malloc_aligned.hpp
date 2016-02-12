@@ -35,7 +35,7 @@ const int malloc_memory_alignment = 64;
 
 inline void* MALLOC ASSUME_ALIGNED(64) malloc_aligned(std::size_t bytes)
 {
-    return boost::alignment::aligned_alloc( bytes, malloc_memory_alignment );
+    return boost::alignment::aligned_alloc( malloc_memory_alignment, bytes );
 }
 
 inline void free_aligned(void *ptr)
