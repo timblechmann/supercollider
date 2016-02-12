@@ -308,12 +308,17 @@ void thread_init_functor::operator()(int thread_index)
 
 void io_thread_init_functor::operator()() const
 {
+
+#ifndef __APPLE__
+
 #ifdef NOVA_TT_PRIORITY_RT
     int priority = thread_priority_interval_rt().first;
     thread_set_priority_rt(priority);
 #else
     int priority = thread_priority_interval().second;
     thread_set_priority(priority);
+#endif
+
 #endif
 
     name_thread("Network Send");
