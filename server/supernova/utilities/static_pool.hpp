@@ -42,10 +42,10 @@ class static_pool
     static const std::size_t poolsize = bytes/sizeof(long);
 
     typedef typename boost::mpl::if_c<blocking,
-                                      spin_lock,
+                                      std::mutex,
                                       dummy_mutex>::type mutex_type;
 
-    typedef typename mutex_type::scoped_lock scoped_lock;
+    typedef typename std::lock_guard<mutex_type> scoped_lock;
 
     struct data:
         mutex_type
