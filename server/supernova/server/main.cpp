@@ -370,10 +370,10 @@ int main(int argc, char * argv[])
     }
 
 #ifdef __APPLE__
-    ProcessSerialNumber psn;
-    if (GetCurrentProcess(&psn) == noErr) {
-        TransformProcessType(&psn, kProcessTransformToUIElementApplication);
-    }
+//    ProcessSerialNumber psn;
+//    if (GetCurrentProcess(&psn) == noErr) {
+//        TransformProcessType(&psn, kProcessTransformToUIElementApplication);
+//    }
 
     SC::Apple::disableAppNap();
 #endif
