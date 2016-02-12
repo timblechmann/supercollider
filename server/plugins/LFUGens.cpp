@@ -26,6 +26,8 @@
 #include "function_attributes.h"
 #include "muladd_helpers.hpp"
 
+#include <boost/align/is_aligned.hpp>
+
 static InterfaceTable *ft;
 
 struct Vibrato : public Unit
@@ -1335,7 +1337,7 @@ void T2A_Ctor(T2A* unit)
 #ifdef NOVA_SIMD
 	if (BUFLENGTH == 64)
 		SETCALC(T2A_next_nova_64);
-	else if (!(BUFLENGTH & 15))
+	else if (boost::alignment::is_aligned( BUFLENGTH, 16 ))
 		SETCALC(T2A_next_nova);
 	else
 #endif
@@ -1471,7 +1473,7 @@ void Line_Ctor(Line* unit)
 #ifdef NOVA_SIMD
 	if (BUFLENGTH == 64)
 		SETCALC(Line_next_nova);
-	else if (!(BUFLENGTH & 15))
+	else if (boost::alignment::is_aligned( BUFLENGTH, 16 ))
 		SETCALC(Line_next_nova);
 	else
 #endif
@@ -1588,7 +1590,7 @@ void XLine_Ctor(XLine* unit)
 #ifdef NOVA_SIMD
 	if (BUFLENGTH == 64)
 		SETCALC(XLine_next_nova_64);
-	else if (!(BUFLENGTH & 15))
+	else if (boost::alignment::is_aligned( BUFLENGTH, 16 ))
 		SETCALC(XLine_next_nova);
 	else
 #endif
@@ -2107,7 +2109,7 @@ static ClipCalcFunc Clip_SelectCalc(Clip * unit)
 	int hiRate = INRATE(2);
 
 #ifdef NOVA_SIMD
-	if (!(BUFLENGTH & 15)) {
+	if (boost::alignment::is_aligned( BUFLENGTH, 16 )) {
 		switch (loRate)
 		{
 		case calc_FullRate:
@@ -2754,7 +2756,7 @@ void EnvGen_Ctor(EnvGen *unit)
 			SETCALC(EnvGen_next_aa);
 		} else {
 #ifdef NOVA_SIMD
-			if (!(BUFLENGTH & 15))
+			if (boost::alignment::is_aligned( BUFLENGTH, 16 ))
 				SETCALC(EnvGen_next_ak_nova);
 			else
 #endif
