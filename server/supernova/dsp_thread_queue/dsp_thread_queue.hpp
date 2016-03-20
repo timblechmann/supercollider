@@ -40,6 +40,7 @@
 
 
 #include <boost/sync/semaphore.hpp>
+#include <boost/sync/support/std_chrono.hpp>
 
 #ifdef __APPLE__
 #define SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
@@ -548,7 +549,7 @@ private:
         watchdog_iterations = (seconds(timeout_in_seconds) / median) * backoff_iterations;
     }
 
-#if 0
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
     template <bool YieldBackoff>
     void run_item(thread_count_t index)
     {
