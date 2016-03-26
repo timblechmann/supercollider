@@ -2936,6 +2936,9 @@ void handle_c_set(ReceivedMessage const & msg)
 
     while (it != msg.ArgumentsEnd()) {
         osc::int32 bus_index = it->AsInt32(); ++it;
+        if( it == msg.ArgumentsEnd() )
+            return;
+
         float value = extract_float_argument(it++);
 
         sc_factory->controlbus_set(bus_index, value);
