@@ -180,7 +180,7 @@ FreqScopeView {
 		dbFactor = 2/dbRange;
 		rate = 4;
 		freqMode = 0;
-		bufSize = 2048;
+		bufSize = (server.sampleRate / 24).nextPowerOfTwo;
 		ServerQuit.add(this, server);
 		^this;
 	}
