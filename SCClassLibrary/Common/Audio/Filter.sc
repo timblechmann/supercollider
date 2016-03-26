@@ -145,12 +145,13 @@ VarLag : Filter {
 }
 
 LeakDC : Filter {
+	classvar <hasIntrusiveMuladd = true;
 
 	*ar { arg in = 0.0, coef = 0.995, mul = 1.0, add = 0.0;
-		^this.multiNew('audio', in, coef).madd(mul, add)
+		^this.multiNewMulAdd('audio', in, coef, mul, add)
 	}
 	*kr { arg in = 0.0, coef = 0.9, mul = 1.0, add = 0.0;
-		^this.multiNew('control', in, coef).madd(mul, add)
+		^this.multiNewMulAdd('control', in, coef, mul, add)
 	}
 }
 
@@ -169,16 +170,24 @@ RHPF : RLPF {}
 
 
 LPF : Filter {
-
+	classvar <hasIntrusiveMuladd = true;
 	*ar { arg in = 0.0, freq = 440.0, mul = 1.0, add = 0.0;
-		^this.multiNew('audio', in, freq).madd(mul, add)
+		^this.multiNewMulAdd('audio', in, freq, mul, add)
 	}
 	*kr { arg in = 0.0, freq = 440.0, mul = 1.0, add = 0.0;
-		^this.multiNew('control', in, freq).madd(mul, add)
+		^this.multiNewMulAdd('control', in, freq, mul, add)
 	}
 }
 
-HPF : LPF {}
+HPF : Filter {
+	classvar <hasIntrusiveMuladd = true;
+	*ar { arg in = 0.0, freq = 440.0, mul = 1.0, add = 0.0;
+		^this.multiNewMulAdd('audio', in, freq, mul, add)
+	}
+	*kr { arg in = 0.0, freq = 440.0, mul = 1.0, add = 0.0;
+		^this.multiNewMulAdd('control', in, freq, mul, add)
+	}
+}
 
 BPF : Filter {
 
@@ -203,12 +212,13 @@ MidEQ : Filter {
 }
 
 LPZ1 : Filter {
+	classvar <hasIntrusiveMuladd = true;
 
 	*ar { arg in = 0.0, mul = 1.0, add = 0.0;
-		^this.multiNew('audio', in).madd(mul, add)
+		^this.multiNewMulAdd('audio', in, mul, add)
 	}
 	*kr { arg in = 0.0, mul = 1.0, add = 0.0;
-		^this.multiNew('control', in).madd(mul, add)
+		^this.multiNewMulAdd('control', in, mul, add)
 	}
 }
 
