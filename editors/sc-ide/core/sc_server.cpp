@@ -138,8 +138,14 @@ void ScServer::createActions(Settings::Manager * settings)
 
     mActions[Volume] = widgetAction = new QWidgetAction(this);
     widgetAction->setDefaultWidget( mVolumeWidget );
-    connect( mVolumeWidget, SIGNAL(volumeChanged(float)), this, SLOT(sendVolume(float)) );
-    connect( mVolumeWidget, SIGNAL(volumeChanged(float)), this, SIGNAL(volumeChanged(float)) );
+
+    connect( mVolumeWidget, &VolumeWidget::volumeChangeRequested, [this](float newValue) {
+        setVolume( newValue );
+    });
+    connect( this, SIGNAL(volumeChanged(float)),            mVolumeWidget, SLOT(setVolume(float))            );
+    connect( this, SIGNAL(volumeRangeChanged(float,float)), mVolumeWidget, SLOT(setVolumeRange(float,float)) );
+    emit volumeChanged( mVolume );
+    emit volumeRangeChanged( mVolumeMin, mVolumeMax );
 
     mActions[VolumeUp] = action = new QAction(tr("Increase Volume"), this);
     action->setShortcut(tr("Ctrl+Alt+PgUp", "Increase volume"));
@@ -264,11 +270,25 @@ void ScServer::setDumpingOSC( bool dumping )
     sendDumpingOSC(dumping);
 }
 
-float ScServer::volume() const { return mVolumeWidget->volume(); }
+float ScServer::volume() const { return mVolume; }
 
 void ScServer::setVolume( float volume )
 {
-    mVolumeWidget->setVolume( volume );
+    volume = qBound( mVolumeMin, volume, mVolumeMax );
+
+    if( volume != mVolume ) {
+        mVolume = volume;
+        sendVolume( volume );
+        emit volumeChanged( volume );
+    }
+}
+
+
+void ScServer::setVolumeRange(float min, float max)
+{
+    mVolumeMin = min;
+    mVolumeMax = max;
+    emit volumeRangeChanged( min, max );
 }
 
 void ScServer::increaseVolume()
@@ -399,10 +419,8 @@ void ScServer::onScLangReponse( const QString & selector, const QString & data )
         bool ok;
         float volume = data.mid(1, data.size() - 2).toFloat(&ok);
         if (ok) {
-            bool signals_blocked = mVolumeWidget->blockSignals(true);
-            volume = mVolumeWidget->setVolume(volume);
-            mVolumeWidget->blockSignals(signals_blocked);
-            emit volumeChanged(volume);
+            mVolume = volume;
+            emit volumeChanged( volume );
         }
     }
     else if (selector == ampRangeSelector) {
@@ -414,10 +432,9 @@ void ScServer::onScLangReponse( const QString & selector, const QString & data )
         if (!ok) return;
         float max = dataList[1].toFloat(&ok);
         if (!ok) return;
-        bool signals_blocked = mVolumeWidget->blockSignals(true);
-        mVolumeWidget->setRange( min, max );
-        mVolumeWidget->blockSignals(signals_blocked);
-        emit volumeChanged(mVolumeWidget->volume());
+        mVolumeMin = min;
+        mVolumeMax = max;
+        setVolumeRange( min, max );
     }
 }
 
@@ -449,7 +466,7 @@ void ScServer::handleRuningStateChangedMsg( const QString & data )
 
     onRunningStateChanged( serverRunningState, qstrHostName, port );
 
-    emit runningStateChange( serverRunningState, qstrHostName, port );
+    emit runningStateChanged( serverRunningState, qstrHostName, port );
 }
 
 void ScServer::timerEvent(QTimerEvent * event)
