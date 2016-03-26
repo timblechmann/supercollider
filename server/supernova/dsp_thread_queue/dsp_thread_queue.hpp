@@ -38,6 +38,14 @@
 #include "utilities/branch_hints.hpp"
 #include "utilities/utils.hpp"
 
+
+#include <boost/sync/semaphore.hpp>
+#include <boost/sync/support/std_chrono.hpp>
+
+#ifdef __APPLE__
+#define SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
+#endif
+
 namespace nova {
 
 template <typename runnable, typename Alloc>
@@ -455,10 +463,21 @@ public:
 
     void tick(thread_count_t thread_index)
     {
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
         if (yield_if_busy)
             run_item<true>(thread_index);
         else
             run_item<false>(thread_index);
+#else
+        for (;;) {
+            bool success = sem.wait_for( std::chrono::milliseconds( 500 ) );
+
+            if( !success )
+                return;
+
+            run_next_item( thread_index );
+        }
+#endif
     }
 
 private:
@@ -530,6 +549,7 @@ private:
         watchdog_iterations = (seconds(timeout_in_seconds) / median) * backoff_iterations;
     }
 
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
     template <bool YieldBackoff>
     void run_item(thread_count_t index)
     {
@@ -574,6 +594,17 @@ private:
             }
         }
     }
+#else
+    template <bool YieldBackoff>
+    void run_item(thread_count_t index)
+    {
+        while( node_count.load() ) {
+            sem.wait();
+            run_next_item( index );
+        }
+    }
+#endif
+
 
 public:
     void tick_master(void)
@@ -588,9 +619,21 @@ private:
     template <bool YieldBackoff>
     void run_item_master(void)
     {
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
         run_item<YieldBackoff>(0);
         wait_for_end<YieldBackoff>();
         assert(runnable_items.empty());
+#else
+        backoff b( 2, 32 );
+        while( node_count.load() ) {
+            if( sem.try_wait() ) {
+                b.reset();
+                run_next_item( 0 );
+            } else {
+                b.run();
+            }
+        }
+#endif
     }
 
     template <bool YieldBackoff>
@@ -610,6 +653,7 @@ private:
         } // busy-wait for helper threads to finish
     }
 
+public:
     HOT int run_next_item(thread_count_t index)
     {
         dsp_thread_queue_item * item;
@@ -638,6 +682,7 @@ private:
     void mark_as_runnable(dsp_thread_queue_item * item)
     {
         runnable_items.push(item);
+        sem.post();
     }
 
     friend class nova::dsp_thread_queue_item<runnable, Alloc>;
@@ -658,6 +703,8 @@ private:
     std::atomic<node_count_t> node_count = {0}; /* number of nodes, that need to be processed during this tick */
     int watchdog_iterations;
     bool yield_if_busy;
+
+    boost::sync::semaphore sem;
 };
 
 } /* namespace nova */

@@ -144,7 +144,10 @@ private:
         thread_init_functor::operator()(index);
 
         for (;;) {
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
             cycle_sem.wait();
+#endif
+
             if (unlikely(stop.load(std::memory_order_relaxed)))
                 return;
 
@@ -207,7 +210,10 @@ public:
     {
         const bool run_tick = interpreter.init_tick();
         if( likely(run_tick) ) {
+
+#ifndef SUPERNOVA_SLEEP_IN_DSP_HELPER_THREAD
             wake_threads();
+#endif
             interpreter.tick_master();
         }
     }
