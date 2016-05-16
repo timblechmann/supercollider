@@ -39,11 +39,14 @@
 #include <string.h>
 # include <signal.h>
 
+#include <boost/config.hpp>
 #include <boost/chrono.hpp>
 
-#include <float.h>
-#define kBigBigFloat DBL_MAX
-#define kSmallSmallFloat DBL_MIN
+#include <limits>
+
+static const double kBigBigFloat     = std::numeric_limits<double>::max();
+static const double kSmallSmallFloat = std::numeric_limits<double>::min();
+
 
 
 #include <new>
@@ -526,13 +529,6 @@ static inline void checkStackDepth(VMGlobals* g, PyrSlot * sp)
 #define dispatch_opcode break
 #endif
 
-#if defined(__GNUC__)
-#define LIKELY(x)       __builtin_expect((x),1)
-#define UNLIKELY(x)     __builtin_expect((x),0)
-#else
-#define LIKELY(x)   x
-#define UNLIKELY(x) x
-#endif
 
 #if defined(__GNUC__) && !defined(__clang__)
 // gcc manual:
@@ -2486,8 +2482,11 @@ HOT FLATTEN void Interpret(VMGlobals *g)
 			// message sends handled here:
 		msg_lookup: {
 			size_t index = slotRawInt(&classobj->classIndex) + selector->u.index;
+
+#if 0
+            // this check should be performed in the bytecode compiler, not in the VM:
 			PyrMethod *meth = NULL;
-			if( UNLIKELY( ( selector->flags & sym_Class ) != 0 ) )
+			if( BOOST_UNLIKELY( ( selector->flags & sym_Class ) != 0 ) )
 			  {
 			    // You have sent a message which is a class name. This is a bad thing.
 			    // There are two cases. It is either an illegitimate classname like
@@ -2503,7 +2502,12 @@ HOT FLATTEN void Interpret(VMGlobals *g)
 			  }
 
 			// and now if meth is null, bail out just like if I don't understand it
-			if (UNLIKELY(meth == NULL || ( slotRawSymbol(&meth->name) != selector))) {
+			if (BOOST_UNLIKELY(meth == NULL || ( slotRawSymbol(&meth->name) != selector))) {
+#else
+			PyrMethod *meth = gRowTable[index];
+
+			if (BOOST_UNLIKELY(slotRawSymbol(&meth->name) != selector)) {
+#endif
 				g->sp = sp; g->ip = ip;
 				doesNotUnderstand(g, selector, numArgsPushed);
 				sp = g->sp; ip = g->ip;
@@ -2643,7 +2647,7 @@ HOT FLATTEN void Interpret(VMGlobals *g)
 			size_t index = slotRawInt(&classobj->classIndex) + selector->u.index;
 			PyrMethod *meth = gRowTable[index];
 
-			if (UNLIKELY(slotRawSymbol(&meth->name) != selector)) {
+			if (BOOST_UNLIKELY(slotRawSymbol(&meth->name) != selector)) {
 				g->sp = sp; g->ip = ip;
 				doesNotUnderstandWithKeys(g, selector, numArgsPushed, numKeyArgsPushed);
 				sp = g->sp; ip = g->ip;
@@ -2863,6 +2867,3 @@ void DumpStack(VMGlobals *g, PyrSlot *sp)
 		post("   %2d  %s\n", i, str);
 	}
 }
-
-
-
