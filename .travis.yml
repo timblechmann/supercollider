@@ -51,11 +51,11 @@ script:
  - iflin sudo make install
  - ifmac cmake --build . --config Release --target install
 # test
- - $TRAVIS_BUILD_DIR/testsuite/sclang/launch_test.py $SCLANG
- - qpm test.run -l ./travis_test_run.json --path $SCLANG --include $HOME/Quarks
+# - $TRAVIS_BUILD_DIR/testsuite/sclang/launch_test.py $SCLANG
+# - qpm test.run -l ./travis_test_run.json --path $SCLANG --include $HOME/Quarks
 # package
- - ifmac mkdir -p $HOME/artifacts
- - (ifmac cd Install; ifmac zip -q -r $HOME/artifacts/SC-$COMMIT_NAME.zip SuperCollider)
+# - ifmac mkdir -p $HOME/artifacts
+# - (ifmac cd Install; ifmac zip -q -r $HOME/artifacts/SC-$COMMIT_NAME.zip SuperCollider)
 
 before_deploy:
  # required for github releases
