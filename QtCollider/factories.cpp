@@ -24,45 +24,46 @@
 
 #include <QLabel>
 
-QC_DECLARE_QWIDGET_FACTORY( QLabel );
+QC_DECLARE_QWIDGET_FACTORY( QLabel )
 
 static void doLoadFactories ()
 {
-  QC_ADD_FACTORY( QcDefaultWidget );
-  QC_ADD_FACTORY( QcHLayoutWidget );
-  QC_ADD_FACTORY( QcVLayoutWidget );
-  QC_ADD_FACTORY( QLabel );
-  QC_ADD_FACTORY( QcTextField );
-  QC_ADD_FACTORY( QcCheckBox );
-  QC_ADD_FACTORY( QcListWidget );
-  QC_ADD_FACTORY( QcPopUpMenu );
   QC_ADD_FACTORY( QcButton );
+  QC_ADD_FACTORY( QcCheckBox );
   QC_ADD_FACTORY( QcCustomPainted );
+  QC_ADD_FACTORY( QcDefaultWidget );
   QC_ADD_FACTORY( QcFileDialog );
   QC_ADD_FACTORY( QcGraph );
+  QC_ADD_FACTORY( QcGridLayout );
+  QC_ADD_FACTORY( QcHBoxLayout );
+  QC_ADD_FACTORY( QcHLayoutWidget );
   QC_ADD_FACTORY( QcKnob );
   QC_ADD_FACTORY( QcLevelIndicator );
+  QC_ADD_FACTORY( QcListWidget );
   QC_ADD_FACTORY( QcMultiSlider );
   QC_ADD_FACTORY( QcNumberBox );
   QC_ADD_FACTORY( QcPenPrinter );
+  QC_ADD_FACTORY( QcPopUpMenu );
   QC_ADD_FACTORY( QcRangeSlider );
   QC_ADD_FACTORY( QcScope );
   QC_ADD_FACTORY( QcScopeShm );
-  QC_ADD_FACTORY( QcScrollWidget );
   QC_ADD_FACTORY( QcScrollArea );
+  QC_ADD_FACTORY( QcScrollWidget );
+  QC_ADD_FACTORY( QcScrollWindow );
   QC_ADD_FACTORY( QcSlider );
   QC_ADD_FACTORY( QcSlider2D );
-  QC_ADD_FACTORY( QcWaveform );
-  QC_ADD_FACTORY( QcTextEdit );
-  QC_ADD_FACTORY( QcTreeWidget );
-  QC_ADD_FACTORY( WebView );
-  QC_ADD_FACTORY( QcWindow );
-  QC_ADD_FACTORY( QcScrollWindow );
-  QC_ADD_FACTORY( QcHBoxLayout );
-  QC_ADD_FACTORY( QcVBoxLayout );
-  QC_ADD_FACTORY( QcGridLayout );
   QC_ADD_FACTORY( QcStackLayout );
+  QC_ADD_FACTORY( QcTextEdit );
+  QC_ADD_FACTORY( QcTextField );
+  QC_ADD_FACTORY( QcTreeWidget );
+  QC_ADD_FACTORY( QcVBoxLayout );
+  QC_ADD_FACTORY( QcVLayoutWidget );
+  QC_ADD_FACTORY( QcWaveform );
+  QC_ADD_FACTORY( QcWindow );
+  QC_ADD_FACTORY( QLabel );
   QC_ADD_FACTORY( QtDownload );
+  QC_ADD_FACTORY( WebView );
+{
 #ifdef __APPLE__
   QC_ADD_FACTORY( QcQuartzComposerView );
 #endif

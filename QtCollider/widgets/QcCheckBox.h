@@ -26,7 +26,7 @@
 class QcCheckBox : public QCheckBox
 {
   Q_OBJECT
-  Q_PROPERTY( bool value READ value WRITE setValue );
+  Q_PROPERTY( bool value READ value WRITE setValue )
 
   public:
     QcCheckBox() {
@@ -39,4 +39,4 @@ class QcCheckBox : public QCheckBox
     void setValue( bool val ) { setChecked(val); }
 };
 
-QC_DECLARE_QWIDGET_FACTORY( QcCheckBox );
+QC_DECLARE_QWIDGET_FACTORY( QcCheckBox )

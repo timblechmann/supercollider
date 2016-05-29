@@ -116,7 +116,7 @@ protected:
     return prox;
   }
 
-  virtual void initialize( QObjectProxy *proxy, QOBJECT *obj ) {};
+  virtual void initialize( QObjectProxy *proxy, QOBJECT *obj ) {}
 };
 
 #define QC_DECLARE_FACTORY( QOBJECT, FACTORY ) \

@@ -30,7 +30,7 @@
 #include <math.h>
 #include <qmath.h>
 
-QC_DECLARE_QWIDGET_FACTORY(QcNumberBox);
+QC_DECLARE_QWIDGET_FACTORY(QcNumberBox)
 
 QcNumberBox::QcNumberBox()
 : scroll( true ),

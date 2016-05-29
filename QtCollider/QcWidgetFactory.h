@@ -124,7 +124,7 @@ protected:
     return prox;
   }
 
-  virtual void initialize( QWidgetProxy *proxy, QWIDGET *obj ) {};
+  virtual void initialize( QWidgetProxy *proxy, QWIDGET *obj ) {}
 };
 
 #define QC_DECLARE_QWIDGET_FACTORY( QWIDGET ) QC_DECLARE_FACTORY( QWIDGET, QcWidgetFactory<QWIDGET> )

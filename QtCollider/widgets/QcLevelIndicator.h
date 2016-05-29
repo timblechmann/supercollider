@@ -31,26 +31,26 @@
 class QcLevelIndicator : public QWidget, QcHelper, QtCollider::Style::Client
 {
   Q_OBJECT
-  Q_PROPERTY( float value READ dummyFloat WRITE setValue );
-  Q_PROPERTY( float warning READ dummyFloat WRITE setWarning );
-  Q_PROPERTY( float critical READ dummyFloat WRITE setCritical );
-  Q_PROPERTY( float peak READ dummyFloat WRITE setPeak );
-  Q_PROPERTY( bool drawPeak READ dummyBool WRITE setDrawPeak );
-  Q_PROPERTY( int ticks READ dummyInt WRITE setTicks );
-  Q_PROPERTY( int majorTicks READ dummyInt WRITE setMajorTicks );
-  Q_PROPERTY( int stepWidth READ dummyInt WRITE setStepWidth );
-  Q_PROPERTY( LevelIndicatorStyle style READ style WRITE setStyle );
-  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor );
-  Q_PROPERTY( QColor meterColor READ dummyColor WRITE setMeterColor );
-  Q_PROPERTY( QColor warningColor READ dummyColor WRITE setWarningColor );
-  Q_PROPERTY( QColor criticalColor READ dummyColor WRITE setCriticalColor );
+  Q_PROPERTY( float value READ dummyFloat WRITE setValue )
+  Q_PROPERTY( float warning READ dummyFloat WRITE setWarning )
+  Q_PROPERTY( float critical READ dummyFloat WRITE setCritical )
+  Q_PROPERTY( float peak READ dummyFloat WRITE setPeak )
+  Q_PROPERTY( bool drawPeak READ dummyBool WRITE setDrawPeak )
+  Q_PROPERTY( int ticks READ dummyInt WRITE setTicks )
+  Q_PROPERTY( int majorTicks READ dummyInt WRITE setMajorTicks )
+  Q_PROPERTY( int stepWidth READ dummyInt WRITE setStepWidth )
+  Q_PROPERTY( LevelIndicatorStyle style READ style WRITE setStyle )
+  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor )
+  Q_PROPERTY( QColor meterColor READ dummyColor WRITE setMeterColor )
+  Q_PROPERTY( QColor warningColor READ dummyColor WRITE setWarningColor )
+  Q_PROPERTY( QColor criticalColor READ dummyColor WRITE setCriticalColor )
 
 public:
   enum LevelIndicatorStyle {
     Continuous = 0,
     LED
   };
-  Q_ENUMS(LevelIndicatorStyle);
+  Q_ENUMS(LevelIndicatorStyle)
   
   QcLevelIndicator();
   void setValue( float f ) { _value = f; update(); }
@@ -63,7 +63,7 @@ public:
   void setStepWidth( int i ) { _stepWidth = qMax(i,1); update(); }
   void setStyle( LevelIndicatorStyle i ) { _style = i; update(); }
   void setStyle( int i ) { _style = (LevelIndicatorStyle)i; update(); }
-  LevelIndicatorStyle style() { return _style; };
+  LevelIndicatorStyle style() { return _style; }
 
   void setMeterColor( const QColor c ) { _meterColor = c; update(); }
   void setWarningColor( const QColor c ) { _warningColor = c; update(); }

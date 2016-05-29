@@ -32,29 +32,29 @@ class QcMultiSlider : public QWidget, QcHelper, QtCollider::Style::Client
 {
   // TODO setting selection with mouse
   Q_OBJECT
-  Q_PROPERTY( int sliderCount READ sliderCount WRITE setSliderCount);
-  Q_PROPERTY( QVector<double> values READ values WRITE setValues );
-  Q_PROPERTY( QVector<double> reference READ reference WRITE setReference );
-  Q_PROPERTY( double value READ value WRITE setValue );
-  Q_PROPERTY( double step READ step WRITE setStep );
-  Q_PROPERTY( int index READ index WRITE setIndex );
-  Q_PROPERTY( int selectionSize READ selectionSize WRITE setSelectionSize );
+  Q_PROPERTY( int sliderCount READ sliderCount WRITE setSliderCount)
+  Q_PROPERTY( QVector<double> values READ values WRITE setValues )
+  Q_PROPERTY( QVector<double> reference READ reference WRITE setReference )
+  Q_PROPERTY( double value READ value WRITE setValue )
+  Q_PROPERTY( double step READ step WRITE setStep )
+  Q_PROPERTY( int index READ index WRITE setIndex )
+  Q_PROPERTY( int selectionSize READ selectionSize WRITE setSelectionSize )
   Q_PROPERTY( Qt::Orientation orientation
-              READ orientation WRITE setOrientation );
-  Q_PROPERTY( bool elastic READ dummyBool WRITE setElastic );
-  Q_PROPERTY( int indexThumbSize READ dummyFloat WRITE setIndexThumbSize );
-  Q_PROPERTY( float valueThumbSize READ dummyFloat WRITE setValueThumbSize );
-  Q_PROPERTY( int gap READ dummyInt WRITE setGap );
-  Q_PROPERTY( bool drawLines READ dummyBool WRITE setDrawLines );
-  Q_PROPERTY( bool drawRects READ dummyBool WRITE setDrawRects );
-  Q_PROPERTY( bool isFilled READ dummyBool WRITE setIsFilled );
-  Q_PROPERTY( bool highlight READ dummyBool WRITE setHighlight );
-  Q_PROPERTY( bool editable READ dummyBool WRITE setEditable );
-  Q_PROPERTY( int startIndex READ dummyInt WRITE setStartIndex );
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
-  Q_PROPERTY( QColor fillColor READ fillColor WRITE setFillColor );
-  Q_PROPERTY( QColor strokeColor READ strokeColor WRITE setStrokeColor );
-  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
+              READ orientation WRITE setOrientation )
+  Q_PROPERTY( bool elastic READ dummyBool WRITE setElastic )
+  Q_PROPERTY( int indexThumbSize READ dummyFloat WRITE setIndexThumbSize )
+  Q_PROPERTY( float valueThumbSize READ dummyFloat WRITE setValueThumbSize )
+  Q_PROPERTY( int gap READ dummyInt WRITE setGap )
+  Q_PROPERTY( bool drawLines READ dummyBool WRITE setDrawLines )
+  Q_PROPERTY( bool drawRects READ dummyBool WRITE setDrawRects )
+  Q_PROPERTY( bool isFilled READ dummyBool WRITE setIsFilled )
+  Q_PROPERTY( bool highlight READ dummyBool WRITE setHighlight )
+  Q_PROPERTY( bool editable READ dummyBool WRITE setEditable )
+  Q_PROPERTY( int startIndex READ dummyInt WRITE setStartIndex )
+  Q_PROPERTY( QColor background READ background WRITE setBackground )
+  Q_PROPERTY( QColor fillColor READ fillColor WRITE setFillColor )
+  Q_PROPERTY( QColor strokeColor READ strokeColor WRITE setStrokeColor )
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor )
 
   Q_SIGNALS:
     void modified();

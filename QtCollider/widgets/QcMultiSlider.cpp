@@ -29,7 +29,7 @@
 
 #include <cmath>
 
-QC_DECLARE_QWIDGET_FACTORY(QcMultiSlider);
+QC_DECLARE_QWIDGET_FACTORY(QcMultiSlider)
 
 QcMultiSlider::QcMultiSlider() :
   QtCollider::Style::Client(this),

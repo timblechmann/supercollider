@@ -32,7 +32,7 @@
 #include <QApplication>
 #include <QStyle>
 
-QC_DECLARE_QWIDGET_FACTORY(WebView);
+QC_DECLARE_QWIDGET_FACTORY(WebView)
 
 namespace QtCollider {
 

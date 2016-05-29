@@ -200,6 +200,6 @@ struct ScMethodCallEvent : public QEvent
 
 } // namespace
 
-Q_DECLARE_METATYPE( QObjectProxy * );
+Q_DECLARE_METATYPE( QObjectProxy * )
 
 #endif //QC_QOBJECT_PROXY_H

@@ -32,15 +32,15 @@
 class QcScope : public QWidget, QcHelper
 {
   Q_OBJECT
-  Q_PROPERTY( int bufferNumber READ dummyInt WRITE setBufferNumber );
-  Q_PROPERTY( float xOffset READ dummyFloat WRITE setXOffset );
-  Q_PROPERTY( float yOffset READ dummyFloat WRITE setYOffset );
-  Q_PROPERTY( float xZoom READ dummyFloat WRITE setXZoom );
-  Q_PROPERTY( float yZoom READ dummyFloat WRITE setYZoom );
-  Q_PROPERTY( int style READ dummyInt WRITE setStyle );
-  Q_PROPERTY( QVariantList waveColors READ dummyVariantList WRITE setWaveColors );
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
-  Q_PROPERTY( int updateInterval READ updateInterval WRITE setUpdateInterval );
+  Q_PROPERTY( int bufferNumber READ dummyInt WRITE setBufferNumber )
+  Q_PROPERTY( float xOffset READ dummyFloat WRITE setXOffset )
+  Q_PROPERTY( float yOffset READ dummyFloat WRITE setYOffset )
+  Q_PROPERTY( float xZoom READ dummyFloat WRITE setXZoom )
+  Q_PROPERTY( float yZoom READ dummyFloat WRITE setYZoom )
+  Q_PROPERTY( int style READ dummyInt WRITE setStyle )
+  Q_PROPERTY( QVariantList waveColors READ dummyVariantList WRITE setWaveColors )
+  Q_PROPERTY( QColor background READ background WRITE setBackground )
+  Q_PROPERTY( int updateInterval READ updateInterval WRITE setUpdateInterval )
 
   public:
     QcScope();

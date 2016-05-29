@@ -29,7 +29,7 @@
 #include <QResizeEvent>
 #include <QWindow>
 
-QC_DECLARE_QWIDGET_FACTORY(QcScopeShm);
+QC_DECLARE_QWIDGET_FACTORY(QcScopeShm)
 
 QcScopeShm::QcScopeShm() :
   _srvPort(-1),

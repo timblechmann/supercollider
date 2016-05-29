@@ -32,7 +32,7 @@
 #include <cmath>
 #include <cstring>
 
-QC_DECLARE_QWIDGET_FACTORY(QcWaveform);
+QC_DECLARE_QWIDGET_FACTORY(QcWaveform)
 
 const int kMaxRawFrames = 300000;
 const int kMaxFramesPerCacheUnit = 128;

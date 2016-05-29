@@ -22,7 +22,7 @@
 #include "QcButton.h"
 #include "../QcWidgetFactory.h"
 
-QC_DECLARE_QWIDGET_FACTORY(QcButton);
+QC_DECLARE_QWIDGET_FACTORY(QcButton)
 
 QcButton::QcButton():
   QtCollider::Style::Client(this),

@@ -31,10 +31,10 @@
 class QcPenPrinter : public QObject
 {
   Q_OBJECT
-  Q_PROPERTY( QRect pageRect READ pageRect );
-  Q_PROPERTY( QRect paperRect READ paperRect );
-  Q_PROPERTY( int fromPage READ fromPage );
-  Q_PROPERTY( int toPage READ toPage );
+  Q_PROPERTY( QRect pageRect READ pageRect )
+  Q_PROPERTY( QRect paperRect READ paperRect )
+  Q_PROPERTY( int fromPage READ fromPage )
+  Q_PROPERTY( int toPage READ toPage )
 
 public:
 

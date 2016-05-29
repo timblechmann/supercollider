@@ -25,7 +25,7 @@
 class QcPopUpMenu : public QComboBox, QcHelper
 {
   Q_OBJECT
-  Q_PROPERTY( QVariantList items READ dummyVariantList WRITE setItems );
+  Q_PROPERTY( QVariantList items READ dummyVariantList WRITE setItems )
   Q_PROPERTY( bool reactivationEnabled READ reactivationEnabled WRITE setReactivationEnabled )
 
 public:

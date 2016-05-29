@@ -24,7 +24,7 @@
 
 #include <QPainter>
 
-QC_DECLARE_QWIDGET_FACTORY(QcLevelIndicator);
+QC_DECLARE_QWIDGET_FACTORY(QcLevelIndicator)
 
 QcLevelIndicator::QcLevelIndicator() :
   QtCollider::Style::Client(this),

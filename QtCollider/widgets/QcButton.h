@@ -27,9 +27,9 @@
 class QcButton : public QPushButton, QcHelper, QtCollider::Style::Client
 {
   Q_OBJECT
-  Q_PROPERTY( QVariantList states READ dummyVariantList WRITE setStates );
-  Q_PROPERTY( int value READ getValue WRITE setValue );
-  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
+  Q_PROPERTY( QVariantList states READ dummyVariantList WRITE setStates )
+  Q_PROPERTY( int value READ getValue WRITE setValue )
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor )
 
   public:
     QcButton();

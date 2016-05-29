@@ -33,16 +33,16 @@ class QcRangeSlider :
 {
   Q_OBJECT
   Q_PROPERTY( Qt::Orientation orientation
-              READ orientation WRITE setOrientation );
+              READ orientation WRITE setOrientation )
   Q_PROPERTY( double loValue READ loValue WRITE setLoValue )
   Q_PROPERTY( double hiValue READ hiValue WRITE setHiValue )
-  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale );
-  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale );
-  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale );
+  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale )
+  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale )
+  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale )
   Q_PROPERTY( double step READ dummyFloat WRITE setStep )
-  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor );
-  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
-  Q_PROPERTY( QColor knobColor READ knobColor WRITE setKnobColor );
+  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor )
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor )
+  Q_PROPERTY( QColor knobColor READ knobColor WRITE setKnobColor )
 
   public:
     enum MouseMode {

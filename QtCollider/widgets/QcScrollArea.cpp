@@ -85,7 +85,7 @@ bool QcScrollWidget::eventFilter ( QObject * watched, QEvent * event ) {
 
 
 
-QC_DECLARE_QWIDGET_FACTORY(QcScrollArea);
+QC_DECLARE_QWIDGET_FACTORY(QcScrollArea)
 
 QcScrollArea::QcScrollArea()
 {

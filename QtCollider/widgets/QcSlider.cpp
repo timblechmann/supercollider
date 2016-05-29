@@ -26,7 +26,7 @@
 #include <QKeyEvent>
 #include <QWheelEvent>
 
-QC_DECLARE_QWIDGET_FACTORY(QcSlider);
+QC_DECLARE_QWIDGET_FACTORY(QcSlider)
 
 QcSlider::QcSlider() :
   QtCollider::Style::Client(this),

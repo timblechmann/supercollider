@@ -25,7 +25,7 @@
 #include <QPainter>
 #include <QTimer>
 
-QC_DECLARE_QWIDGET_FACTORY(QcScope);
+QC_DECLARE_QWIDGET_FACTORY(QcScope)
 
 QcScope::QcScope()
 : bufNum( 0 ),
