@@ -44,6 +44,7 @@ static void doLoadFactories ()
   QC_ADD_FACTORY( QcNumberBox );
   QC_ADD_FACTORY( QcPenPrinter );
   QC_ADD_FACTORY( QcPopUpMenu );
+  QC_ADD_FACTORY( QcQmlView );
   QC_ADD_FACTORY( QcRangeSlider );
   QC_ADD_FACTORY( QcScope );
   QC_ADD_FACTORY( QcScopeShm );
@@ -63,7 +64,7 @@ static void doLoadFactories ()
   QC_ADD_FACTORY( QLabel );
   QC_ADD_FACTORY( QtDownload );
   QC_ADD_FACTORY( WebView );
-{
+
 #ifdef __APPLE__
   QC_ADD_FACTORY( QcQuartzComposerView );
 #endif

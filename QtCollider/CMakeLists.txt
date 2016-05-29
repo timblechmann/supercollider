@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8.11)
 
-set(required_qt_version 5.2)
+set(required_qt_version 5.3)
 
 find_package(Qt5Core)
 find_package(Qt5Network)
@@ -9,6 +9,7 @@ find_package(Qt5Positioning)
 find_package(Qt5PrintSupport)
 find_package(Qt5Qml)
 find_package(Qt5Quick)
+find_package(Qt5QuickWidgets)
 find_package(Qt5Sensors)
 find_package(Qt5Sql)
 find_package(Qt5WebKit)
@@ -19,7 +20,7 @@ mark_as_advanced(Qt5Concurrent_DIR Qt5Core_DIR Qt5Gui_DIR Qt5LinguistTools_DIR Q
 
 set (QT_COLLIDER_LIBS
   Qt5::Core Qt5::Gui Qt5::Widgets Qt5::Network Qt5::WebKit Qt5::WebKitWidgets Qt5::PrintSupport
-  Qt5::OpenGL Qt5::Sensors Qt5::Quick Qt5::Qml Qt5::Sql Qt5::Positioning
+  Qt5::OpenGL Qt5::Sensors Qt5::Quick Qt5::Qml Qt5::Sql Qt5::Positioning Qt5::QuickWidgets
   ${MATH_LIBRARY})
 
 if (APPLE)
@@ -54,6 +55,7 @@ set( QT_COLLIDER_HDRS
   ${QT_COLLIDER_DIR}/widgets/QcListWidget.h
   ${QT_COLLIDER_DIR}/widgets/QcMultiSlider.h
   ${QT_COLLIDER_DIR}/widgets/QcNumberBox.h
+  ${QT_COLLIDER_DIR}/widgets/QcQmlView.h
   ${QT_COLLIDER_DIR}/widgets/QcPenPrinter.h
   ${QT_COLLIDER_DIR}/widgets/QcPopUpMenu.h
   ${QT_COLLIDER_DIR}/widgets/QcRangeSlider.h
@@ -108,6 +110,7 @@ set( QT_COLLIDER_SRCS
   ${QT_COLLIDER_DIR}/widgets/QcListWidget.cpp
   ${QT_COLLIDER_DIR}/widgets/QcMultiSlider.cpp
   ${QT_COLLIDER_DIR}/widgets/QcNumberBox.cpp
+  ${QT_COLLIDER_DIR}/widgets/QcQmlView.cpp
   ${QT_COLLIDER_DIR}/widgets/QcPenPrinter.cpp
   ${QT_COLLIDER_DIR}/widgets/QcPopUpMenu.cpp
   ${QT_COLLIDER_DIR}/widgets/QcRangeSlider.cpp

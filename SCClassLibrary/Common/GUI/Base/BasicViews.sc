@@ -404,3 +404,25 @@ PopUpMenu : ItemViewBase {
 		this.valueAction = View.currentDrag;
 	}
 }
+
+
+QmlView : View {
+
+	*qtClass { ^'QcQmlView' }
+
+	*new{ | parent bounds |
+		^super.new(parent, bounds)
+	}
+
+	setSource { | qmlSourceOrUrl |
+		this.setProperty( \source, qmlSourceOrUrl );
+	}
+
+	setQmlProperty { | property value |
+		this.invokeMethod( \setQMLProperty, [property, value] );
+	}
+
+	getQmlProperty { | property |
+		^this.invokeMethod( \getQMLProperty, [property] )
+	}
+}
