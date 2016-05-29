@@ -30,11 +30,12 @@
 
 #include <cassert>
 
+
 namespace QtCollider {
 
 int QPalette_Finalize( struct VMGlobals *g, struct PyrObject *obj )
 {
-  delete QPALETTE_FROM_OBJECT(obj);
+  delete qPaletteFromObject(obj);
   return errNone;
 }
 
@@ -70,7 +71,7 @@ QC_LANG_PRIMITIVE( QPalette_System, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 
 QC_LANG_PRIMITIVE( QPalette_Color, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QPalette *p = QPALETTE_FROM_OBJECT(slotRawObject(r));
+  QPalette *p = qPaletteFromObject(slotRawObject(r));
 
   if(NotInt(a)) return errWrongType;
   QPalette::ColorRole role = (QPalette::ColorRole)(slotRawInt(a));
@@ -88,7 +89,7 @@ QC_LANG_PRIMITIVE( QPalette_Color, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 
 QC_LANG_PRIMITIVE( QPalette_SetColor, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QPalette *p = QPALETTE_FROM_OBJECT(slotRawObject(r));
+  QPalette *p = qPaletteFromObject(slotRawObject(r));
 
   QColor color = QtCollider::get(a);
 
@@ -108,7 +109,7 @@ QC_LANG_PRIMITIVE( QPalette_SetColor, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 
 QC_LANG_PRIMITIVE( QPalette_HasColor, 2, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QPalette *p = QPALETTE_FROM_OBJECT(slotRawObject(r));
+  QPalette *p = qPaletteFromObject(slotRawObject(r));
 
   if(NotInt(a)) return errWrongType;
   QPalette::ColorRole role = (QPalette::ColorRole)(slotRawInt(a));

@@ -256,7 +256,7 @@ QFont TypeCodec<QFont>::safeRead( PyrSlot *slot )
 
 QPalette TypeCodec<QPalette>::read( PyrSlot *slot )
 {
-  QPalette *p = QPALETTE_FROM_OBJECT(slotRawObject(slot));
+  QPalette *p = qPaletteFromObject(slotRawObject(slot));
   return *p;
 }
 

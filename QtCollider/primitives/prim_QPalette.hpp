@@ -24,12 +24,19 @@
 
 #include <QPalette>
 
+#include <PyrObject.h>
+
 struct PyrObject;
 struct VMGlobals;
 
-#define QPALETTE_FROM_OBJECT( OBJ ) reinterpret_cast<QPalette*>( slotRawPtr(OBJ->slots) );
-
 namespace QtCollider {
+
+
+inline QPalette * qPaletteFromObject( PyrObject * obj )
+{
+  return reinterpret_cast<QPalette*>( slotRawPtr(obj->slots) );
+}
+
 
 void QPalette_Init( struct VMGlobals *g, struct PyrObject *obj, const QPalette & palette = QPalette() );
 

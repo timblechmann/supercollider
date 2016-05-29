@@ -89,6 +89,7 @@ set( QT_COLLIDER_SRCS
   ${QT_COLLIDER_DIR}/primitives/primitives.cpp
   ${QT_COLLIDER_DIR}/QcApplication.cpp
   ${QT_COLLIDER_DIR}/QcObjectFactory.cpp
+  ${QT_COLLIDER_DIR}/QcSignalSpy.h
   ${QT_COLLIDER_DIR}/QObjectProxy.cpp
   ${QT_COLLIDER_DIR}/QtDownload.cpp
   ${QT_COLLIDER_DIR}/QWidgetProxy.cpp
