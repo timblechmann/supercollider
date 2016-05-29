@@ -425,6 +425,14 @@ template <> struct TypeCodec<QVariantList>
   static void write( PyrSlot *slot, const QVariantList & );
 };
 
+template <> struct TypeCodec<QVariant>
+{
+  static QVariant read( PyrSlot *slot );
+  static QVariant safeRead( PyrSlot *slot );
+
+  static void write( PyrSlot *slot, const QVariant & );
+};
+
 } // namespace QtCollider
 
 #endif // QT_COLLIDER_TYPE_CODEC_INCLUDED

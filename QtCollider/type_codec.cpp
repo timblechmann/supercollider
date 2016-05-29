@@ -345,6 +345,23 @@ void TypeCodec<QVariantList>::write( PyrSlot *slot, const QVariantList & varList
 }
 
 
+QVariant TypeCodec<QVariant>::read( PyrSlot *slot )
+{
+  MetaType *mt = MetaType::find( slot );
+  return mt ? mt->read( slot ) : QVariant();
+}
+
+QVariant TypeCodec<QVariant>::safeRead( PyrSlot *slot )
+{
+  return read( slot );
+}
+
+void TypeCodec<QVariant>::write( PyrSlot *slot, const QVariant & val )
+{
+  QtCollider::set( slot, val );
+}
+
+
 #define WRONG_OBJECT_FORMAT false
 
 template<typename DEST, typename ORIG>

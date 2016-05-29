@@ -137,10 +137,7 @@ struct MetaTypeImpl : MetaType
 class MetaValue
 {
 public:
-  MetaValue() :
-    mType(0),
-    mData(0)
-  {}
+  MetaValue() = default;
 
   ~MetaValue() {
     if( mType )
@@ -183,8 +180,8 @@ public:
 
 private:
 
-  MetaType *mType;
-  void *mData;
+  MetaType *mType = nullptr;
+  void *mData     = nullptr;
 };
 
 
@@ -193,15 +190,6 @@ MetaType *metaType()
 {
   return MetaTypeImpl<T>::instance;
 }
-
-template<> struct TypeCodec<QVariant>
-{
-  static QVariant safeRead( PyrSlot * slot )
-  {
-    MetaType *mt = MetaType::find(slot);
-    return mt ? mt->read(slot) : QVariant();
-  }
-};
 
 inline bool set( PyrSlot *s, const QVariant &var )
 {
