@@ -143,7 +143,8 @@ void ScCodeEditor::blinkCode( const QTextCursor & c )
 
     // Construct a pixmap to render the code on:
 
-    QPixmap pix( QSize(qCeil(width), qCeil(bottom - top)) );
+    QPixmap pix( QSize(qCeil(width), qCeil(bottom - top)) * devicePixelRatioF() );
+    pix.setDevicePixelRatio( devicePixelRatioF() );
     pix.fill(QColor(0,0,0,0));
 
     // Render the visible blocks:

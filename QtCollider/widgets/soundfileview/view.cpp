@@ -470,7 +470,9 @@ void QcWaveform::zoomSelection( int i )
 void QcWaveform::resizeEvent( QResizeEvent * )
 {
   delete pixmap;
-  pixmap = new QPixmap( size() );
+  pixmap = new QPixmap( size() * devicePixelRatioF() );
+  pixmap->setDevicePixelRatio( devicePixelRatioF() );
+
   updateFPP();
   redraw();
 }

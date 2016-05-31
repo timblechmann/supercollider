@@ -146,7 +146,8 @@ void QcScopeShm::updateScope()
 
 void QcScopeShm::resizeEvent ( QResizeEvent * ev )
 {
-  _pixmap = QPixmap(ev->size());
+  _pixmap = QPixmap(ev->size() * devicePixelRatio() );
+  _pixmap.setDevicePixelRatio( devicePixelRatioF() );
 }
 
 void QcScopeShm::paintEvent ( QPaintEvent * event )
