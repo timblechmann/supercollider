@@ -134,7 +134,8 @@ void QcCanvas::paintEvent( QPaintEvent *e )
 {
   if( _paint && _repaintNeeded ) {
     if( _resize ) {
-      _pixmap = QPixmap( size() );
+      _pixmap = QPixmap( size() * devicePixelRatioF() );
+      _pixmap.setDevicePixelRatio( devicePixelRatioF() );
       _resize = false;
       _clearOnce = true;
     }
@@ -167,7 +168,12 @@ void QcCanvas::paintEvent( QPaintEvent *e )
   if (_bkg_image.isValid())
       _bkg_image.paint( &painter, rect() );
 
-  if( _paint ) painter.drawPixmap( e->rect(), _pixmap, e->rect() );
+  if( _paint ) {
+    QRect rect = e->rect();
+    rect.setSize( rect.size() * devicePixelRatioF() );
+
+    painter.drawPixmap( e->rect(), _pixmap, rect );
+  }
 }
 
 void QcCanvas::timerEvent( QTimerEvent *e )

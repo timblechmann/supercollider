@@ -153,7 +153,8 @@ void Style::drawComplexControl
                     option ->state & QStyle::State_Selected
                     ? QIcon::On : QIcon::Off;
 
-            QPixmap pixmap = icon.pixmap(toolOption->iconSize, iconMode, iconState);
+            QPixmap pixmap = icon.pixmap(toolOption->iconSize * painter->device()->devicePixelRatioF(), iconMode, iconState);
+            pixmap.setDevicePixelRatio( painter->device()->devicePixelRatioF() );
             QRect pixRect = pixmap.rect();
             pixRect.moveCenter( option->rect.center() );
             painter->drawPixmap(pixRect.topLeft(), pixmap);
@@ -239,7 +240,8 @@ void Style::drawControl
         painter->restore();
 
         if (!tabOption->icon.isNull()) {
-            QPixmap pixmap = tabOption->icon.pixmap( tabOption->iconSize );
+            QPixmap pixmap = tabOption->icon.pixmap( tabOption->iconSize * painter->device()->devicePixelRatioF() );
+            pixmap.setDevicePixelRatio( painter->device()->devicePixelRatioF() );
             QRect iconRect = pixmap.rect();
             iconRect.moveCenter( tabOption->rect.center() );
             int lmargin = 5;
