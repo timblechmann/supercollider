@@ -298,12 +298,12 @@ private:
         if (statusFlags & (paInputOverflow | paInputUnderflow | paOutputOverflow | paOutputUnderflow))
             engine_functor::sync_clock();
 
-        const float * inputs[input_channels];
+        float const ** inputs = (float const **)alloca(input_channels * sizeof(float*));
         float * const *in = static_cast<float * const *>(inputBuffer);
         for (uint16_t i = 0; i != input_channels; ++i)
             inputs[i] = in[i];
 
-        float * outputs[output_channels];
+        float ** outputs = (float **)alloca(output_channels * sizeof(float*));
         float **out = static_cast<float **>(outputBuffer);
         for (uint16_t i = 0; i != output_channels; ++i)
             outputs[i] = out[i];

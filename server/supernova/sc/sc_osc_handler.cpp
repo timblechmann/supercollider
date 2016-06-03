@@ -825,7 +825,7 @@ void sc_osc_handler::handle_receive_udp(const boost::system::error_code& error,
         return;
     }
 
-    handle_packet_async(recv_buffer_.begin(), bytes_transferred, make_shared<udp_endpoint>(udp_remote_endpoint_));
+    handle_packet_async(recv_buffer_.data(), bytes_transferred, make_shared<udp_endpoint>(udp_remote_endpoint_));
 
     start_receive_udp();
     return;
@@ -3923,13 +3923,13 @@ void handle_asynchronous_command( World * world, const char* cmdName, void *cmdD
             }
             consume( std::move( message ) );
 
-            cmd_dispatcher<realtime>::fire_system_callback( [=, endpoint=std::move(endpoint)] {
+            cmd_dispatcher<realtime>::fire_system_callback( [=, endpoint=std::move(endpoint)] () mutable {
                 if (stage4)
                     (stage4)(world, cmdData);
 
                 send_done_message(endpoint, cmdName);
 
-                cmd_dispatcher<realtime>::fire_rt_callback( [=, endpoint=std::move(endpoint)] {
+                cmd_dispatcher<realtime>::fire_rt_callback( [=, endpoint=std::move(endpoint)] () mutable {
                     if (cleanup)
                         (cleanup)(world, cmdData);
                 });

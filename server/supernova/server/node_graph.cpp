@@ -17,6 +17,7 @@
 //  Boston, MA 02111-1307, USA.
 
 #include <fstream>
+#include <cstdlib>
 
 #include "dependency_graph_generator.hpp"
 #include "dsp_thread_queue_node.hpp"
@@ -63,7 +64,7 @@ void node_graph::synth_reassign_id(int32_t node_id)
     int32_t hidden_id = -std::abs(node_id);
 
     while (!node_id_available(hidden_id))
-        hidden_id = -std::abs<int32_t>(hasher(node_id));
+        hidden_id = -std::abs( int32_t(hasher(node_id) ));
 
     assert(hidden_id < 0);
 
@@ -77,7 +78,7 @@ int32_t node_graph::generate_node_id(void)
     int32_t new_id;
     do {
         for (;;) {
-            new_id = -std::abs<int32_t>(server_node::hash(generated_id));
+            new_id = -std::abs( int32_t(server_node::hash(generated_id)) );
             if (likely (new_id != generated_id))
                 break;
 
@@ -112,7 +113,7 @@ void abstract_group::resume(void)
 
 void abstract_group::add_child(server_node * node)
 {
-    assert (not has_child(node));
+    assert (!has_child(node));
 
     child_nodes.push_front(*node);
     node->set_parent(this);
@@ -120,7 +121,7 @@ void abstract_group::add_child(server_node * node)
 
 void abstract_group::replace_child(server_node * node, server_node * node_to_replace)
 {
-    assert (not has_child(node));
+    assert (!has_child(node));
     assert (has_child(node_to_replace));
 
     server_node_list::iterator position_of_old_element = server_node_list::s_iterator_to(*node_to_replace);
@@ -218,7 +219,7 @@ int parallel_group::tail_nodes(void) const
 
 void group::add_child(server_node * node, node_position_constraint const & constraint)
 {
-    assert (not has_child(node));
+    assert (!has_child(node));
 
     server_node * ref = constraint.first;
     node_position position = constraint.second;
@@ -244,7 +245,7 @@ void parallel_group::add_child(server_node * node, node_position_constraint cons
 
 void group::add_child(server_node * node, node_position position)
 {
-    assert (not has_child(node));
+    assert (!has_child(node));
     assert((position == head) || (position == tail));
 
     if (position == head)

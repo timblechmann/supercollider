@@ -29,6 +29,12 @@
 
 #include "SC_InterfaceTable.h"
 #include "SC_Unit.h"
+#ifdef IN
+#undef IN
+#endif
+#ifdef OUT
+#undef OUT
+#endif
 
 #include "utilities/named_hash_entry.hpp"
 

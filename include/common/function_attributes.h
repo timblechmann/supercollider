@@ -50,6 +50,8 @@
 
 
 #ifdef _MSC_VER
+#undef PURE
+
 #ifndef PURE
 #define PURE /*PURE*/
 #endif

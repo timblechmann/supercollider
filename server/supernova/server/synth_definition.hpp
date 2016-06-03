@@ -83,7 +83,7 @@ protected:
 
     void register_slot(symbol const & str, slot_index_t i, int number_of_values)
     {
-        assert(not exists(str.c_str()));
+        assert( !exists(str.c_str()));
         map_type * elem = new map_type(str, i, number_of_values);
         bool success = slot_resolver_map.insert(*elem).second;
         assert(success);
