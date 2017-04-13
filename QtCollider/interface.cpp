@@ -70,6 +70,10 @@ void QtCollider::init() {
     static char qcArg0[] = "SuperCollider";
     static char *qcArgv[1] = {qcArg0};
 
+#if ( QT_VERSION >= QT_VERSION_CHECK( 5, 6, 0 ) )
+    QCoreApplication::setAttribute( Qt::AA_EnableHighDpiScaling, true );
+#endif
+    QCoreApplication::setAttribute( Qt::AA_UseHighDpiPixmaps, true );
     QcApplication *qcApp = new QcApplication( qcArgc, qcArgv );
 
     qcApp->setQuitOnLastWindowClosed( false );
