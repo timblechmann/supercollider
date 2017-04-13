@@ -30,7 +30,7 @@
 
 #define HND 10
 
-QC_DECLARE_QWIDGET_FACTORY(QcRangeSlider);
+QC_DECLARE_QWIDGET_FACTORY(QcRangeSlider)
 
 QcRangeSlider::QcRangeSlider() :
   QtCollider::Style::Client(this),

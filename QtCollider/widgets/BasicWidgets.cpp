@@ -25,9 +25,9 @@
 #include <QPaintEvent>
 #include <QPainter>
 
-QC_DECLARE_QWIDGET_FACTORY( QcDefaultWidget );
-QC_DECLARE_QWIDGET_FACTORY( QcHLayoutWidget );
-QC_DECLARE_QWIDGET_FACTORY( QcVLayoutWidget );
+QC_DECLARE_QWIDGET_FACTORY( QcDefaultWidget )
+QC_DECLARE_QWIDGET_FACTORY( QcHLayoutWidget )
+QC_DECLARE_QWIDGET_FACTORY( QcVLayoutWidget )
 
 void QcSimpleWidget::setBackground( const QColor &c )
 {

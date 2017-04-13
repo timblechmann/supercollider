@@ -30,7 +30,7 @@
 
 #include <cmath>
 
-QC_DECLARE_QWIDGET_FACTORY(QcGraph);
+QC_DECLARE_QWIDGET_FACTORY(QcGraph)
 
 void QcGraphModel::append( QcGraphElement * e ) {
   if( _elems.count() ) {

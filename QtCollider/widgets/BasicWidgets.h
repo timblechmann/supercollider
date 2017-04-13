@@ -29,7 +29,7 @@
 class QcSimpleWidget : public QWidget
 {
   Q_OBJECT
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
+  Q_PROPERTY( QColor background READ background WRITE setBackground )
 
 public:
   const QColor & background() const { return _bkg; }

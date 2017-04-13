@@ -37,7 +37,7 @@ class QcWaveform;
 class SoundCacheStream;
 
 struct SoundCache {
-  SoundCache() : min(0), max(0), sum(0), sum2(0) {};
+  SoundCache() : min(0), max(0), sum(0), sum2(0) {}
   ~SoundCache() {
     delete [] min;
     delete [] max;
@@ -54,29 +54,29 @@ class QcWaveform : public QWidget, public QcHelper {
 
   Q_OBJECT
 
-  Q_PROPERTY( float readProgress READ loadProgress );
-  Q_PROPERTY( int startFrame READ startFrame );
-  Q_PROPERTY( int frames READ frames );
-  Q_PROPERTY( double viewFrames READ viewFrames );
-  Q_PROPERTY( double viewStartFrame READ viewStartFrame WRITE scrollTo );
-  Q_PROPERTY( float scrollPos READ scrollPos WRITE setScrollPos );
-  Q_PROPERTY( int currentSelection READ currentSelection WRITE setCurrentSelection );
-  Q_PROPERTY( QVariantList selections READ selections );
+  Q_PROPERTY( float readProgress READ loadProgress )
+  Q_PROPERTY( int startFrame READ startFrame )
+  Q_PROPERTY( int frames READ frames )
+  Q_PROPERTY( double viewFrames READ viewFrames )
+  Q_PROPERTY( double viewStartFrame READ viewStartFrame WRITE scrollTo )
+  Q_PROPERTY( float scrollPos READ scrollPos WRITE setScrollPos )
+  Q_PROPERTY( int currentSelection READ currentSelection WRITE setCurrentSelection )
+  Q_PROPERTY( QVariantList selections READ selections )
 
-  Q_PROPERTY( float yZoom READ yZoom WRITE setYZoom );
-  Q_PROPERTY( float xZoom READ xZoom WRITE setXZoom );
-  Q_PROPERTY( bool cursorVisible READ cursorVisible WRITE setCursorVisible );
-  Q_PROPERTY( bool cursorEditable READ cursorEditable WRITE setCursorEditable );
-  Q_PROPERTY( int cursorPosition READ cursorPosition WRITE setCursorPosition );
-  Q_PROPERTY( bool gridVisible READ gridVisible WRITE setGridVisible );
-  Q_PROPERTY( float gridOffset READ gridOffset WRITE setGridOffset );
-  Q_PROPERTY( float gridResolution READ gridResolution WRITE setGridResolution );
-  Q_PROPERTY( bool drawsWaveform READ drawsWaveform WRITE setDrawsWaveform );
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
-  Q_PROPERTY( QColor peakColor READ peakColor WRITE setPeakColor );
-  Q_PROPERTY( QColor rmsColor READ rmsColor WRITE setRmsColor );
-  Q_PROPERTY( QColor cursorColor READ cursorColor WRITE setCursorColor );
-  Q_PROPERTY( QColor gridColor READ gridColor WRITE setGridColor );
+  Q_PROPERTY( float yZoom READ yZoom WRITE setYZoom )
+  Q_PROPERTY( float xZoom READ xZoom WRITE setXZoom )
+  Q_PROPERTY( bool cursorVisible READ cursorVisible WRITE setCursorVisible )
+  Q_PROPERTY( bool cursorEditable READ cursorEditable WRITE setCursorEditable )
+  Q_PROPERTY( int cursorPosition READ cursorPosition WRITE setCursorPosition )
+  Q_PROPERTY( bool gridVisible READ gridVisible WRITE setGridVisible )
+  Q_PROPERTY( float gridOffset READ gridOffset WRITE setGridOffset )
+  Q_PROPERTY( float gridResolution READ gridResolution WRITE setGridResolution )
+  Q_PROPERTY( bool drawsWaveform READ drawsWaveform WRITE setDrawsWaveform )
+  Q_PROPERTY( QColor background READ background WRITE setBackground )
+  Q_PROPERTY( QColor peakColor READ peakColor WRITE setPeakColor )
+  Q_PROPERTY( QColor rmsColor READ rmsColor WRITE setRmsColor )
+  Q_PROPERTY( QColor cursorColor READ cursorColor WRITE setCursorColor )
+  Q_PROPERTY( QColor gridColor READ gridColor WRITE setGridColor )
 
 public:
   Q_INVOKABLE void load( const QString& filename );
@@ -127,7 +127,7 @@ public:
   Q_INVOKABLE void setSelectionEnd( int i, sf_count_t frame );
   Q_INVOKABLE void setSelectionEditable( int index, bool editable );
   Q_INVOKABLE void setSelectionColor( int index, const QColor &clr );
-  Q_PROPERTY( QVariantList waveColors READ waveColors WRITE setWaveColors );
+  Q_PROPERTY( QVariantList waveColors READ waveColors WRITE setWaveColors )
 
   bool cursorVisible() const { return _showCursor; }
   void setCursorVisible( bool b ) { _showCursor = b; update(); }

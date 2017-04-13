@@ -32,25 +32,25 @@
 class QcNumberBox : public QLineEdit, QcHelper, QcAbstractStepValue
 {
   Q_OBJECT
-  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale );
-  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale );
-  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale );
+  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale )
+  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale )
+  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale )
 
-  Q_PROPERTY( double minimum READ minimum WRITE setMinimum );
-  Q_PROPERTY( double maximum READ maximum WRITE setMaximum );
-  Q_PROPERTY( int decimals READ decimals WRITE setDecimals );
-  Q_PROPERTY( int maxDecimals READ maxDecimals WRITE setMaxDecimals );
-  Q_PROPERTY( int minDecimals READ minDecimals WRITE setMinDecimals );
-  Q_PROPERTY( double value READ value WRITE setValue );
-  Q_PROPERTY( int valueType READ valueType );
-  Q_PROPERTY( QString text READ text WRITE setTextValue );
+  Q_PROPERTY( double minimum READ minimum WRITE setMinimum )
+  Q_PROPERTY( double maximum READ maximum WRITE setMaximum )
+  Q_PROPERTY( int decimals READ decimals WRITE setDecimals )
+  Q_PROPERTY( int maxDecimals READ maxDecimals WRITE setMaxDecimals )
+  Q_PROPERTY( int minDecimals READ minDecimals WRITE setMinDecimals )
+  Q_PROPERTY( double value READ value WRITE setValue )
+  Q_PROPERTY( int valueType READ valueType )
+  Q_PROPERTY( QString text READ text WRITE setTextValue )
 
   Q_PROPERTY( double step READ dummyFloat WRITE setStep )
   Q_PROPERTY( double scrollStep READ dummyFloat WRITE setScrollStep )
-  Q_PROPERTY( bool scroll READ dummyBool WRITE setScroll );
+  Q_PROPERTY( bool scroll READ dummyBool WRITE setScroll )
 
-  Q_PROPERTY( QColor normalColor READ dummyColor WRITE setTextColor );
-  Q_PROPERTY( QColor editingColor READ dummyColor WRITE setEditedTextColor );
+  Q_PROPERTY( QColor normalColor READ dummyColor WRITE setTextColor )
+  Q_PROPERTY( QColor editingColor READ dummyColor WRITE setEditedTextColor )
 
   public:
 

@@ -33,16 +33,16 @@ class WebPage;
 class WebView : public QWebView
 {
   Q_OBJECT
-  Q_PROPERTY( QString url READ url WRITE setUrl );
+  Q_PROPERTY( QString url READ url WRITE setUrl )
   Q_PROPERTY( QString html READ html )
   Q_PROPERTY( QString plainText READ plainText )
   Q_PROPERTY( QWebPage::LinkDelegationPolicy linkDelegationPolicy
               READ linkDelegationPolicy WRITE setLinkDelegationPolicy )
-  Q_PROPERTY( bool delegateReload READ delegateReload WRITE setDelegateReload );
+  Q_PROPERTY( bool delegateReload READ delegateReload WRITE setDelegateReload )
   Q_PROPERTY( bool enterInterpretsSelection
-              READ interpretSelection WRITE setInterpretSelection );
+              READ interpretSelection WRITE setInterpretSelection )
   Q_PROPERTY( bool editable
-               READ editable WRITE setEditable );
+               READ editable WRITE setEditable )
 
 public:
   Q_INVOKABLE void setHtml ( const QString &html, const QString &baseUrl = QString() );

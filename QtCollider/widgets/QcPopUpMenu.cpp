@@ -22,7 +22,7 @@
 #include "QcPopUpMenu.h"
 #include "../QcWidgetFactory.h"
 
-QC_DECLARE_QWIDGET_FACTORY(QcPopUpMenu);
+QC_DECLARE_QWIDGET_FACTORY(QcPopUpMenu)
 
 QcPopUpMenu::QcPopUpMenu() :
   _changed(false),

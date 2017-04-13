@@ -32,11 +32,11 @@
 
 class QcCanvas : public QWidget
 {
-  Q_PROPERTY( bool clearOnRefresh READ clearOnRefresh WRITE setClearOnRefresh );
-  Q_PROPERTY( bool drawingEnabled READ drawingEnabled WRITE setDrawingEnabled );
-  Q_PROPERTY( float frameRate READ frameRate WRITE setFrameRate );
-  Q_PROPERTY( int frameCount READ frameCount );
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
+  Q_PROPERTY( bool clearOnRefresh READ clearOnRefresh WRITE setClearOnRefresh )
+  Q_PROPERTY( bool drawingEnabled READ drawingEnabled WRITE setDrawingEnabled )
+  Q_PROPERTY( float frameRate READ frameRate WRITE setFrameRate )
+  Q_PROPERTY( int frameCount READ frameCount )
+  Q_PROPERTY( QColor background READ background WRITE setBackground )
   Q_OBJECT
 public:
   QcCanvas( QWidget *parent = 0 );

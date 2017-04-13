@@ -61,7 +61,7 @@ public:
 
   Q_OBJECT
   Q_PROPERTY( QVariantList columns READ columns WRITE setColumns )
-  Q_PROPERTY( QcTreeWidget::ItemPtr currentItem READ currentItem WRITE setCurrentItem );
+  Q_PROPERTY( QcTreeWidget::ItemPtr currentItem READ currentItem WRITE setCurrentItem )
 
 public:
 
@@ -114,6 +114,6 @@ private:
   bool _emitAction;
 };
 
-Q_DECLARE_METATYPE( QcTreeWidget::ItemPtr );
+Q_DECLARE_METATYPE( QcTreeWidget::ItemPtr )
 
 #endif

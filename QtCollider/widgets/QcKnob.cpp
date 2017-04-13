@@ -28,7 +28,7 @@
 
 using namespace QtCollider;
 
-QC_DECLARE_QWIDGET_FACTORY(QcKnob);
+QC_DECLARE_QWIDGET_FACTORY(QcKnob)
 
 QcKnob::QcKnob() :
   Style::Client(this),

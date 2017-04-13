@@ -29,15 +29,15 @@
 class QcKnob : public QWidget, QcAbstractStepValue, QtCollider::Style::Client
 {
   Q_OBJECT
-  Q_PROPERTY( double shiftScale READ shiftScale WRITE setShiftScale );
-  Q_PROPERTY( double ctrlScale READ ctrlScale WRITE setCtrlScale );
-  Q_PROPERTY( double altScale READ altScale WRITE setAltScale );
+  Q_PROPERTY( double shiftScale READ shiftScale WRITE setShiftScale )
+  Q_PROPERTY( double ctrlScale READ ctrlScale WRITE setCtrlScale )
+  Q_PROPERTY( double altScale READ altScale WRITE setAltScale )
 
   Q_PROPERTY( double value READ value WRITE setValue )
   Q_PROPERTY( int mode READ mode WRITE setMode )
   Q_PROPERTY( double step READ step WRITE setStep )
   Q_PROPERTY( bool centered READ centered WRITE setCentered )
-  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor )
 
 Q_SIGNALS:
   void action();

@@ -256,7 +256,7 @@ QFont TypeCodec<QFont>::safeRead( PyrSlot *slot )
 
 QPalette TypeCodec<QPalette>::read( PyrSlot *slot )
 {
-  QPalette *p = QPALETTE_FROM_OBJECT(slotRawObject(slot));
+  QPalette *p = qPaletteFromObject(slotRawObject(slot));
   return *p;
 }
 
@@ -342,6 +342,23 @@ void TypeCodec<QVariantList>::write( PyrSlot *slot, const QVariantList & varList
     array->size++;
     g->gc->GCWrite( array, s );
   }
+}
+
+
+QVariant TypeCodec<QVariant>::read( PyrSlot *slot )
+{
+  MetaType *mt = MetaType::find( slot );
+  return mt ? mt->read( slot ) : QVariant();
+}
+
+QVariant TypeCodec<QVariant>::safeRead( PyrSlot *slot )
+{
+  return read( slot );
+}
+
+void TypeCodec<QVariant>::write( PyrSlot *slot, const QVariant & val )
+{
+  QtCollider::set( slot, val );
 }
 
 

@@ -31,17 +31,17 @@
 class QcSlider : public QWidget, QcHelper, QcAbstractStepValue, QtCollider::Style::Client
 {
   Q_OBJECT
-  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale );
-  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale );
-  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale );
+  Q_PROPERTY( double shiftScale READ dummyFloat WRITE setShiftScale )
+  Q_PROPERTY( double ctrlScale READ dummyFloat WRITE setCtrlScale )
+  Q_PROPERTY( double altScale READ dummyFloat WRITE setAltScale )
   Q_PROPERTY( double step READ step WRITE setStep )
   Q_PROPERTY( double pixelStep READ pixelStep )
-  Q_PROPERTY( double value READ value WRITE setValue );
-  Q_PROPERTY( int orientation READ orientation WRITE setOrientation );
-  Q_PROPERTY( int handleLength READ handleLength WRITE setHandleLength );
-  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor );
-  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
-  Q_PROPERTY( QColor knobColor READ knobColor WRITE setKnobColor );
+  Q_PROPERTY( double value READ value WRITE setValue )
+  Q_PROPERTY( int orientation READ orientation WRITE setOrientation )
+  Q_PROPERTY( int handleLength READ handleLength WRITE setHandleLength )
+  Q_PROPERTY( QColor grooveColor READ grooveColor WRITE setGrooveColor )
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor )
+  Q_PROPERTY( QColor knobColor READ knobColor WRITE setKnobColor )
 
   public Q_SLOTS:
     void increment( double factor );

@@ -28,7 +28,7 @@
 #include <QApplication>
 #include <QPainter>
 
-QC_DECLARE_QWIDGET_FACTORY(QcSlider2D);
+QC_DECLARE_QWIDGET_FACTORY(QcSlider2D)
 
 QcSlider2D::QcSlider2D() :
   QtCollider::Style::Client(this),

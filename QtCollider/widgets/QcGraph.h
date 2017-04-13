@@ -128,30 +128,30 @@ class QcGraph : public QWidget, QcHelper, QtCollider::Style::Client
   Q_OBJECT
   Q_ENUMS( ElementStyle )
   Q_PROPERTY( QVariantList value READ value WRITE setValue )
-  Q_PROPERTY( QVariantList strings READ dummyVariantList WRITE setStrings );
-  Q_PROPERTY( int index READ index WRITE setIndex );
-  Q_PROPERTY( int lastIndex READ lastIndex );
-  Q_PROPERTY( QVariantList selectionIndexes READ selectionIndexes);
-  Q_PROPERTY( int thumbSize READ dummyInt WRITE setThumbSize );
-  Q_PROPERTY( int thumbWidth READ dummyInt WRITE setThumbWidth );
-  Q_PROPERTY( int thumbHeight READ dummyInt WRITE setThumbHeight );
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
-  Q_PROPERTY( QColor strokeColor READ strokeColor WRITE setStrokeColor );
-  Q_PROPERTY( QColor fillColor READ dummyColor WRITE setFillColor );
-  Q_PROPERTY( QColor gridColor READ gridColor WRITE setGridColor );
-  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor );
-  Q_PROPERTY( QColor selectionColor READ selectionColor WRITE setSelectionColor );
-  Q_PROPERTY( bool drawLines READ dummyBool WRITE setDrawLines );
-  Q_PROPERTY( bool drawRects READ dummyBool WRITE setDrawRects );
-  Q_PROPERTY( ElementStyle style READ elementStyle WRITE setElementStyle );
-  Q_PROPERTY( bool editable READ dummyBool WRITE setEditable );
-  Q_PROPERTY( double step READ step WRITE setStep );
-  Q_PROPERTY( int selectionForm READ selectionForm WRITE setSelectionForm );
-  Q_PROPERTY( int horizontalOrder READ horizontalOrder WRITE setHorizontalOrder );
-  Q_PROPERTY( float x READ currentX WRITE setCurrentX );
-  Q_PROPERTY( float y READ currentY WRITE setCurrentY );
-  Q_PROPERTY( QPointF grid READ grid WRITE setGrid );
-  Q_PROPERTY( bool gridOn READ dummyBool WRITE setGridOn );
+  Q_PROPERTY( QVariantList strings READ dummyVariantList WRITE setStrings )
+  Q_PROPERTY( int index READ index WRITE setIndex )
+  Q_PROPERTY( int lastIndex READ lastIndex )
+  Q_PROPERTY( QVariantList selectionIndexes READ selectionIndexes)
+  Q_PROPERTY( int thumbSize READ dummyInt WRITE setThumbSize )
+  Q_PROPERTY( int thumbWidth READ dummyInt WRITE setThumbWidth )
+  Q_PROPERTY( int thumbHeight READ dummyInt WRITE setThumbHeight )
+  Q_PROPERTY( QColor background READ background WRITE setBackground )
+  Q_PROPERTY( QColor strokeColor READ strokeColor WRITE setStrokeColor )
+  Q_PROPERTY( QColor fillColor READ dummyColor WRITE setFillColor )
+  Q_PROPERTY( QColor gridColor READ gridColor WRITE setGridColor )
+  Q_PROPERTY( QColor focusColor READ focusColor WRITE setFocusColor )
+  Q_PROPERTY( QColor selectionColor READ selectionColor WRITE setSelectionColor )
+  Q_PROPERTY( bool drawLines READ dummyBool WRITE setDrawLines )
+  Q_PROPERTY( bool drawRects READ dummyBool WRITE setDrawRects )
+  Q_PROPERTY( ElementStyle style READ elementStyle WRITE setElementStyle )
+  Q_PROPERTY( bool editable READ dummyBool WRITE setEditable )
+  Q_PROPERTY( double step READ step WRITE setStep )
+  Q_PROPERTY( int selectionForm READ selectionForm WRITE setSelectionForm )
+  Q_PROPERTY( int horizontalOrder READ horizontalOrder WRITE setHorizontalOrder )
+  Q_PROPERTY( float x READ currentX WRITE setCurrentX )
+  Q_PROPERTY( float y READ currentY WRITE setCurrentY )
+  Q_PROPERTY( QPointF grid READ grid WRITE setGrid )
+  Q_PROPERTY( bool gridOn READ dummyBool WRITE setGridOn )
 
   public:
     Q_INVOKABLE void connectElements( int, QVariantList );

@@ -69,6 +69,7 @@ void MetaType::initAll()
   qc_init_metatype<PyrObject*>();
   qc_init_metatype<QcTreeWidget::ItemPtr>();
   qc_init_metatype<SharedImage>();
+  qc_init_metatype< QVariant >();
   qc_init_metatype< QVector<double> >();
   qc_init_metatype< QVector<int> >();
   qc_init_metatype< QVariantList >();

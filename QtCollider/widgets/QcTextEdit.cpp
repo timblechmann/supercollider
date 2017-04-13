@@ -36,7 +36,7 @@ class QcTextEditFactory : public QcWidgetFactory<QcTextEdit>
   }
 };
 
-QC_DECLARE_FACTORY( QcTextEdit, QcTextEditFactory );
+QC_DECLARE_FACTORY( QcTextEdit, QcTextEditFactory )
 
 QcTextEdit::QcTextEdit() : _interpretSelection(true)
 {

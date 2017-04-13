@@ -47,4 +47,4 @@ Q_SIGNALS:
   void action();
 };
 
-QC_DECLARE_QWIDGET_FACTORY( QcTextField );
+QC_DECLARE_QWIDGET_FACTORY( QcTextField )

@@ -29,8 +29,8 @@
 
 class QtDownload : public QObject {
     Q_OBJECT
-	Q_PROPERTY( QString source READ source WRITE setSource );
-	Q_PROPERTY( QString destination READ destination WRITE setDestination );
+	Q_PROPERTY( QString source READ source WRITE setSource )
+	Q_PROPERTY( QString destination READ destination WRITE setDestination )
 
 public:
     explicit QtDownload();

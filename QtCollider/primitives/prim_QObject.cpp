@@ -43,14 +43,22 @@
 # include <alloca.h>
 #endif
 
-#define IS_OBJECT_NIL( a ) \
-  IsNil( slotRawObject(a)->slots )
 
-#define QOBJECT_FROM_SLOT( s ) \
-  ((QObjectProxy*) slotRawPtr( slotRawObject( s )->slots ))
+static inline bool isObjectNil( PyrSlot * a )
+{
+  return IsNil( slotRawObject(a)->slots );
+}
 
-#define CLASS_NAME( slot ) \
-  slotRawSymbol( &slotRawObject( slot )->classptr->name )->name
+
+static inline QObjectProxy * qObjectFromSlot( PyrSlot * s )
+{
+  return (QObjectProxy*) slotRawPtr( slotRawObject( s )->slots );
+}
+
+static inline char * className( PyrSlot * slot )
+{
+  return slotRawSymbol( &slotRawObject( slot )->classptr->name )->name;
+}
 
 namespace QtCollider {
 
@@ -113,7 +121,7 @@ QC_LANG_PRIMITIVE( QObject_Destroy, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
   qcSCObjectDebugMsg( 1, slotRawObject(r), "DESTROY" );
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
@@ -143,7 +151,7 @@ int QObject_Finalize( struct VMGlobals *, struct PyrObject *obj )
 
 QC_LANG_PRIMITIVE( QObject_SetParent, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   QObjectProxy *parent = QtCollider::get( a );
   if( !parent ) return errWrongType;
@@ -252,7 +260,7 @@ QC_LANG_PRIMITIVE( QMetaObject_Methods, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 
 QC_LANG_PRIMITIVE( QObject_GetProperties, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
   QObject *obj = proxy->object();
@@ -269,7 +277,7 @@ QC_LANG_PRIMITIVE( QObject_GetProperties, 0, PyrSlot *r, PyrSlot *a, VMGlobals *
 
 QC_LANG_PRIMITIVE( QObject_GetMethods, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
   QObject *obj = proxy->object();
@@ -290,7 +298,7 @@ QC_LANG_PRIMITIVE( QObject_GetMethods, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 
 QC_LANG_PRIMITIVE( QObject_SetProperty, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( NotSym( a ) ) return errWrongType;
   PyrSymbol *property = slotRawSymbol( a );
@@ -316,7 +324,7 @@ QC_LANG_PRIMITIVE( QObject_SetProperty, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 
 QC_LANG_PRIMITIVE( QObject_GetProperty, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( NotSym(a) ) return errWrongType;
   PyrSymbol *symProp = slotRawSymbol( a );
@@ -340,7 +348,7 @@ QC_LANG_PRIMITIVE( QObject_GetProperty, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 
 QC_LANG_PRIMITIVE( QObject_SetEventHandler, 4, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( NotInt( a+0 ) || NotSym( a+1 ) ) return errWrongType;
   int eventType = QtCollider::get( a+0 );
@@ -372,7 +380,7 @@ QC_LANG_PRIMITIVE( QObject_SetEventHandlerEnabled, 2, PyrSlot *r, PyrSlot *a, VM
                       QStringLiteral("SET EVENT HANDLER STATE: type %1 = %2")
                       .arg(type).arg(enabled ? "on" : "off") );
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
@@ -394,7 +402,7 @@ QC_LANG_PRIMITIVE( QObject_ConnectMethod, 3, PyrSlot *r, PyrSlot *a, VMGlobals *
                       QStringLiteral("CONNECT METHOD: %1 -> %2 [%3]").arg(signal->name).arg(handler->name)
                       .arg( IsTrue(a+2) ? "SYNC" : "ASYNC") );
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
@@ -413,7 +421,7 @@ QC_LANG_PRIMITIVE( QObject_DisconnectMethod, 2, PyrSlot *r, PyrSlot *a, VMGlobal
   qcSCObjectDebugMsg( 1, slotRawObject(r),
                       QStringLiteral("DISCONNECT METHOD: %1 -> %2").arg(signal->name).arg(handler->name) );
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
@@ -437,7 +445,7 @@ QC_LANG_PRIMITIVE( QObject_ConnectObject, 3, PyrSlot *r, PyrSlot *a, VMGlobals *
                       .arg( slotRawSymbol( &handlerObj->classptr->name )->name )
                       .arg( IsTrue(a+2) ? "SYNC" : "ASYNC") );
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
@@ -456,7 +464,7 @@ QC_LANG_PRIMITIVE( QObject_DisconnectObject, 2, PyrSlot *r, PyrSlot *a, VMGlobal
   qcSCObjectDebugMsg( 1, slotRawObject(r),
                       QStringLiteral("DISCONNECT OBJECT: %1").arg(signal->name) );
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   if( !proxy->compareThread() ) return QtCollider::wrongThreadError();
 
@@ -473,8 +481,8 @@ QC_LANG_PRIMITIVE( QObject_ConnectSlot, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 
   PyrSymbol *symSig = slotRawSymbol( a+0 );
   PyrSymbol *symSlot = slotRawSymbol( a+2 );
-  QObjectProxy *sndProxy = QOBJECT_FROM_SLOT( r );
-  QObjectProxy *rcvProxy = QOBJECT_FROM_SLOT( a+1 );
+  QObjectProxy *sndProxy = qObjectFromSlot( r );
+  QObjectProxy *rcvProxy = qObjectFromSlot( a+1 );
 
   qcSCObjectDebugMsg( 1, slotRawObject(r),
                       QStringLiteral("CONNECT TO SLOT: %1 -> %2").arg(symSig->name).arg(symSlot->name) );
@@ -517,7 +525,7 @@ QC_LANG_PRIMITIVE( QObject_InvokeMethod, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g
   qcSCObjectDebugMsg( 1, slotRawObject(r),
                       QStringLiteral("INVOKE: '%1' [%2]").arg(method->name).arg(sync ? "SYNC" : "ASYNC") );
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   PyrSlot *retSlot;
   Qt::ConnectionType cType;
@@ -539,7 +547,7 @@ QC_LANG_PRIMITIVE( QObject_InvokeMethod, 3, PyrSlot *r, PyrSlot *a, VMGlobals *g
 
 QC_LANG_PRIMITIVE( QObject_IsValid, 0, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
 
   bool needLock = !proxy->compareThread();
 
@@ -560,7 +568,7 @@ QC_LANG_PRIMITIVE( QObject_GetChildren, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g 
 {
   if( NotSym(a) && NotNil(a) ) return errWrongType;
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
   PyrSymbol *className = IsSym( a ) ? slotRawSymbol( a ) : 0;
 
   qcSCObjectDebugMsg( 1, slotRawObject(r),
@@ -590,7 +598,7 @@ QC_LANG_PRIMITIVE( QObject_GetParent, 1, PyrSlot *r, PyrSlot *a, VMGlobals *g )
 {
   if( NotSym(a) && NotNil(a) ) return errWrongType;
 
-  QObjectProxy *proxy = QOBJECT_FROM_SLOT( r );
+  QObjectProxy *proxy = qObjectFromSlot( r );
   PyrSymbol *className = IsSym( a ) ? slotRawSymbol( a ) : 0;
 
   qcSCObjectDebugMsg( 1, slotRawObject(r), QStringLiteral("GET PARENT") );

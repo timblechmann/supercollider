@@ -29,21 +29,21 @@
 class QcTextEdit : public QTextEdit, QcHelper
 {
   Q_OBJECT
-  Q_PROPERTY( QString document READ documentFilename WRITE setDocument );
-  Q_PROPERTY( int selectionStart READ selectionStart );
-  Q_PROPERTY( int selectionSize READ selectionSize );
-  Q_PROPERTY( QString selectedString READ selectedString WRITE replaceSelectedText );
-  Q_PROPERTY( QString currentLine READ currentLine );
-  Q_PROPERTY( QFont textFont READ dummyFont WRITE setTextFont );
-  Q_PROPERTY( QColor textColor READ dummyColor WRITE setTextColor );
+  Q_PROPERTY( QString document READ documentFilename WRITE setDocument )
+  Q_PROPERTY( int selectionStart READ selectionStart )
+  Q_PROPERTY( int selectionSize READ selectionSize )
+  Q_PROPERTY( QString selectedString READ selectedString WRITE replaceSelectedText )
+  Q_PROPERTY( QString currentLine READ currentLine )
+  Q_PROPERTY( QFont textFont READ dummyFont WRITE setTextFont )
+  Q_PROPERTY( QColor textColor READ dummyColor WRITE setTextColor )
   Q_PROPERTY( QVariantList rangeColor
-              READ dummyVariantList WRITE setRangeColor );
+              READ dummyVariantList WRITE setRangeColor )
   Q_PROPERTY( QVariantList rangeFont
-              READ dummyVariantList WRITE setRangeFont );
+              READ dummyVariantList WRITE setRangeFont )
   Q_PROPERTY( QVariantList rangeText
-              READ dummyVariantList WRITE setRangeText );
+              READ dummyVariantList WRITE setRangeText )
   Q_PROPERTY( bool enterInterpretsSelection
-              READ interpretSelection WRITE setInterpretSelection );
+              READ interpretSelection WRITE setInterpretSelection )
 
   public:
     QcTextEdit();

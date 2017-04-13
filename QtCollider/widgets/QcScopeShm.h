@@ -42,18 +42,18 @@ using QtCollider::ScopeShm;
 class QcScopeShm : public QWidget, QcHelper
 {
   Q_OBJECT
-  Q_PROPERTY( int serverPort READ serverPort WRITE setServerPort );
-  Q_PROPERTY( int bufferNumber READ dummyInt WRITE setBufferNumber );
-  Q_PROPERTY( float xOffset READ dummyFloat WRITE setXOffset );
-  Q_PROPERTY( float yOffset READ dummyFloat WRITE setYOffset );
-  Q_PROPERTY( float xZoom READ dummyFloat WRITE setXZoom );
-  Q_PROPERTY( float yZoom READ dummyFloat WRITE setYZoom );
-  Q_PROPERTY( int style READ style WRITE setStyle );
-  Q_PROPERTY( QVariantList waveColors READ dummyVariantList WRITE setWaveColors );
-  Q_PROPERTY( QColor background READ background WRITE setBackground );
-  Q_PROPERTY( bool fill READ fill WRITE setFill );
-  Q_PROPERTY( int updateInterval READ updateInterval WRITE setUpdateInterval );
-  Q_PROPERTY( bool running READ running );
+  Q_PROPERTY( int serverPort READ serverPort WRITE setServerPort )
+  Q_PROPERTY( int bufferNumber READ dummyInt WRITE setBufferNumber )
+  Q_PROPERTY( float xOffset READ dummyFloat WRITE setXOffset )
+  Q_PROPERTY( float yOffset READ dummyFloat WRITE setYOffset )
+  Q_PROPERTY( float xZoom READ dummyFloat WRITE setXZoom )
+  Q_PROPERTY( float yZoom READ dummyFloat WRITE setYZoom )
+  Q_PROPERTY( int style READ style WRITE setStyle )
+  Q_PROPERTY( QVariantList waveColors READ dummyVariantList WRITE setWaveColors )
+  Q_PROPERTY( QColor background READ background WRITE setBackground )
+  Q_PROPERTY( bool fill READ fill WRITE setFill )
+  Q_PROPERTY( int updateInterval READ updateInterval WRITE setUpdateInterval )
+  Q_PROPERTY( bool running READ running )
 
   public:
     QcScopeShm();
@@ -70,8 +70,8 @@ class QcScopeShm : public QWidget, QcHelper
     void setWaveColors( const QVariantList & colors );
     QColor background() const       { return _bkg; }
     void setBackground( const QColor &c ) { _bkg = c; update(); }
-    bool fill()                     { return _fill; };
-    void setFill(bool b)            { _fill = b; };
+    bool fill()                     { return _fill; }
+    void setFill(bool b)            { _fill = b; }
     int updateInterval() const;
     void setUpdateInterval( int i );
     bool running() const            { return _running; }

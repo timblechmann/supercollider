@@ -36,9 +36,9 @@
 #include <PyrObject.h>
 #include <PyrSched.h>
 
-Q_DECLARE_METATYPE( PyrObject * );
-Q_DECLARE_METATYPE( QVector<double> );
-Q_DECLARE_METATYPE( QVector<int> );
+Q_DECLARE_METATYPE( PyrObject * )
+Q_DECLARE_METATYPE( QVector<double> )
+Q_DECLARE_METATYPE( QVector<int> )
 
 namespace QtCollider {
 
