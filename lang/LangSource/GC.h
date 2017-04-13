@@ -242,7 +242,10 @@ BOOST_FORCEINLINE void PyrGC::DLInsertBefore(PyrObjectHdr *before, PyrObjectHdr 
 
 inline GCSet* PyrGC::GetGCSet(PyrObjectHdr* inObj)
 {
-	return mSets + (inObj->classptr == class_finalizer ? kFinalizerSet : inObj->obj_sizeclass);
+	if( BOOST_UNLIKELY( inObj->classptr == class_finalizer ) )
+		return mSets + kFinalizerSet;
+	else
+		return mSets + inObj->obj_sizeclass;
 }
 
 inline void PyrGC::ToBlack(PyrObjectHdr *obj)
@@ -335,12 +338,12 @@ inline PyrObject * PyrGC::Allocate(size_t inNumBytes, int32 sizeclass, bool inRu
 	GCSet *gcs = mSets + sizeclass;
 
 	PyrObject * obj = (PyrObject*)gcs->mFree;
-	if (!IsMarker(obj)) {
+	if ( BOOST_LIKELY( !IsMarker(obj) )) {
 		// from free list
 		gcs->mFree = obj->next;
 		assert(obj->obj_sizeclass == sizeclass);
 	} else {
-		if (sizeclass > kMaxPoolSet) {
+		if ( BOOST_LIKELY( sizeclass > kMaxPoolSet) ) {
 			SweepBigObjects();
 			size_t allocSize = sizeof(PyrObjectHdr) + (sizeof(PyrSlot) << sizeclass);
 			obj = (PyrObject*)mPool->Alloc(allocSize);
