@@ -21,6 +21,13 @@
 #define SC_SYNTH_HPP
 
 #include "SC_Unit.h"
+#ifdef IN
+#undef IN
+#endif
+#ifdef OUT
+#undef OUT
+#endif
+
 #include "SC_Graph.h"
 #include "SC_Rate.h"
 #include "SC_RGen.h"
@@ -125,8 +132,8 @@ public:
 
         static const size_t cacheline_size = 64;
 
-        for ( ; ptr < end; ptr += cacheline_size)
 #ifdef __GNUC__
+        for ( ; ptr < end; ptr += cacheline_size)
             __builtin_prefetch(ptr, 0, 0);
 #endif
     }

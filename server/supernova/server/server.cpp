@@ -18,6 +18,13 @@
 
 #include <stdexcept>
 
+#ifdef _MSC_VER
+#include <boost/asio.hpp>
+#endif
+
+#include "SC_Unit.h"
+
+
 #include "nova-tt/thread_affinity.hpp"
 #include "nova-tt/thread_priority.hpp"
 #include "nova-tt/name_thread.hpp"

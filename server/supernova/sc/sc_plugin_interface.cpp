@@ -35,6 +35,12 @@
 
 #include "SC_Prototypes.h"
 #include "SC_Unit.h"
+#ifdef IN
+#undef IN
+#endif
+#ifdef OUT
+#undef OUT
+#endif
 #include "SC_Lock.h"
 #include "clz.h"
 #include "SC_fftlib.h"

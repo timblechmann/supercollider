@@ -20,8 +20,8 @@
 
 #include <boost/align/align_up.hpp>
 
-#include "sc_synth.hpp"
 #include "sc_ugen_factory.hpp"
+#include "sc_synth.hpp"
 #include "../server/server.hpp"
 
 namespace nova {
