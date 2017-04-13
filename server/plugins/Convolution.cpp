@@ -303,8 +303,11 @@ void Convolution2_Ctor(Convolution2 *unit)
 		int framesize_f = unit->m_framesize * sizeof(float);
 		int fftsize_f = unit->m_fftsize * sizeof(float);
 		unit->m_inbuf1 = (float*)RTAlloc(world, framesize_f);
+		memset(unit->m_inbuf1, 0, framesize_f);
 		unit->m_fftbuf1 = (float*)RTAlloc(world, fftsize_f);
+		memset(unit->m_fftbuf1, 0, fftsize_f);
 		unit->m_fftbuf2 = (float*)RTAlloc(world, fftsize_f);
+		memset(unit->m_fftbuf2, 0, fftsize_f);
 
 		unit->m_outbuf = (float*)RTAlloc(world, fftsize_f);
 		memset(unit->m_outbuf, 0, fftsize_f);
